@@ -1,0 +1,97 @@
+version: "3.9"
+
+services:
+  amd-backend:
+    build:
+      context: .
+      dockerfile: ./apps/AMD-backend/Dockerfile
+    container_name: lazarus-AMD-backend-test
+    env_file:
+      - ./apps/AMD-backend/.env
+    ports:
+      - "8010:8010"
+
+  amd-frontend:
+    build:
+      context: .
+      dockerfile: ./apps/AMD-frontend/Dockerfile
+    container_name: lazarus-AMD-frontend-test
+    env_file:
+      - ./apps/AMD-frontend/.env
+    ports:
+      - "3010:3010"
+    restart: unless-stopped
+
+  bess-backend:
+    build:
+      context: .
+      dockerfile: ./apps/BESS-backend/Dockerfile
+    container_name: lazarus-BESS-backend-test
+    env_file:
+      - ./apps/BESS-backend/.env
+    ports:
+      - "8020:8020"
+    depends_on:
+      - lazarus-redis
+
+  bess-worker:
+    build:
+      context: .
+      dockerfile: ./apps/BESS-backend/Dockerfile
+    container_name: lazarus-BESS-worker-test
+    env_file:
+      - ./apps/BESS-backend/.env
+    depends_on:
+      - lazarus-redis
+    command:
+      ["/app/.venv/bin/taskiq", "worker", "broker:broker", "--workers", "5"]
+
+  bess-frontend:
+    build:
+      context: .
+      dockerfile: ./apps/BESS-frontend/Dockerfile
+    container_name: lazarus-BESS-frontend-test
+    env_file:
+      - ./apps/BESS-frontend/.env
+    ports:
+      - "3020:3020"
+
+  admin-backend:
+    build:
+      context: .
+      dockerfile: ./apps/admin-backend/Dockerfile
+    container_name: lazarus-admin-backend-test
+    env_file:
+      - ./apps/admin-backend/.env
+    ports:
+      - "8030:8030"
+
+  admin-frontend:
+    build:
+      context: .
+      dockerfile: ./apps/admin-frontend/Dockerfile
+    container_name: lazarus-admin-frontend-test
+    env_file:
+      - ./apps/admin-frontend/.env
+    ports:
+      - "3030:3030"
+
+  lazarus-redis:
+    image: redis:7-alpine
+    container_name: lazarus-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: ["redis-server", "--replicaof", "no", "one"]
+    networks:
+      - default
+
+networks:
+  default:
+    external: true
+    name: lazarus-app_default
+
+volumes:
+  redis_data:

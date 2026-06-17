@@ -1,0 +1,704 @@
+import type {
+  APDAuditLogModules,
+  APDAuditLogScenario,
+  AssetBatteryCycleCalculationMethod,
+  AssetFileType,
+  AssetStatus,
+  AssetSteps,
+  AssetType,
+  DigestFrequency,
+  DigestScope,
+  Platform,
+  UserRole,
+} from '@/constants';
+import {AuditLog, DonutSegment, MonthYear, Nullable, ScheduleTime} from '@lazarus/react-common/interface';
+export {Auth, Nullable, AuditLog} from '@lazarus/react-common/interface';
+
+// utlilities
+export type ENV = 'loc' | 'dev' | 'qa' | 'uat' | 'prod';
+export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+export type AssetMarket = 'multi' | 'epex_daily' | 'epex_efa' | 'actual';
+
+// =============================== Entities ===============================
+
+export interface User {
+  id: number;
+  user_id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  organization?: {id: number; name: string};
+  status: boolean;
+  last_activity: string;
+  platform?: Platform[];
+}
+
+export interface Organization {
+  id: number;
+  org_id: string;
+  name: string;
+  status: boolean;
+  created_at: string;
+}
+
+export type AssetReportFile = {
+  id: number;
+  asset_id: number;
+  name: string;
+  size: number;
+  uploaded_at: string;
+  projection_summary: {
+    start_timestamp: string;
+    end_timestamp: string;
+  };
+  total_rows: number;
+  type?: AssetFileType;
+  month?: number;
+  year?: number;
+};
+
+export interface AssetGenerateReport {
+  id: number;
+  asset_id: number;
+  name: string;
+  month: number;
+  year: number;
+}
+
+export interface Asset {
+  id: number;
+  asset_id: string;
+  name: string;
+  type: AssetType;
+  capacity: number;
+  status: AssetStatus;
+  current_step: AssetSteps;
+  organization: {
+    id: number;
+    name: string;
+  };
+  country: {
+    id: number;
+    name: string;
+  };
+  location: string;
+  analysis_available?: boolean;
+
+  max_charging_rate?: number;
+  max_discharging_rate?: number;
+  usable_capacity?: number;
+  soc_min?: number;
+  soc_max?: number;
+  round_trip_efficiency?: number;
+  max_daily_cycles?: number;
+
+  aggregator_report_file?: AssetReportFile | null;
+  scada_report_file?: AssetReportFile | null;
+  iar_report_file?: AssetReportFile | null;
+
+  merged_dataset_file?: Nullable<AssetGenerateReport>;
+
+  optimized_dataset_file?: Nullable<AssetGenerateReport>;
+
+  active_period: Nullable<MonthYear>;
+  available_periods?: Array<MonthYear>;
+  submitted_by: {
+    id: number;
+    name: string;
+  };
+  is_asset_alert_seen_before?: boolean;
+  created_by: {
+    id: number;
+    name: string;
+  };
+  activated_by: {
+    id: number;
+    name: string;
+  };
+  activated_at: string;
+  submitted_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// asset analysis
+export interface AssetOperationAnalytics {
+  revenue: {
+    sffr: number;
+    ida1: number;
+    epex_30_da: number;
+    imbalance_revenue: number;
+    imbalance_charge: number;
+    net_imbalance: number;
+    total_net_revenue: number;
+  };
+  revenue_distribution: DonutSegment[];
+  soc_distribution: Array<{
+    range: {
+      min: number;
+      max: number;
+    };
+    count: number;
+  }>;
+
+  market_price: {
+    day_ahead: {
+      avg: number;
+      min: number;
+      max: number;
+      std_dev: number;
+    };
+    intraday: {
+      avg: number;
+      min: number;
+      max: number;
+    };
+    spread: number;
+  };
+  ancillary_services_revenue: Array<{
+    service: string;
+    avg_clearing_price: number;
+    avg_availability_mw: number;
+  }>;
+  trading_activity: {
+    avg_da_mw: number;
+    avg_epex_30_da_mw: number;
+    avg_ida1_mw: number;
+  };
+  energy_price_comparison: Array<{
+    timestamp: string;
+    day_ahead_price: number | null;
+    intraday_price: number | null;
+  }>;
+  battery_power_over_time: Array<{
+    timestamp: string;
+    battery_power: number | null;
+  }>;
+}
+
+export interface AssetMarketAnalytics {
+  summary: {
+    asset_id: number;
+    month: number;
+    year: number;
+    epex_daily: {
+      total_revenue: number;
+      improvement: number;
+    };
+    epex_efa: {
+      total_revenue: number;
+      improvement: number;
+    };
+    multi_market: {
+      total_revenue: number;
+      improvement: number;
+    };
+    additional_revenue: number;
+    actual_revenue: number;
+  };
+  utilization: {
+    asset_id: number;
+    month: number;
+    year: number;
+    market_strategy: AssetMarket;
+    data: Array<{
+      market_used: string;
+      count: number;
+      percentage: number;
+      total_revenue: number;
+    }>;
+  };
+  revenue_distribution: {
+    asset_id: number;
+    month: number;
+    year: number;
+    market_strategy: string;
+    chart_data: [
+      {
+        market: string;
+        revenue: number;
+      },
+    ];
+  };
+  best_markets: {
+    asset_id: number;
+    month: number;
+    year: number;
+    buying_markets: Array<{
+      market: string;
+      times_selected: number;
+      percentage: number;
+    }>;
+    selling_markets: Array<{
+      market: string;
+      times_selected: number;
+      percentage: number;
+    }>;
+  };
+  statistics: {
+    asset_id: number;
+    month: number;
+    year: number;
+    market_strategy: AssetMarket;
+    total_periods: number;
+    total_revenue: number;
+    rows: Array<{
+      market: string;
+      periods: number;
+      percentage_time: number;
+      revenue: number;
+      percentage_revenue: number;
+    }>;
+  };
+}
+
+export interface AssetMarketPriceAnalytics {
+  spread: {
+    asset_id: number;
+    month: number;
+    year: number;
+    price_summary: {
+      epex_da_avg_price_per_mwh: number;
+      epex_da_max_price_per_mwh: number;
+      ssp_max_price_per_mwh: number;
+      sbp_max_price_per_mwh: number;
+    };
+    spread_analysis: {
+      epex_avg_daily_spread_per_mwh: number;
+      epex_max_daily_spread_per_mwh: number;
+      avg_ssp_sbp_spread_per_mwh: number;
+
+      daily_epex_spread: [
+        {
+          date: string;
+          spread: number;
+        },
+      ];
+    };
+  };
+  hourly_prices: {
+    asset_id: number;
+    month: number;
+    year: number;
+    lowest_avg_epex_price_per_mwh: number;
+    best_buy_hour: number;
+    highest_avg_epex_price_per_mwh: number;
+    best_sell_hour: number;
+    hourly_arbitrage_per_mwh: number;
+    hourly_price_patterns: [
+      {
+        hour: number;
+        epex_da: number;
+        ssp: number;
+        sbp: number;
+      },
+    ];
+  };
+  price_volatility: {
+    asset_id: number;
+    month: number;
+    year: number;
+
+    threshold: number;
+
+    kpi: {
+      average_daily_volatility: number;
+      high_volatility_days: number;
+
+      max_volatility: {
+        value: number;
+        date: string;
+      };
+    };
+
+    chart_data: [
+      {
+        date: string;
+        std_deviation: number;
+        threshold: number;
+      },
+    ];
+  };
+  correlation_matrix: {
+    asset_id: number;
+    month: number;
+    year: number;
+
+    correlation_matrix: {
+      markets: string[];
+      matrix: number[][];
+    };
+  };
+}
+
+export interface AssetAncillaryServiceAnalytics {
+  summary: {
+    asset_id: number;
+    month: number;
+    year: number;
+    summary: {
+      total_ancillary_revenue: number;
+      top_service: string;
+      services_used: number;
+      total_services: number;
+      top_service_share: number;
+    };
+  };
+  revenue_breakdown: {
+    asset_id: string;
+    month: string;
+    year: string;
+
+    service_breakdown: Array<{
+      service: string;
+      service_name: string;
+      total_revenue: number | null;
+      periods_active: number | null;
+      avg_price: number | null;
+      revenue_per_mwh: number | null;
+    }>;
+  };
+  opportunity_cost: {
+    asset_id: number;
+    month: number;
+    year: number;
+    opportunity_cost_analysis: {
+      current_avg_rate: number;
+      best_service_rate: number;
+      opportunity_cost: number;
+      best_service: string;
+    };
+  };
+  hourly_service_revenue: {
+    asset_id: number;
+    month: number;
+    year: number;
+    hourly_revenue: Array<{
+      hour: number;
+      services: Array<{
+        service: string;
+        revenue: number;
+      }>;
+    }>;
+  };
+}
+
+export interface AssetImbalanceAnalytics {
+  summary: {
+    asset_id: number;
+    month: number;
+    year: number;
+    summary: {
+      imbalance_revenue: number;
+      revenue_periods: number;
+      imbalance_charges: number;
+      charge_periods: number;
+      net_imbalance: number;
+      status: string;
+      percentage_of_periods_with_charges: number;
+    };
+  };
+  daily_breakdown: {
+    asset_id: number;
+    month: number;
+    year: number;
+    daily_breakdown: Array<{
+      date: string;
+      daily_revenue: number;
+      daily_charges: number;
+      daily_net_imbalance: number;
+    }>;
+  };
+  worst_days: {
+    asset_id: number;
+    month: number;
+    year: number;
+
+    worst_days: Array<{
+      date: string;
+      revenue: number;
+      charges: number;
+      net_imbalance: number;
+    }>;
+  };
+  hourly_charges: {
+    peak_imbalance_hour: {
+      hour: string;
+      total_charges: number;
+    };
+    hourly_breakdown: [
+      {
+        hour: string;
+        total_charges: number;
+      },
+    ];
+  };
+}
+
+export interface AssetBatteryHealthAnalytics {
+  summary: {
+    asset_id: number;
+    month: number;
+    year: number;
+    battery_health: {
+      actual_discharge_energy: number;
+      optimized_multi_market_discharge_energy: number;
+      actual_charge_energy: number;
+      optimized_multi_market_charge_energy: number;
+    };
+  };
+  cycle_comparison: {
+    asset_id: number;
+    month: number;
+    year: number;
+    battery_capacity: number;
+    number_of_days: number;
+    cycle_comparison: Array<{
+      method_key: AssetBatteryCycleCalculationMethod;
+      method_name: AssetBatteryCycleCalculationMethod;
+      actual_total_cycles: number;
+      multi_market_total_cycles: number;
+      actual_daily_avg: number;
+      multi_market_daily_avg: number;
+    }>;
+  };
+  stratergy_cycle_comparison: {
+    asset_id: number;
+    month: number;
+    year: number;
+    cycle_method: string;
+    battery_capacity: number;
+    number_of_days: number;
+    degradation_per_cycle_percentage: number;
+    warranty_threshold: number;
+    strategy_cycling_comparison: Array<{
+      strategy: AssetMarket;
+      total_discharge_mwh: number;
+      total_cycle: number;
+      daily_cycle: number;
+      degradation_percent: number;
+      is_warranty_exceeded: boolean;
+    }>;
+  };
+  annual_projection: {
+    asset_id: number;
+    month: number;
+    year: number;
+    cycle_method: AssetBatteryCycleCalculationMethod;
+    annual_degradation_limit: number;
+    warranty_limit: number;
+    degradation_per_cycle: number;
+    annual_projection_report: Array<{
+      strategy: AssetMarket;
+      projected_annual_cycles: number;
+      projected_annual_degradation: number;
+      estimated_battery_lifespan: number;
+    }>;
+  };
+  daily_cycles: {
+    asset_id: number;
+    month: number;
+    year: number;
+    cycle_method: string;
+    warranty_limit: number;
+    actual: {
+      avg_cycles: number;
+      max_cycles: number;
+      max_cycles_date: string; // dd-mm-yyyy
+    };
+    multi_market: {
+      avg_cycles: number;
+      max_cycles: number;
+      max_cycles_date: string; // dd-mm-yyyy
+    };
+    daily_cycles: Array<{
+      actual_daily_cycles: number;
+      multi_market_daily_cycles: number;
+      date: string; // dd-mm-yyyy
+    }>;
+  };
+  warranty_limit_exceed: {
+    asset_id: number;
+    month: number;
+    year: number;
+    cycle_method: AssetBatteryCycleCalculationMethod;
+    warranty_limit: number;
+    warranty_exceedance: {
+      actual: Array<{
+        date: string; // dd-mm-yyyy
+        daily_cycles: number;
+        over_limit: number;
+      }>
+      multi_market: Array<{
+        date: string; // dd-mm-yyyy
+        daily_cycles: number;
+        over_limit: number;
+      }>;
+    };
+  };
+}
+
+export interface AssetTBSpreadAnalytics {
+  summary: {
+    asset_id: number;
+    month: number;
+    year: number;
+    avg_tb1: number;
+    avg_tb2: number;
+    avg_tb3: number;
+    avg_arbitrage_revenue: number;
+    tb2_capture_rate: number;
+    tb_spread_benchmark: number;
+    benchmark_gap: number;
+  };
+  details: {
+    asset_id: number;
+    month: number;
+    year: number;
+    tb_spread_benchmark: number;
+    tb_spread: Array<{
+      date: string;
+      tb1: number;
+      tb2: number;
+      tb3: number;
+      arbitrage_revenue: number;
+      capture_rate: number;
+    }>;
+  };
+}
+
+// asset benchmark
+export interface AssetBenchmarkRevenueActualvsIAR {
+  asset_id: number;
+  year: number;
+
+  monthly_data: Record<
+    string,
+    {
+      streams: Array<{
+        revenue_stream: string;
+        iar_revenue: number;
+        actual_revenue: number;
+        variance_percentage: number | null;
+      }>;
+
+      total_excluding_bm_tnuos: {
+        iar_revenue: number;
+        actual_revenue: number;
+        variance_percentage: number;
+      };
+
+      total_all_streams: {
+        iar_revenue: number;
+        actual_revenue: number;
+        variance_percentage: number;
+      };
+    }
+  >;
+}
+
+export interface AssetBenchmarkMultiMarketOptmizationVsActual {
+  asset_id: number;
+  year: number;
+  monthly_data: Record<
+    string,
+    {
+      revenue_streams: Array<{
+        revenue_stream: string;
+        actual_revenue: number | null;
+        optimized_revenue: number | null;
+      }>;
+
+      totals: {
+        total_actual_revenue: number | null;
+        total_optimized_revenue: number | null;
+        revenue_gap: number | null;
+        capture_rate: number | null;
+      };
+    }
+  >;
+}
+
+// ===============================
+// Digest Management Entities
+// ===============================
+export interface DigestResource {
+  id: number;
+  name: string;
+}
+
+export interface DigestRecipient {
+  id: number;
+  name: string;
+  email: string;
+  role: UserRole;
+}
+
+export interface Digest {
+  id: number;
+  digest_id: string;
+  name: string;
+  scope: {
+    id: DigestScope;
+    label?: string;
+  };
+  frequency: {
+    id: DigestFrequency;
+    label?: string;
+  };
+  schedule: ScheduleTime;
+  resources: DigestResource[];
+  recipients: DigestRecipient[];
+  status: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// ===============================
+// Metric Entities
+// ===============================
+export interface Metric {
+  id: number;
+  metric_name: string;
+  created_at?: string;
+}
+
+export interface BenchmarkMetric extends Metric {
+  metric_id: number;
+  industry_low: Nullable<number>;
+  industry_mid: Nullable<number>;
+  industry_high: Nullable<number>;
+}
+
+export interface MetricMonthlyValues extends Metric {
+  metric_id: number;
+  month: number;
+  year: number;
+  value: number | null;
+}
+
+export interface MetricMonthlyValueTabluar {
+  id: number;
+  metric_name?: string;
+  columns: Array<{
+    month: MetricMonthlyValues['month'];
+    year: MetricMonthlyValues['year'];
+    value: MetricMonthlyValues['value'];
+  }>;
+}
+
+// ===============================
+// APD Audit Logs
+// ===============================
+// custom APD-specific audit log interface that extends the common AuditLog interface, with module and action typed as APDAuditLogModules and APDAuditLogScenario respectively
+export interface APDAuditLog extends Omit<AuditLog, 'module' | 'action'> {
+  module: {
+    id: APDAuditLogModules;
+    name: string;
+  };
+  action: {
+    id: APDAuditLogScenario;
+    name: string;
+  };
+}

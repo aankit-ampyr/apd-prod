@@ -1,0 +1,122 @@
+{
+  "S-10001": {
+    "key": "user_created",
+    "message": "User added successfully. Invite email sent.",
+    "type": "success"
+  },
+  "S-10002": {
+    "key": "user_updated",
+    "message": "User updated successfully.",
+    "type": "success"
+  },
+  "S-10003": {
+    "key": "user_disabled",
+    "message": "User disabled successfully.",
+    "type": "success"
+  },
+  "S-10004": {
+    "key": "user_enabled",
+    "message": "User enabled successfully.",
+    "type": "success"
+  },
+  "S-10005": {
+    "key": "user_list_fetched",
+    "message": "User list fetched successfully.",
+    "type": "success"
+  },
+  "S-10006": {
+    "key": "organization_list_fetched",
+    "message": "Organizations list fetched successfully.",
+    "type": "success"
+  },
+  "S-10007": {
+    "key": "organization_created",
+    "message": "Organization created successfully.",
+    "type": "success"
+  },
+  "S-10008": {
+    "key": "organization_updated",
+    "message": "Organization updated successfully.",
+    "type": "success"
+  },
+  "S-10009": {
+    "key": "organization_deactivated",
+    "message": "Organization deactivated successfully.",
+    "type": "success"
+  },
+  "S-10010": {
+    "key": "organization_activated",
+    "message": "Organization activated successfully.",
+    "type": "success"
+  },
+  "S-10011": {
+    "key": "user_deleted",
+    "message": "User deleted successfully.",
+    "type": "success"
+  },
+  "S-10012": {
+    "key": "organization_assigned",
+    "message": "Organization assigned successfully",
+    "type": "success"
+  },
+  "S-10013": {
+    "key": "organization_reassigned",
+    "message": "Organization reassigned successfully.",
+    "type": "success"
+  },
+  "S-10014": {
+    "key": "audit_logs_fetched",
+    "message": "Audit logs fetched successfully.",
+    "type": "success"
+  },
+  "S-10015": {
+    "key": "assets_fetched",
+    "message": "Assets fetched successfully.",
+    "type": "success"
+  },
+  "S-10016": {
+    "key": "asset_ownership_updated",
+    "message": "Asset ownership updated successfully.",
+    "type": "success"
+  },
+  "S-10017": {
+    "key": "otp_sent",
+    "message": "OTP sent successfully.",
+    "type": "success"
+  },
+  "S-10018": {
+    "key": "otp_verified",
+    "message": "OTP verified successfully.",
+    "type": "success"
+  },
+  "S-10019": {
+    "key": "otp_resent",
+    "message": "OTP resent successfully.",
+    "type": "success"
+  },
+  "S-10020": {
+    "key": "digest_created",
+    "message": "Digest created successfully.",
+    "type": "success"
+  },
+  "S-10021": {
+    "key": "digest_updated",
+    "message": "Digest updated successfully.",
+    "type": "success"
+  },
+  "S-10022": {
+    "key": "digest_activated",
+    "message": "Digest activated successfully.",
+    "type": "success"
+  },
+  "S-10023": {
+    "key": "digest_deactivated",
+    "message": "Digest deactivated successfully.",
+    "type": "success"
+  },
+  "S-10024": {
+    "key": "digest_list_fetched",
+    "message": "Digest list fetched successfully.",
+    "type": "success"
+  }
+}

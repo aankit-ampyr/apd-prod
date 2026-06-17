@@ -1,0 +1,11 @@
+{
+  "python.analysis.extraPaths": [
+    "./packages/python-common"
+  ],
+  "workbench.editorAssociations": {
+    "*.svg": "default"
+  },
+  "files.associations": {
+    "*.svg": "xml"
+  }
+}

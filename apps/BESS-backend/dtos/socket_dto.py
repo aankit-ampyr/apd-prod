@@ -1,0 +1,77 @@
+from typing import Optional, Union, Literal
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+from constants.enums import ResourceType, ActionType
+
+
+class ConfigDetails(BaseModel):
+    bess_size_mwh: int
+    duration_hr: int
+    dg_size_mw: int
+
+
+class SimulationDataBase(BaseModel):
+    simulation_id: int
+
+
+class StartedData(SimulationDataBase):
+    status: Literal["started"] = "started"
+    started_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class ProgressData(SimulationDataBase):
+    status: Literal["running"] = "running"
+    current_config: int
+    total_config: int
+    progress_percentage: float
+    current_config_details: ConfigDetails
+
+
+class CompletedData(SimulationDataBase):
+    status: Literal["completed"] = "completed"
+    completed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    total_config: int
+    message: str = "Simulation completed successfully"
+
+
+class FailedData(SimulationDataBase):
+    status: Literal["failed"] = "failed"
+    error_code: str
+    error_message: str
+    failed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+class StoppedData(SimulationDataBase):
+    status: Literal["stopped"] = "stopped"
+    stopped_by: int
+    stopped_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    message: str = "Simulation stopped by user"
+
+
+class MultiYearProgressData(SimulationDataBase):
+    status: Literal["running"] = "running"
+    current_config: int
+    total_config: int
+    progress_percentage: float
+    year: int
+
+
+# Union type for easy parsing of any simulation data format
+SimulationData = Union[
+    StartedData,
+    ProgressData,
+    CompletedData,
+    FailedData,
+    StoppedData,
+    MultiYearProgressData,
+    dict,
+]
+
+
+class SocketEvent(BaseModel):
+    resource_type: ResourceType
+    resource_id: Union[int, str]
+    action_id: ActionType
+    data: Optional[SimulationData] = None
+    status: Optional[Literal["success", "error"]] = None
+    status_code: Optional[str] = None

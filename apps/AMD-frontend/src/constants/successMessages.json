@@ -1,0 +1,317 @@
+{
+  "S-10001": {
+    "key": "user_created",
+    "message": "User added successfully. Invite email sent.",
+    "type": "success"
+  },
+  "S-10002": {
+    "key": "user_updated",
+    "message": "User updated successfully.",
+    "type": "success"
+  },
+  "S-10003": {
+    "key": "user_disabled",
+    "message": "User disabled successfully.",
+    "type": "success"
+  },
+  "S-10004": {
+    "key": "user_enabled",
+    "message": "User enabled successfully.",
+    "type": "success"
+  },
+  "S-10005": {
+    "key": "user_list_fetched",
+    "message": "User list fetched successfully.",
+    "type": "success"
+  },
+  "S-10006": {
+    "key": "organization_list_fetched",
+    "message": "Organizations list fetched successfully.",
+    "type": "success"
+  },
+  "S-10007": {
+    "key": "organization_created",
+    "message": "Organization created successfully.",
+    "type": "success"
+  },
+  "S-10008": {
+    "key": "organization_updated",
+    "message": "Organization updated successfully.",
+    "type": "success"
+  },
+  "S-10009": {
+    "key": "organization_deactivated",
+    "message": "Organization deactivated successfully.",
+    "type": "success"
+  },
+  "S-10010": {
+    "key": "organization_activated",
+    "message": "Organization activated successfully.",
+    "type": "success"
+  },
+  "S-10011": {
+    "key": "user_deleted",
+    "message": "User deleted successfully.",
+    "type": "success"
+  },
+  "S-10012": {
+    "key": "organization_assigned",
+    "message": "Organization assigned successfully",
+    "type": "success"
+  },
+  "S-10013": {
+    "key": "organization_reassigned",
+    "message": "Organization reassigned successfully.",
+    "type": "success"
+  },
+  "S-10014": {
+    "key": "audit_logs_fetched",
+    "message": "Audit logs fetched successfully.",
+    "type": "success"
+  },
+  "S-10015": {
+    "key": "assets_fetched",
+    "message": "Assets fetched successfully.",
+    "type": "success"
+  },
+  "S-10016": {
+    "key": "asset_ownership_updated",
+    "message": "Asset ownership updated successfully.",
+    "type": "success"
+  },
+  "S-10017": {
+    "key": "otp_sent",
+    "message": "OTP sent successfully.",
+    "type": "success"
+  },
+  "S-10018": {
+    "key": "otp_verified",
+    "message": "OTP verified successfully.",
+    "type": "success"
+  },
+  "S-10019": {
+    "key": "otp_resent",
+    "message": "OTP resent successfully.",
+    "type": "success"
+  },
+  "S-10020": {
+    "key": "digest_created",
+    "message": "Digest created successfully.",
+    "type": "success"
+  },
+  "S-10021": {
+    "key": "digest_updated",
+    "message": "Digest updated successfully.",
+    "type": "success"
+  },
+  "S-10022": {
+    "key": "digest_activated",
+    "message": "Digest activated successfully.",
+    "type": "success"
+  },
+  "S-10023": {
+    "key": "digest_deactivated",
+    "message": "Digest deactivated successfully.",
+    "type": "success"
+  },
+  "S-10024": {
+    "key": "digest_list_fetched",
+    "message": "Digest list fetched successfully.",
+    "type": "success"
+  },
+  "S-10025": {
+    "key": "digest_list_fetched",
+    "message": "Asset details saved successfully",
+    "type": "success"
+  },
+  "S-10026": {
+    "key": "digest_list_fetched",
+    "message": "Asset details fetched successfully",
+    "type": "success"
+  },
+  "S-10027": {
+    "key": "optimization_params_saved",
+    "message": "Optimization parameters saved successfully.",
+    "type": "success"
+  },
+  "S-10028": {
+    "key": "asset_details_updated",
+    "message": "Asset details updated successfully",
+    "type": "success"
+  },
+  "S-10029": {
+    "key": "asset_details_updated",
+    "message": "Aggregator report uploaded successfully",
+    "type": "success"
+  },
+  "S-10030": {
+    "key": "scada_report_uploaded",
+    "message": "SCADA report uploaded successfully.",
+    "type": "success"
+  },
+  "S-10031": {
+    "key": "scada_aggregator_merged",
+    "message": "SCADA and Aggregator datasets merged successfully.",
+    "type": "success"
+  },
+  "S-10032": {
+    "key": "soc_reconstruction_completed",
+    "message": "SOC reconstruction completed successfully.",
+    "type": "success"
+  },
+  "S-10033": {
+    "key": "scada_file_removed",
+    "message": "SCADA file removed successfully.",
+    "type": "success"
+  },
+  "S-10034": {
+    "key": "aggregator_file_removed",
+    "message": "Aggregator file removed successfully",
+    "type": "success"
+  },
+  "S-10035": {
+    "key": "aggregator_file_removed",
+    "message": "Token refreshed successfully.",
+    "type": "success"
+  },
+  "S-10036": {
+    "key": "aggregator_file_removed",
+    "message": "Revenue calculated successfully.",
+    "type": "success"
+  },
+  "S-10037": {
+    "key": "soc_distribution_calculated",
+    "message": "SOC distribution calculated successfully.",
+    "type": "success"
+  },
+  "S-10038": {
+    "key": "price_and_ancillary_calculated",
+    "message": "Price and ancillary calculated successfully.",
+    "type": "success"
+  },
+  "S-10039": {
+    "key": "iar_file_uploaded",
+    "message": "IAR file uploaded successfully.",
+    "type": "success"
+  },
+  "S-10040": {
+    "key": "iar_file_deleted",
+    "message": "IAR file deleted successfully.",
+    "type": "success"
+  },
+  "S-10041": {
+    "key": "asset_created",
+    "message": "Asset created successfully",
+    "type": "success"
+  },
+  "S-10042": {
+    "key": "benchmark_config_fetched",
+    "message": "Benchmark configuration fetched successfully.",
+    "type": "success"
+  },
+  "S-10043": {
+    "key": "benchmark_config_updated",
+    "message": "Benchmark configuration updated successfully.",
+    "type": "success"
+  },
+  "S-10044": {
+    "key": "monthly_values_saved",
+    "message": "Monthly values saved successfully.",
+    "type": "success"
+  },
+  "S-10045": {
+    "key": "monthly_values_fetched",
+    "message": "Monthly values fetched successfully.",
+    "type": "success"
+  },
+  "S-10046": {
+    "key": "asset_benchmark_analysis_loaded",
+    "message": "Asset benchmark analysis loaded successfully",
+    "type": "success"
+  },
+  "S-10047": {
+    "key": "asset_file_list_fetched",
+    "message": "Asset files list fetched successfully.",
+    "type": "success"
+  },
+  "S-10048": {
+    "key": "asset_activated",
+    "message": "Asset Activate successfully",
+    "type": "success"
+  },
+  "S-10049": {
+    "key": "asset_deactivated",
+    "message": "Asset Deactivated successfully",
+    "type": "success"
+  },
+  "S-10050": {
+    "key": "battery_power_over_time_analysis_fetched",
+    "message": "Battery power over time analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10051": {
+    "key": "energy_price_comparison_analysis_fetched",
+    "message": "Energy Price Comparison analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10052": {
+    "key": "optimized_dataset_generated",
+    "message": "Optimized dataset generated successfully.",
+    "type": "success"
+  },
+  "S-10053": {
+    "key": "asset_file_removed",
+    "message": "Asset file removed successfully.",
+    "type": "success"
+  },
+  "S-10054": {
+    "key": "optimized_dataset_analysis_generated",
+    "message": "Optimized dataset analysis generated successfully.",
+    "type": "success"
+  },
+  "S-10055": {
+    "key": "multi_market_summary_fetched",
+    "message": "Multi market summary fetched successfully.",
+    "type": "success"
+  },
+  "S-10056": {
+    "key": "market_utilization_analysis_fetched",
+    "message": "Market utilization analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10057": {
+    "key": "market_statistics_table_fetched",
+    "message": "Market statistics table fetched successfully.",
+    "type": "success"
+  },
+  "S-10058": {
+    "key": "revenue_distribution_analysis_fetched",
+    "message": "Revenue distribution analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10059": {
+    "key": "best_markets_by_period_analysis_fetched",
+    "message": "Best markets by period analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10060": {
+    "key": "market_price_summary_and_spread_analysis_fetched",
+    "message": "Market price summary and spread analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10061": {
+    "key": "market_hourly_price_patterns_fetched",
+    "message": "Market hourly price patterns fetched successfully.",
+    "type": "success"
+  },
+  "S-10062": {
+    "key": "price_volatility_analysis_fetched",
+    "message": "Price volatility analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10063": {
+    "key": "asset_submitted_for_approval",
+    "message": "Asset submitted for approval successfully.",
+    "type": "success"
+  }
+}

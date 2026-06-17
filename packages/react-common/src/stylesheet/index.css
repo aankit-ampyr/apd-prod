@@ -1,0 +1,277 @@
+@theme {
+  /* =========================
+       PRIMARY COLORS
+    ========================= */
+  --color-primary-active: #0c4a43;
+  --color-primary-disabled: #8dc9c2;
+  --color-primary-hover: #007e6f;
+  --color-primary: #2f9c8f;
+  --color-primary-tint-1: #6fc2b8;
+  --color-primary-tint-2: #effaf9;
+
+  /* =========================
+       SECONDARY / ACCENT (your highlighted section)
+    ========================= */
+  --color-secondary-light: #2f325a;
+  --color-secondary: #151735;
+  --color-secondary-deep: #111328;
+
+  /* =========================
+       SEMANTIC COLORS
+    ========================= */
+  --color-success: #1f8a4c;
+  --color-warning: #ed9024;
+  --color-error: #d64545;
+  --color-error-text: #cd2020;
+  --color-error-tint-1: #ec8c85;
+  --color-info: #1d4ed8;
+  --color-accent-yellow: #ffcc00;
+
+  /* =========================
+       NEUTRAL COLORS
+    ========================= */
+  --color-bg-card: #f2f3f5;
+  --color-gray-50: #fafafa;
+  --color-bg-main: #ffffff;
+  --color-disabled: #c9ccd6;
+  --color-border: #e2e4ea;
+
+  /* =========================
+       TEXT COLORS
+    ========================= */
+  --color-text-primary: #101329;
+  --color-text-secondary: #4b5563;
+  --color-text-placeholder: #6b7280;
+
+  /* =========================
+       DATA VISUALIZATION (optional)
+    ========================= */
+  --color-blue: #0284c7;
+  --color-blue-2: #4E90BD;
+  --color-blue-tint: #0ea5e9;
+  --color-teal: #2a9d8f;
+  --color-teal-tint: #14b8a6;
+  --color-violet: #7f7fbd;
+  --color-magenta: #AC28FF;
+  --color-aqua: #c8fff8;
+  --color-violet-tint: #8b93e5;
+  --color-pastel-green: #BBFF8D;
+  --color-yellow: #FFF170;
+  --color-blue-data: #4D9CD1;
+  --color-orange: #FFAC5A;
+  --color-pastel-mint: #70EFC3;
+  --color-purple: #BE83FF;
+  --color-light-blue: #A1E7F6;
+  --color-red-data: #FF6565;
+  --color-pink: #FFB6DC;
+  --color-link: #1D4ED8;
+  --color-mint: #31E6AD;
+
+  /* Spacing Scale */
+  --spacing-1: 4px;
+  --spacing-2: 8px;
+  --spacing-3: 12px;
+  --spacing-4: 16px;
+  --spacing-5: 20px;
+  --spacing-6: 24px;
+  --spacing-7: 28px;
+  --spacing-8: 32px;
+  --spacing-9: 36px;
+  --spacing-10: 40px;
+  --spacing-12: 48px;
+  --spacing-14: 56px;
+  --spacing-16: 64px;
+
+  /* Radius */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+  --radius-full: 80px;
+  --radius-pill: 32px;
+
+  /* fonts */
+  --font-SpaceGroteskLight: "SpaceGrotesk-Light", sans-serif;
+  --font-SpaceGroteskRegular: "SpaceGrotesk-Regular", sans-serif;
+  --font-SpaceGroteskMedium: "SpaceGrotesk-Medium", sans-serif;
+  --font-SpaceGroteskSemiBold: "SpaceGrotesk-SemiBold", sans-serif;
+  --font-SpaceGroteskBold: "SpaceGrotesk-Bold", sans-serif;
+
+  --font-InterThin: "Inter-Thin", sans-serif;
+  --font-InterExtraLight: "Inter-ExtraLight", sans-serif;
+  --font-InterLight: "Inter-Light", sans-serif;
+  --font-InterRegular: "Inter-Regular", sans-serif;
+  --font-InterMedium: "Inter-Medium", sans-serif;
+  --font-InterSemiBold: "Inter-SemiBold", sans-serif;
+  --font-InterBold: "Inter-Bold", sans-serif;
+  --font-InterExtraBold: "Inter-ExtraBold", sans-serif;
+  --font-InterBlack: "Inter-Black", sans-serif;
+
+  --font-GeneralSansMedium: "GeneralSans-Medium", sans-serif;
+
+  /* =========================
+    TEXT SIZES
+    ========================= */
+  /* Headings */
+  --text-h1: 32px;
+  --text-h2: 28px;
+  --text-h3: 24px;
+  --text-h4: 20px;
+
+  /* Subtitles */
+  --text-subtitle-1: 20px;
+  --text-subtitle-2: 18px;
+
+  /* Body */
+  --text-large-body: 18px;
+  --text-body-1: 16px;
+  --text-body-2: 16px;
+
+  /* Small text */
+  --text-caption: 14px;
+  --text-small: 12px;
+
+  /* Buttons */
+  --text-btn-large: 18px;
+  --text-btn-medium: 16px;
+  --text-btn-small: 14px;
+
+  /* =========================
+    LINE HEIGHTS
+    ========================= */
+  /* Headings */
+  --leading-h1: 46px;
+  --leading-h2: 38px;
+  --leading-h3: 32px;
+  --leading-h4: 30px;
+
+  /* Subtitles */
+  --leading-subtitle-1: 32px;
+  --leading-subtitle-2: 30px;
+
+  /* Body */
+  --leading-large-body: 26px;
+  --leading-body: 24px;
+
+  /* Small text */
+  --leading-caption: 22px;
+  --leading-small: 18px;
+
+  /* Buttons */
+  --leading-btn-large: 26px;
+  --leading-btn-medium: 24px;
+  --leading-btn-small: 22px;
+}
+
+/* ||==================================================|| */
+/* ||                font configuration                || */
+/* ||==================================================|| */
+@font-face {
+  font-family: "Inter-Thin";
+  src: url("../assets/fonts/Inter-Thin.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-ExtraLight";
+  src: url("../assets/fonts/Inter-ExtraLight.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-Light";
+  src: url("../assets/fonts/Inter-Light.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-Regular";
+  src: url("../assets/fonts/Inter-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-Medium";
+  src: url("../assets/fonts/Inter-Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-SemiBold";
+  src: url("../assets/fonts/Inter-SemiBold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-Bold";
+  src: url("../assets/fonts/Inter-Bold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-ExtraBold";
+  src: url("../assets/fonts/Inter-ExtraBold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "Inter-Black";
+  src: url("../assets/fonts/Inter-Black.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SpaceGrotesk-Light";
+  src: url("../assets/fonts/SpaceGrotesk-Light.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SpaceGrotesk-Regular";
+  src: url("../assets/fonts/SpaceGrotesk-Regular.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SpaceGrotesk-Medium";
+  src: url("../assets/fonts/SpaceGrotesk-Medium.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SpaceGrotesk-SemiBold";
+  src: url("../assets/fonts/SpaceGrotesk-SemiBold.ttf") format("truetype");
+}
+
+@font-face {
+  font-family: "SpaceGrotesk-Bold";
+  src: url("../assets/fonts/SpaceGrotesk-Bold.ttf") format("truetype");
+}
+
+.recharts-wrapper,
+.recharts-wrapper * {
+  outline: none !important;
+}
+
+.input-without-number-spinner {
+  /* Chrome, Safari, Edge */
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  /* Firefox */
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.scroll-none::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Edge */
+}
+
+.apd-heat-map-scroll-container {
+scrollbar-gutter: stable;
+}
+.apd-heat-map-scroll-container::-webkit-scrollbar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}

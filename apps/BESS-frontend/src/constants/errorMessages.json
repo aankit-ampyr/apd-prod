@@ -1,0 +1,323 @@
+{
+  "E-20001": {
+    "key": "generic_error",
+    "message": "Oops! Something went wrong.",
+    "type": "server_error"
+  },
+  "E-20002": {
+    "key": "unauthorized_access",
+    "message": "Unauthorized Access! Sorry, we could not verify the user.",
+    "type": "auth_error"
+  },
+  "E-20003": {
+    "key": "auth_token_expired",
+    "message": "Your auth token has been expired. Please login again",
+    "type": "auth_error"
+  },
+  "E-20004": {
+    "key": "not_authorized_action",
+    "message": "You are not authorized to perform this action.",
+    "type": "auth_error"
+  },
+  "E-20005": {
+    "key": "no_records_match",
+    "message": "No records match the search or filter criteria.",
+    "type": "data_error"
+  },
+  "E-20006": {
+    "key": "no_data_found",
+    "message": "No data found.",
+    "type": "data_error"
+  },
+  "E-20007": {
+    "key": "page_number_exceeds_results",
+    "message": "Requested page number exceeds available results.",
+    "type": "validation_error"
+  },
+  "E-20008": {
+    "key": "missing_request_parameter",
+    "message": "Missing required request parameter.",
+    "type": "validation_error"
+  },
+  "E-20009": {
+    "key": "invalid_user_id_format",
+    "message": "Invalid user ID format.",
+    "type": "validation_error"
+  },
+  "E-20010": {
+    "key": "internal_server_error_fetching_users",
+    "message": "Internal server error while fetching BESS users.",
+    "type": "server_error"
+  },
+  "E-20011": {
+    "key": "no_user_match_filter",
+    "message": "No user match your search or filter criteria.",
+    "type": "data_error"
+  },
+  "E-20012": {
+    "key": "no_project_match_filter",
+    "message": "No projects match the filter or search criteria.",
+    "type": "data_error"
+  },
+  "E-20013": {
+    "key": "select_user_to_assign",
+    "message": "Please select a user to assign to the project.",
+    "type": "validation_error"
+  },
+  "E-20014": {
+    "key": "unable_to_reassign_project",
+    "message": "Unable to reassign the project. Please try again.",
+    "type": "server_error"
+  },
+  "E-20015": {
+    "key": "project_not_found",
+    "message": "Project not found.",
+    "type": "data_error"
+  },
+  "E-20016": {
+    "key": "user_not_in_project",
+    "message": "User does not belong to this project.",
+    "type": "validation_error"
+  },
+  "E-20017": {
+    "key": "load_profile_calculation_failed",
+    "message": "Load profile calculation failed. Please try again.",
+    "type": "data_error"
+  },
+  "E-20018": {
+    "key": "project_simulation_load_failed",
+    "message": "Please select a project to begin simulation with.",
+    "type": "validation_error"
+  },
+  "E-20019": {
+    "key": "solar_profile_calculation_failed",
+    "message": "Source file not found for the solar profile calculation. Please upload the source file and try again.",
+    "type": "data_error"
+  },
+  "E-20020": {
+    "key": "invalid_file_format_solar_profile",
+    "message": "Invalid file format for the solar profile calculation. Please upload a valid CSV file and try again.",
+    "type": "data_error"
+  },
+  "E-20021": {
+    "key": "solar_profile_file_size_exceeded",
+    "message": "Solar profile file size should not exceed more than 200MB.",
+    "type": "data_error"
+  },
+  "E-20022": {
+    "key": "invalid_file_format_load_profile",
+    "message": "Your CSV file contains invalid data. Please check the file and try again.",
+    "type": "data_error"
+  },
+  "E-20023": {
+    "key": "invalid_file_format_load_profile",
+    "message": "Invalid source for solar profile calculation.",
+    "type": "data_error"
+  },
+  "E-20024": {
+    "key": "invalid_bess_container_configuration",
+    "message": "Invalid BESS container configuration",
+    "type": "server_error"
+  },
+  "E-20025": {
+    "key": "invalid_bess_container_configuration",
+    "message": "Please select at least one container type.",
+    "type": "server_error"
+  },
+  "E-20026": {
+    "key": "project_archived",
+    "message": "Archived or Deleted projects cannot be updated.",
+    "type": "server_error"
+  },
+  "E-20027": {
+    "key": "inactive_assigned_users",
+    "message": "One or more assigned users are currently inactive.",
+    "type": "server_error"
+  },
+  "E-20028": {
+    "key": "project_name_already_exists",
+    "message": "Project name already exists",
+    "type": "validation_error"
+  },
+  "E-20029": {
+    "key": "invalid_responsible_user",
+    "message": "Selected responsible user must be a BESS Admin or Analyst.",
+    "type": "validation_error"
+  },
+  "E-20030": {
+    "key": "invalid_responsible_user_action",
+    "message": "Only the responsible user can perform this action.",
+    "type": "validation_error"
+  },
+  "E-20031": {
+    "key": "project_already_archived",
+    "message": "Archive option will only be available for active/inactive projects.",
+    "type": "server_error"
+  },
+  "E-20032": {
+    "key": "project_already_deleted",
+    "message": "Delete action is only available for Active, Inactive, and Archived projects",
+    "type": "server_error"
+  },
+  "E-20033": {
+    "key": "responsible_user_in_assigned_users",
+    "message": "The Responsible User cannot also be included in the Assigned Users list.",
+    "type": "server_error"
+  },
+  "E-20034": {
+    "key": "load_mw_out_of_range",
+    "message": "Load must be between 1.00 and 500.00 MW",
+    "type": "validation_error"
+  },
+  "E-20035": {
+    "key": "solar_profile_row_count_invalid",
+    "message": "CSV file must contain exactly 8760 rows (hourly data for a full year)",
+    "type": "validation_error"
+  },
+  "E-20036": {
+    "key": "same_start_end_hour",
+    "message": "Start and End hour cannot be the same",
+    "type": "validation_error"
+  },
+  "E-20037": {
+    "key": "access_terminated",
+    "message": "Your access has been terminated",
+    "type": "validation_error"
+  },
+  "E-20038": {
+    "key": "minimum_stable_load_required",
+    "message": "Minimum stable load is required for variable generator configuration.",
+    "type": "server_error"
+  },
+  "E-20039": {
+    "key": "invalid_load_profile",
+    "message": "Both no-load and load coefficients are required for advanced fuel curve model.",
+    "type": "data_error"
+  },
+  "E-20040": {
+    "key": "dg_config_not_found",
+    "message": "DG Config not found.",
+    "type": "validation_error"
+  },
+  "E-20041": {
+    "key": "invalid_dg_config",
+    "message": "Invalid parameter passed.",
+    "type": "validation_error"
+  },
+  "E-20042": {
+    "key": "bess_dg_sizing_config_not_found",
+    "message": "BESS & DG Sizing configuration not found.",
+    "type": "validation_error"
+  },
+  "E-20043": {
+    "key": "simulation_not_found",
+    "message": "Simulation not found",
+    "type": "validation_error"
+  },
+  "E-20044": {
+    "key": "missing_required_parameter",
+    "message": "Missing required parameters.",
+    "type": "validation_error"
+  },
+  "E-20045": {
+    "key": "simulation_name_already_exists",
+    "message": "Simulation name already exists",
+    "type": "validation_error"
+  },
+  "E-20046": {
+    "key": "simulation_result_not_found",
+    "message": "Simulation result not found.",
+    "type": "validation_error"
+  },
+  "E-20047": {
+    "key": "simulation_job_not_found",
+    "message": "Simulation job not found.",
+    "type": "validation_error"
+  },
+  "E-20048": {
+    "key": "simulation_not_in_running_state",
+    "message": "Simulation is not in a running state.",
+    "type": "validation_error"
+  },
+  "E-20049": {
+    "key": "solar_profile_duplicate_file",
+    "message": "Duplicate file not accepted",
+    "type": "validation_error"
+  },
+  "E-20050": {
+    "key": "invalid_search_parameter",
+    "message": "Invalid search parameter",
+    "type": "validation_error"
+  },
+  "E-20051": {
+    "key": "invalid_date_range",
+    "message": "Invalid date range provided",
+    "type": "validation_error"
+  },
+  "E-20052": {
+    "key": "simulation_result_not_found",
+    "message": "Simulation result not found.",
+    "type": "validation_error"
+  },
+
+  "E-10003": {
+    "key": "email_required",
+    "message": "Email is required",
+    "type": "validation_error"
+  },
+  "E-10008": {
+    "key": "invalid_email",
+    "message": "Please enter a valid email address",
+    "type": "validation_error"
+  },
+  "E-10036": {
+    "key": "email_field_empty",
+    "message": "Email field cannot be empty.",
+    "type": "validation_error"
+  },
+  "E-10037": {
+    "key": "invalid_email_format",
+    "message": "Invalid email format.",
+    "type": "validation_error"
+  },
+  "E-10038": {
+    "key": "user_not_found_login",
+    "message": "User with the given email does not exist.",
+    "type": "not_found_error"
+  },
+  "E-10039": {
+    "key": "user_account_inactive",
+    "message": "Your account is inactive. Please contact support.",
+    "type": "auth_error"
+  },
+  "E-10040": {
+    "key": "otp_field_empty",
+    "message": "Please enter the OTP",
+    "type": "validation_error"
+  },
+  "E-10041": {
+    "key": "invalid_otp_format",
+    "message": "Please enter a valid 6-digit OTP.",
+    "type": "validation_error"
+  },
+  "E-10042": {
+    "key": "incorrect_otp",
+    "message": "Incorrect OTP. Please try again.",
+    "type": "validation_error"
+  },
+  "E-10043": {
+    "key": "otp_expired",
+    "message": "OTP has expired. Please request a new one.",
+    "type": "validation_error"
+  },
+  "E-10044": {
+    "key": "account_temporarily_blocked",
+    "message": "Your account has been temporarily blocked due to too many failed attempts.",
+    "type": "auth_error"
+  },
+  "E-10045": {
+    "key": "resend_otp_limit_exceeded",
+    "message": "Resend OTP attempt limit exceeded. Please try again later.",
+    "type": "auth_error"
+  }
+}

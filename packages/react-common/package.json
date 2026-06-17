@@ -1,0 +1,60 @@
+{
+  "name": "@lazarus/react-common",
+  "version": "0.0.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./components": "./src/components/index.ts",
+    "./stylesheet": "./src/stylesheet/index.css",
+    "./ui-kit": "./src/ui-kit/index.ts",
+    "./assets/icons": "./src/assets/icons/index.ts",
+    "./assets/images": "./src/assets/images/index.ts",
+    "./assets": "./src/assets/index.ts",
+    "./utils": "./src/utils/index.ts",
+    "./interface": "./src/interface/index.ts",
+    "./interface/api-interface": "./src/interface/api-interface.ts",
+    "./interface/slice-interface": "./src/interface/slice-interface.ts",
+    "./hooks": "./src/hooks/index.ts",
+    "./constants": "./src/constants/index.ts",
+    "./constants/defaults": "./src/constants/defaults.ts",
+    "./constants/enums": "./src/constants/enums.ts",
+    "./constants/keys": "./src/constants/keys.ts",
+    "./constants/regex": "./src/constants/regex.ts",
+    "./context": "./src/context/index.ts",
+    "./screen": "./src/screen/index.ts"
+  },
+  "files": [
+    "src"
+  ],
+  "peerDependencies": {
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1"
+  },
+  "devDependencies": {
+    "cpx": "^1.5.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.14.0",
+    "@emotion/styled": "^11.14.1",
+    "@mui/material": "^7.3.9",
+    "@radix-ui/react-scroll-area": "^1.2.10",
+    "clsx": "^2.1.1",
+    "d3-shape": "^3.2.0",
+    "date-fns": "^4.1.0",
+    "date-fns-tz": "^3.2.0",
+    "echarts": "^6.0.0",
+    "echarts-for-react": "^3.0.6",
+    "formik": "^2.4.9",
+    "recharts": "^3.8.1",
+    "sonner": "^2.0.7",
+    "tailwind-merge": "^3.5.0",
+    "tailwind-variants": "^3.2.2",
+    "yup": "^1.7.1"
+  }
+}

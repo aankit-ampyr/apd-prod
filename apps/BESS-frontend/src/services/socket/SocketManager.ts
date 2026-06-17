@@ -1,0 +1,198 @@
+import { SocketEvent } from '@/interface';
+import { ToastType } from '@/ui-kits';
+
+export const SIMULATION_JOB_STORAGE_KEY = 'simulation_job_id';
+
+export type SimulationProgressPayload = {
+  progress: number;
+  current: number;
+  total: number;
+  bess: number;
+  duration: number;
+};
+
+type SimulationSocketHandlers = {
+  onProgress?: (payload: SimulationProgressPayload) => void;
+  onCompleted?: (payload: SimulationProgressPayload) => void;
+  onStoppedOrFailed?: () => void;
+};
+
+export class SocketManager {
+  public socket: WebSocket | null = null;
+  public reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private reconnectDelay: number = 3000;
+  private readonly BASE_DELAY: number = 3000;
+  private readonly MAX_DELAY: number = 30000;
+  public simulationJobId: number | null = null;
+  public simulationSocketHandlers: SimulationSocketHandlers = {};
+  private messageListeners: Set<(event: SocketEvent) => void> = new Set();
+
+  public readonly dispatch: any;
+  public readonly onStatusChange: (open: boolean) => void;
+  public readonly showGlobalToast: (message: string, type: ToastType) => void;
+
+  constructor(dispatch: any, showGlobalToast: (message: string, type: ToastType) => void, onStatusChange: (open: boolean) => void) {
+    this.dispatch = dispatch;
+    this.onStatusChange = onStatusChange;
+    this.showGlobalToast = showGlobalToast;
+  }
+
+  public addMessageListener(listener: (event: SocketEvent) => void) {
+    this.messageListeners.add(listener);
+  }
+
+  public removeMessageListener(listener: (event: SocketEvent) => void) {
+    this.messageListeners.delete(listener);
+  }
+
+  connect(url: string, handlers: SimulationSocketHandlers = {}) {
+    if (this.socket?.readyState === WebSocket.OPEN) return;
+
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    this.simulationSocketHandlers = handlers;
+
+    this.socket = new WebSocket(url);
+
+    this.socket.onopen = () => {
+      console.log('[SocketManager] Socket connected');
+      this.onStatusChange(true);
+      this.reconnectDelay = this.BASE_DELAY;
+    };
+
+    this.socket.onclose = () => {
+      console.log('[SocketManager] Socket disconnected');
+      this.onStatusChange(false);
+      this.socket = null;
+
+      if (!this.reconnectTimer) {
+        this.reconnectTimer = setTimeout(() => {
+          this.reconnectTimer = null;
+          this.connect(url, this.simulationSocketHandlers);
+        }, this.reconnectDelay);
+
+        console.error('Reconnection Failed');
+
+        this.reconnectDelay = Math.min(this.reconnectDelay * 2, this.MAX_DELAY);
+      }
+    };
+
+    this.socket.onerror = err => {
+      console.error('[SocketManager] Socket error:', err);
+    };
+
+    this.socket.onmessage = event => {
+      try {
+        const parsed: SocketEvent = JSON.parse(event.data);
+        this.handleSocketEvent(parsed);
+      } catch (e) {
+        console.error('[SocketManager] Invalid socket message', e);
+      }
+    };
+  }
+
+  send(data: SocketEvent | Record<string, unknown>) {
+    if (this.isOpen()) {
+      this.socket!.send(JSON.stringify(data));
+    }
+  }
+
+  close() {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+
+    if (this.socket) {
+      this.socket.onclose = null;
+      this.socket.close();
+      this.socket = null;
+    }
+  }
+
+  hasSocket(): boolean {
+    return this.socket !== null;
+  }
+
+  isConnecting(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.CONNECTING;
+  }
+
+  isOpen(): boolean {
+    return this.socket !== null && this.socket.readyState === WebSocket.OPEN;
+  }
+
+  private handleSocketEvent(event: SocketEvent) {
+    // Notify all general listeners
+    this.messageListeners.forEach(listener => listener(event));
+
+    // const jobId = Number(localStorage.getItem(SIMULATION_JOB_STORAGE_KEY));
+    //
+    // // Only SimulationJob events are relevant for simulation progress.
+    // if (event.resource_type !== ResourceType.SimulationJob) return;
+    //
+    // // Ignore progress for any job other than the active one.
+    // if (event.resource_id !== jobId) return;
+    //
+    // switch (event.action_id) {
+    //   case ActionType.Started:
+    //     this.showGlobalToast('Simulation started', 'success');
+    //     break;
+    //
+    //   case ActionType.Updated: {
+    //     const payload = this.getSimulationProgressPayload(event);
+    //
+    //     console.log('[SocketManager] Simulation progress update:', payload);
+    //     this.dispatch({ type: 'UPDATE_SIMULATION_PROGRESS', payload });
+    //     this.simulationSocketHandlers.onProgress?.(payload);
+    //     break;
+    //   }
+    //
+    //   case ActionType.Completed: {
+    //     const payload = this.getSimulationProgressPayload(event, true);
+    //
+    //     console.log('[SocketManager] Simulation completed update:', payload);
+    //     this.dispatch({ type: 'UPDATE_SIMULATION_PROGRESS', payload });
+    //     this.showGlobalToast('Simulation completed', 'success');
+    //     this.simulationSocketHandlers.onCompleted?.(payload);
+    //     break;
+    //   }
+    //
+    //   case ActionType.Failed:
+    //     this.showGlobalToast('Simulation failed', 'error');
+    //     this.simulationSocketHandlers.onStoppedOrFailed?.();
+    //     break;
+    //
+    //   case ActionType.Stopped:
+    //     this.showGlobalToast('Simulation stopped', 'success');
+    //     this.simulationSocketHandlers.onStoppedOrFailed?.();
+    //     break;
+    //
+    //   default:
+    //     break;
+    // }
+  }
+
+  private getSimulationProgressPayload(event: SocketEvent, completed = false): SimulationProgressPayload {
+    const total = Number(event.data?.total_config ?? 0);
+    const current = Number(event.data?.current_config ?? (completed ? total : 0));
+
+    return {
+      progress: Number(event.data?.progress_percentage ?? (completed ? 100 : 0)),
+      current,
+      total,
+      bess: Number(event.data?.current_config_details?.bess_size_mwh ?? 0),
+      duration: Number(event.data?.current_config_details?.duration_hr ?? 0),
+    };
+  }
+
+  private cleanup() {
+    localStorage.removeItem(SIMULATION_JOB_STORAGE_KEY);
+    this.simulationJobId = null;
+    this.simulationSocketHandlers = {};
+    this.close();
+  }
+}

@@ -1,0 +1,707 @@
+{
+  "E-10001": {
+    "key": "generic_error",
+    "message": "Oops something went wrong",
+    "type": "server_error"
+  },
+  "E-10002": {
+    "key": "name_required",
+    "message": "Name is required",
+    "type": "validation_error"
+  },
+  "E-10003": {
+    "key": "email_required",
+    "message": "Email is required",
+    "type": "validation_error"
+  },
+  "E-10004": {
+    "key": "role_required",
+    "message": "Role is required",
+    "type": "validation_error"
+  },
+  "E-10005": {
+    "key": "organization_required",
+    "message": "Organization is required",
+    "type": "validation_error"
+  },
+  "E-10006": {
+    "key": "invalid_name_characters",
+    "message": "Only alphabets, spaces, and dots are allowed.",
+    "type": "validation_error"
+  },
+  "E-10007": {
+    "key": "name_length_invalid",
+    "message": "Name must be between 2 and 100 characters.",
+    "type": "validation_error"
+  },
+  "E-10008": {
+    "key": "invalid_email",
+    "message": "Please enter a valid email address",
+    "type": "validation_error"
+  },
+  "E-10009": {
+    "key": "email_already_registered",
+    "message": "This email address is already registered.",
+    "type": "conflict_error"
+  },
+  "E-10010": {
+    "key": "user_creation_failed",
+    "message": "Unable to add user. Please try again.",
+    "type": "server_error"
+  },
+  "E-10011": {
+    "key": "unauthorized_access",
+    "message": "Unauthorized Access! Sorry, we could not verify the user.",
+    "type": "auth_error"
+  },
+  "E-10012": {
+    "key": "token_expired",
+    "message": "Your auth token has been expired. Please login again",
+    "type": "auth_error"
+  },
+  "E-10013": {
+    "key": "forbidden_action",
+    "message": "You are not authorized to perform this action.",
+    "type": "permission_error"
+  },
+  "E-10014": {
+    "key": "no_data_found",
+    "message": "No data found.",
+    "type": "not_found_error"
+  },
+  "E-10015": {
+    "key": "no_records_found",
+    "message": "No records match the search or filter criteria.",
+    "type": "not_found_error"
+  },
+  "E-10016": {
+    "key": "no_users_found",
+    "message": "No users match your search or filter criteria.",
+    "type": "not_found_error"
+  },
+  "E-10017": {
+    "key": "no_organizations_found",
+    "message": "No organizations match your search criteria.",
+    "type": "not_found_error"
+  },
+  "E-10018": {
+    "key": "organization_name_required",
+    "message": "Organization name is required.",
+    "type": "validation_error"
+  },
+  "E-10019": {
+    "key": "organization_already_exists",
+    "message": "Organization already exists.",
+    "type": "conflict_error"
+  },
+  "E-10020": {
+    "key": "invalid_characters",
+    "message": "Invalid characters entered.",
+    "type": "validation_error"
+  },
+  "E-10021": {
+    "key": "organization_not_active",
+    "message": "This organization is not active. Please select a different organization.",
+    "type": "validation_error"
+  },
+  "E-10022": {
+    "key": "user_delete_failed",
+    "message": "Unable to delete user. Please try again.",
+    "type": "server_error"
+  },
+  "E-10023": {
+    "key": "platform_type_required",
+    "message": "Platform type is required",
+    "type": "validation_error"
+  },
+  "E-10024": {
+    "key": "invalid_role_for_platform",
+    "message": "Invalid role specified for the platform type",
+    "type": "validation_error"
+  },
+  "E-10025": {
+    "key": "assign_org_failed",
+    "message": "Unable to assign organization. Please try again.",
+    "type": "server_error"
+  },
+  "E-10026": {
+    "key": "reassign_org_failed",
+    "message": "Unable to reassign organization. Please try again.",
+    "type": "server_error"
+  },
+  "E-10027": {
+    "key": "user_not_found",
+    "message": "user not found",
+    "type": "server_error"
+  },
+  "E-10028": {
+    "key": "invalid_name_length",
+    "message": "Invalid input length. Name must be between 2 and 100 characters.",
+    "type": "validation_error"
+  },
+  "E-10029": {
+    "key": "invalid_org_name_length",
+    "message": "Invalid input length. Organization name must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10030": {
+    "key": "invalid_search_parameter",
+    "message": "Invalid search parameter.",
+    "type": "validation_error"
+  },
+  "E-10031": {
+    "key": "invalid_filter_criteria",
+    "message": "Invalid filter criteria provided.",
+    "type": "validation_error"
+  },
+  "E-10032": {
+    "key": "invalid_date_range",
+    "message": "Invalid date range provided.",
+    "type": "validation_error"
+  },
+  "E-10033": {
+    "key": "no_assets_found",
+    "message": "No assets match filter or search criteria.",
+    "type": "not_found_error"
+  },
+  "E-10034": {
+    "key": "asset_not_found",
+    "message": "Asset not found.",
+    "type": "not_found_error"
+  },
+  "E-10035": {
+    "key": "organization_not_found",
+    "message": "Organization not found.",
+    "type": "not_found_error"
+  },
+  "E-10036": {
+    "key": "email_field_empty",
+    "message": "Email field cannot be empty.",
+    "type": "validation_error"
+  },
+  "E-10037": {
+    "key": "invalid_email_format",
+    "message": "Invalid email format.",
+    "type": "validation_error"
+  },
+  "E-10038": {
+    "key": "user_not_found_login",
+    "message": "User with the given email does not exist.",
+    "type": "not_found_error"
+  },
+  "E-10039": {
+    "key": "user_account_inactive",
+    "message": "Your account is inactive. Please contact support.",
+    "type": "auth_error"
+  },
+  "E-10040": {
+    "key": "otp_field_empty",
+    "message": "Please enter the OTP",
+    "type": "validation_error"
+  },
+  "E-10041": {
+    "key": "invalid_otp_format",
+    "message": "Please enter a valid 6-digit OTP.",
+    "type": "validation_error"
+  },
+  "E-10042": {
+    "key": "incorrect_otp",
+    "message": "Incorrect OTP. Please try again.",
+    "type": "validation_error"
+  },
+  "E-10043": {
+    "key": "otp_expired",
+    "message": "OTP has expired. Please request a new one.",
+    "type": "validation_error"
+  },
+  "E-10044": {
+    "key": "account_temporarily_blocked",
+    "message": "Your account has been temporarily blocked due to too many failed attempts.",
+    "type": "auth_error"
+  },
+  "E-10045": {
+    "key": "resend_otp_limit_exceeded",
+    "message": "Resend OTP attempt limit exceeded. Please try again later.",
+    "type": "auth_error"
+  },
+  "E-10046": {
+    "key": "digest_name_required",
+    "message": "Digest name is required.",
+    "type": "validation_error"
+  },
+  "E-10047": {
+    "key": "digest_name_length_invalid",
+    "message": "Digest name must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10048": {
+    "key": "digest_name_already_exists",
+    "message": "Digest name already exists.",
+    "type": "conflict_error"
+  },
+  "E-10049": {
+    "key": "scope_required",
+    "message": "Scope is required.",
+    "type": "validation_error"
+  },
+  "E-10050": {
+    "key": "frequency_required",
+    "message": "Frequency is required.",
+    "type": "validation_error"
+  },
+  "E-10051": {
+    "key": "schedule_required",
+    "message": "Schedule is required.",
+    "type": "validation_error"
+  },
+  "E-10052": {
+    "key": "recipient_required",
+    "message": "At least one recipient must be selected.",
+    "type": "validation_error"
+  },
+  "E-10053": {
+    "key": "digest_not_found",
+    "message": "Digest not found.",
+    "type": "not_found_error"
+  },
+  "E-10054": {
+    "key": "invalid_digest_resource",
+    "message": "Please select a valid resource to apply the digest on.",
+    "type": "validation_error"
+  },
+  "E-10055": {
+    "key": "invalid_digest_resource",
+    "message": "Please select atleast one resource",
+    "type": "validation_error"
+  },
+  "E-10056": {
+    "key": "invalid_capacity_value",
+    "message": "Please enter a valid capacity value.",
+    "type": "validation_error"
+  },
+  "E-10057": {
+    "key": "asset_name_length_invalid",
+    "message": "Asset name must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10058": {
+    "key": "asset_name_invalid_characters",
+    "message": "Asset name contains invalid characters.",
+    "type": "validation_error"
+  },
+  "E-10059": {
+    "key": "asset_name_required",
+    "message": "Asset name is required.",
+    "type": "validation_error"
+  },
+  "E-10060": {
+    "key": "asset_already_exists",
+    "message": "Asset already exists",
+    "type": "conflict_error"
+  },
+  "E-10061": {
+    "key": "asset_type_required",
+    "message": "Asset type is required.",
+    "type": "validation_error"
+  },
+  "E-10062": {
+    "key": "capacity_required",
+    "message": "Capacity is required.",
+    "type": "validation_error"
+  },
+  "E-10063": {
+    "key": "capacity_invalid_number",
+    "message": "Capacity must be a valid number.",
+    "type": "validation_error"
+  },
+  "E-10064": {
+    "key": "capacity_greater_than_zero",
+    "message": "Capacity must be greater than zero.",
+    "type": "validation_error"
+  },
+  "E-10065": {
+    "key": "capacity_max_two_decimals",
+    "message": "Capacity can have maximum two decimal places.",
+    "type": "validation_error"
+  },
+  "E-10066": {
+    "key": "location_required",
+    "message": "Location is required.",
+    "type": "validation_error"
+  },
+  "E-10067": {
+    "key": "location_invalid_characters",
+    "message": "Location contains invalid characters.",
+    "type": "validation_error"
+  },
+  "E-10068": {
+    "key": "location_length_invalid",
+    "message": "Location must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10069": {
+    "key": "country_required",
+    "message": "Country is required.",
+    "type": "validation_error"
+  },
+  "E-10070": {
+    "key": "max_charging_rate_invalid",
+    "message": "Maximum charging rate must be a valid number.",
+    "type": "validation_error"
+  },
+  "E-10071": {
+    "key": "max_discharging_rate_invalid",
+    "message": "Maximum discharging rate must be a valid number.",
+    "type": "validation_error"
+  },
+  "E-10072": {
+    "key": "value_must_be_gt_zero",
+    "message": "Value must be greater than 0.",
+    "type": "validation_error"
+  },
+  "E-10073": {
+    "key": "usable_capacity_invalid",
+    "message": "Usable capacity must be a valid number.",
+    "type": "validation_error"
+  },
+  "E-10074": {
+    "key": "min_soc_range_invalid",
+    "message": "Minimum SOC must be between 0 and 100.",
+    "type": "validation_error"
+  },
+  "E-10075": {
+    "key": "max_soc_gt_min_soc",
+    "message": "Maximum SOC must be greater than Minimum SOC.",
+    "type": "validation_error"
+  },
+  "E-10076": {
+    "key": "round_trip_efficiency_range_invalid",
+    "message": "Round-trip efficiency must be between 0 and 100.",
+    "type": "validation_error"
+  },
+  "E-10077": {
+    "key": "max_daily_cycles_positive_number",
+    "message": "Maximum daily cycles must be a valid positive number.",
+    "type": "validation_error"
+  },
+  "E-10078": {
+    "key": "max_daily_cycles_range_invalid",
+    "message": "Maximum daily cycles must be between 0 and 20.",
+    "type": "validation_error"
+  },
+  "E-10079": {
+    "key": "optimization_params_not_applicable",
+    "message": "Optmization Params cannot be applied to this asset type.",
+    "type": "validation_error"
+  },
+  "E-10080": {
+    "key": "max_charge_rate_range_invalid",
+    "message": "Max charge rate must be between 0 and 1000 MW.",
+    "type": "validation_error"
+  },
+  "E-10081": {
+    "key": "max_discharge_rate_range_invalid",
+    "message": "Max discharge rate must be between 0 and 1000 MW.",
+    "type": "validation_error"
+  },
+  "E-10082": {
+    "key": "usable_capacity_range_invalid",
+    "message": "Usable Capacity must be between 0 and 10000 MW.",
+    "type": "validation_error"
+  },
+  "E-10083": {
+    "key": "max_soc_range_invalid",
+    "message": "Maximum SOC must be between 0 and 100.",
+    "type": "validation_error"
+  },
+  "E-10084": {
+    "key": "invalid_file_type",
+    "message": "File must be Excel (.xlsx, format only).",
+    "type": "validation_error"
+  },
+  "E-10085": {
+    "key": "aggregator_report_min_size",
+    "message": "Aggregator report size must alteast 1 KB",
+    "type": "validation_error"
+  },
+  "E-10086": {
+    "key": "aggregator_report_max_size",
+    "message": "Aggregator report size should not exceed more than 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10087": {
+    "key": "aggregator_report_validation_failed",
+    "message": "Aggregator report file validation failed. Please check the file and try again.",
+    "type": "validation_error"
+  },
+  "E-10088": {
+    "key": "aggregator_report_removed",
+    "message": "Aggregator report file removed successfully.",
+    "type": "server_error"
+  },
+  "E-10089": {
+    "key": "aggregator_report_invalid_asset_type",
+    "message": "Aggregator report file cannot be uploaded for this asset type.",
+    "type": "validation_error"
+  },
+  "E-10090": {
+    "key": "invalid_file_type",
+    "message": "Invalid SCADA file name. Please upload a valid SCADA file.",
+    "type": "validation_error"
+  },
+  "E-10091": {
+    "key": "aggregator_report_min_size",
+    "message": "Invalid file structure. Only one sheet is allowed.",
+    "type": "validation_error"
+  },
+  "E-10092": {
+    "key": "scada_unexpected_columns",
+    "message": "Unexpected columns found in SCADA file.",
+    "type": "validation_error"
+  },
+  "E-10093": {
+    "key": "scada_missing_mandatory_columns",
+    "message": "Mandatory columns are missing in SCADA files.",
+    "type": "validation_error"
+  },
+  "E-10094": {
+    "key": "scada_file_min_size",
+    "message": "SCADA file size must be at least 1 KB.",
+    "type": "validation_error"
+  },
+  "E-10095": {
+    "key": "scada_file_max_size",
+    "message": "SCADA file size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10096": {
+    "key": "scada_file_not_uploaded",
+    "message": "SCADA file not uploaded.",
+    "type": "validation_error"
+  },
+  "E-10097": {
+    "key": "aggregator_file_not_uploaded",
+    "message": "Aggregator file not uploaded.",
+    "type": "validation_error"
+  },
+  "E-10098": {
+    "key": "merge_failed",
+    "message": "Failed to merge SCADA and Aggregator datasets.",
+    "type": "validation_error"
+  },
+  "E-10099": {
+    "key": "power_mw_missing",
+    "message": "Power_MW value missing.",
+    "type": "validation_error"
+  },
+  "E-10100": {
+    "key": "merged_dataset_not_found",
+    "message": "Merged dataset not found.",
+    "type": "not_found_error"
+  },
+  "E-10101": {
+    "key": "invalid_power_mw_value",
+    "message": "Invalid Power_MW value.",
+    "type": "validation_error"
+  },
+  "E-10102": {
+    "key": "previous_soc_missing",
+    "message": "Previous SOC value missing for calculation.",
+    "type": "validation_error"
+  },
+  "E-10103": {
+    "key": "field_empty",
+    "message": "This field cannot be empty.",
+    "type": "validation_error"
+  },
+  "E-10104": {
+    "key": "max_two_decimals",
+    "message": "This value cannot have more than 2 decimal places.",
+    "type": "validation_error"
+  },
+  "E-10105": {
+    "key": "max_two_decimals",
+    "message": "Invalid number format",
+    "type": "validation_error"
+  },
+  "E-10108": {
+    "key": "invalid_country_name",
+    "message": "Invalid country name",
+    "type": "validation_error"
+  },
+  "E-10109": {
+    "key": "invalid_organization_name",
+    "message": "Invalid organization name",
+    "type": "validation_error"
+  },
+  "E-10110": {
+    "key": "access_terminated",
+    "message": "Your access has been terminated",
+    "type": "access_error"
+  },
+  "E-10111": {
+    "key": "analysis_not_available",
+    "message": "Analysis not available for the selected asset, month and year",
+    "type": "not_found_error"
+  },
+  "E-10112": {
+    "key": "soc_data_not_available",
+    "message": "SOC data not available for the selected asset, month and year",
+    "type": "not_found_error"
+  },
+  "E-10113": {
+    "key": "price_service_data_not_available",
+    "message": "Required price or service data not available for the selected asset, month and year",
+    "type": "not_found_error"
+  },
+  "E-10114": {
+    "key": "iar_report_min_size",
+    "message": "IAR report size must alteast 1 KB",
+    "type": "validation_error"
+  },
+  "E-10115": {
+    "key": "iar_report_validation_failed",
+    "message": "IAR report file validation failed. Please check the file and try again.",
+    "type": "validation_error"
+  },
+  "E-10116": {
+    "key": "asset_optimization_not_saved",
+    "message": "Asset optmization are not saved.",
+    "type": "server_error"
+  },
+  "E-10117": {
+    "key": "asset_aggregator_file_not_found",
+    "message": "Asset aggregator file not found.",
+    "type": "not_found_error"
+  },
+  "E-10118": {
+    "key": "asset_scada_file_not_found",
+    "message": "Asset SCADA file not found.",
+    "type": "not_found_error"
+  },
+  "E-10119": {
+    "key": "asset_iar_file_not_found",
+    "message": "Asset IAR file not found.",
+    "type": "not_found_error"
+  },
+  "E-10120": {
+    "key": "action_not_allowed_on_solar_asset",
+    "message": "This action cannot be perform on solar asset",
+    "type": "validation_error"
+  },
+  "E-10201": {
+    "key": "only_numeric_values_allowed",
+    "message": "Only numeric values are allowed.",
+    "type": "validation_error"
+  },
+  "E-10202": {
+    "key": "negative_values_not_allowed",
+    "message": "Negative values are not allowed.",
+    "type": "validation_error"
+  },
+  "E-10203": {
+    "key": "value_between_80_and_90",
+    "message": "Value must be between 80% and 90%.",
+    "type": "validation_error"
+  },
+  "E-10204": {
+    "key": "value_between_0_5_and_3_0",
+    "message": "Value must be between 0.5 and 3.0.",
+    "type": "validation_error"
+  },
+  "E-10205": {
+    "key": "industry_low_lte_mid",
+    "message": "Industry Low must be less than or equal to Industry Mid.",
+    "type": "validation_error"
+  },
+  "E-10206": {
+    "key": "industry_mid_lte_high",
+    "message": "Industry Mid must be less than or equal to Industry High.",
+    "type": "validation_error"
+  },
+  "E-10207": {
+    "key": "industry_low_lte_high",
+    "message": "Industry Low must be less than or equal to Industry High.",
+    "type": "validation_error"
+  },
+  "E-10208": {
+    "key": "benchmark_config_validation_failed",
+    "message": "Benchmark configuration validation failed.",
+    "type": "validation_error"
+  },
+  "E-10209": {
+    "key": "only_integers_allowed",
+    "message": "Invalid input. Only integers allowed. Please check values.",
+    "type": "validation_error"
+  },
+  "E-10210": {
+    "key": "monthly_hardcoded_values_validation_failed",
+    "message": "Monthly hardcoded values validation failed.",
+    "type": "validation_error"
+  },
+  "E-10211": {
+    "key": "atmost 2 decimal places",
+    "message": "Value must have atmost 2 decimal places",
+    "type": "validation_error"
+  },
+  "E-10121": {
+    "key": "analysis_not_allowed_on_solar_asset",
+    "message": "The analysis cannot be performed on solar asset",
+    "type": "validation_error"
+  },
+  "E-10122": {
+    "key": "modo_benchmark_fetch_failed",
+    "message": "Failed to fetch modo benchmark",
+    "type": "server_error"
+  },
+  "E-10123": {
+    "key": "file_time_period_mismatch",
+    "message": "File uploaded does not match the specified time period",
+    "type": "validation_error"
+  },
+  "E-10124": {
+    "key": "asset_file_not_found",
+    "message": "Asset file not found",
+    "type": "not_found_error"
+  },
+  "E-10125": {
+    "key": "asset_already_exists_in_organization",
+    "message": "Asset \"<asset_name>\" already exists in this organization",
+    "type": "conflict_error"
+  },
+  "E-10126": {
+    "key": "optimization_data_missing",
+    "message": "Required input data for optimization is missing.",
+    "type": "validation_error"
+  },
+  "E-10127": {
+    "key": "timestamp_validation_failed",
+    "message": "Timestamp validation failed. Invalid format or interval mismatch.",
+    "type": "validation_error"
+  },
+  "E-10128": {
+    "key": "dataset_column_validation_failed",
+    "message": "Dataset column validation failed.",
+    "type": "validation_error"
+  },
+  "E-10129": {
+    "key": "optimization_constraint_violation",
+    "message": "Optimization constraint violation detected.",
+    "type": "validation_error"
+  },
+  "E-10130": {
+    "key": "optimization_process_failed",
+    "message": "Optimization process failed to generate results.",
+    "type": "server_error"
+  },
+  "E-10131": {
+    "key": "lp_solver_convergence_failed",
+    "message": "LP solver failed to converge for the given inputs.",
+    "type": "server_error"
+  },
+  "E-10132": {
+    "key": "",
+    "message": "Optimized dataset not found",
+    "type": "server_error"
+  }
+}

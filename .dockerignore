@@ -1,0 +1,23 @@
+# Virtual environments
+**/.venv
+**/venv
+**/__pycache__
+
+# Node modules
+**/node_modules
+**/dist
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Logs
+*.log
+
+# Local env files (use env_file in docker-compose)
+**/.env.local
+**/.env.*.local

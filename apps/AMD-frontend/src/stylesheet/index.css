@@ -1,0 +1,18 @@
+@import "tailwindcss";
+/* allow tailwind to scan shared components */
+@source "../../../../packages/react-common/src";
+@import "@lazarus/react-common/stylesheet";
+
+.debug {
+  @apply border border-black;
+}
+
+.group-bar-chart::-webkit-scrollbar {
+  height: 12px;
+  background-color: #e2e4ea80;
+  border-radius: 16px;
+}
+.group-bar-chart::-webkit-scrollbar-thumb{
+  background-color: #B7B8B8;
+  border-radius: 16px;
+}

@@ -1,0 +1,60 @@
+from dotenv import load_dotenv
+from os import getenv
+
+load_dotenv()
+
+USER_DATABASE_URL = getenv("USER_DATABASE_URL")
+BESS_DATABASE_URL = getenv("BESS_DATABASE_URL")
+
+# redis
+REDIS_URL = getenv("REDIS_URL")
+
+# flags
+ENCRYPT = getenv("ENCRYPT", default=False) == "True"
+DEBUG = getenv("DEBUG", default=False) == "True"
+DB_ENCRYPTION = getenv("DB_ENCRYPT", default=False) == "True"
+
+# smtp
+EMAIL_HOST = getenv("SMTP_HOST")
+EMAIL_PORT = int(getenv("SMTP_PORT"))
+EMAIL_ID = getenv("SMTP_USERNAME")
+EMAIL_PASSWORD = getenv("SMTP_PASSWORD")
+
+# storage type
+STORAGE_TYPE = getenv("STORAGE_TYPE")
+# blob
+AZURE_CONNECTION_STRING = getenv("AZURE_CONNECTION_STRING")
+AZURE_CONTAINER_NAME = getenv("AZURE_CONTAINER_NAME")
+# s3
+AWS_ACCESS_KEY = getenv("AWS_ACCESS_KEY")
+AWS_SECRET_KEY = getenv("AWS_SECRET_KEY")
+AWS_REGION = getenv("AWS_REGION")
+S3_BUCKET_NAME = getenv("S3_BUCKET_NAME")
+# contabo
+CONTABO_ACCESS_KEY = getenv("CONTABO_ACCESS_KEY")
+CONTABO_SECRET_KEY = getenv("CONTABO_SECRET_KEY")
+CONTABO_OBJECT_NAME = getenv("CONTABO_OBJECT_NAME")
+CONTABO_REGION = getenv("CONTABO_REGION")
+CONTABO_BUCKET_NAME = getenv("CONTABO_BUCKET_NAME")
+CONTABO_BUCKET_ID = getenv("CONTABO_BUCKET_ID")
+# server
+SERVER_STORAGE_PATH = getenv("SERVER_STORAGE_PATH")
+SERVER_PUBLIC_BASE_URL = getenv("SERVER_PUBLIC_BASE_URL")
+
+
+# Database pooling
+DB_POOL_SIZE = int(getenv("DB_POOL_SIZE"))
+DB_MAX_OVERFLOW = int(getenv("DB_MAX_OVERFLOW"))
+DB_POOL_PRE_PING = eval(getenv("DB_POOL_PRE_PING"))
+DB_POOL_RECYCLE = int(getenv("DB_POOL_RECYCLE"))
+DB_POOL_TIMEOUT = int(getenv("DB_POOL_TIMEOUT"))
+
+# Allowed Origins
+ALLOWED_ORIGINS = getenv("ALLOWED_ORIGINS").split(",")
+
+# secret
+JWT_SECRET = getenv("JWT_SECRET")
+AES_SECRET_KEY = getenv("AES_SECRET_KEY")
+MASTER_KEK_SECRET = getenv("MASTER_KEK_SECRET")
+PEPPER = getenv("PEPPER")
+FILE_ENCRYPTION_KEY = getenv("FILE_ENCRYPTION_KEY")

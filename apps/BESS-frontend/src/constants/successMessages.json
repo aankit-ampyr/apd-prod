@@ -1,0 +1,215 @@
+{
+  "S-20001": {
+    "key": "bess_user_list_fetched",
+    "message": "BESS user list fetched successfully.",
+    "type": "success"
+  },
+  "S-20002": {
+    "key": "project_list_fetched",
+    "message": "Project list fetched successfully.",
+    "type": "success"
+  },
+  "S-20003": {
+    "key": "project_reassigned",
+    "message": "Project reassigned successfully.",
+    "type": "success"
+  },
+  "S-20004": {
+    "key": "load_profile_calculated",
+    "message": "Load profile calculated successfully",
+    "type": "success"
+  },
+  "S-20005": {
+    "key": "project_simulation_loaded",
+    "message": "Project simulation loaded successfully",
+    "type": "success"
+  },
+  "S-20006": {
+    "key": "solar_profile_computed",
+    "message": "Solar profile computed successfully",
+    "type": "success"
+  },
+  "S-20007": {
+    "key": "solar_profile_uploaded",
+    "message": "Solar profile uploaded successfully",
+    "type": "success"
+  },
+  "S-20008": {
+    "key": "solar_profile_fetched",
+    "message": "Solar profile fetched successfully",
+    "type": "success"
+  },
+  "S-20009": {
+    "key": "load_profile_calculated",
+    "message": "Load profile uploaded successfully",
+    "type": "success"
+  },
+  "S-20010": {
+    "key": "load_profile_fetched",
+    "message": "Load profile fetched successfully",
+    "type": "success"
+  },
+  "S-20011": {
+    "key": "bess_container_fetched",
+    "message": "BESS container fetched successfully",
+    "type": "success"
+  },
+  "S-20012": {
+    "key": "bess_container_configuration_fetched",
+    "message": "BESS container configuration fetched successfully",
+    "type": "success"
+  },
+  "S-20013": {
+    "key": "project_created",
+    "message": "Project created successfully.",
+    "type": "success"
+  },
+  "S-20014": {
+    "key": "project_updated",
+    "message": "Project updated successfully.",
+    "type": "success"
+  },
+  "S-20015": {
+    "key": "project_deleted",
+    "message": "Project deleted successfully.",
+    "type": "success"
+  },
+  "S-20016": {
+    "key": "project_restored",
+    "message": "Project restored successfully.",
+    "type": "success"
+  },
+  "S-20017": {
+    "key": "project_archived",
+    "message": "Project archived successfully.",
+    "type": "success"
+  },
+  "S-20018": {
+    "key": "project_unarchived",
+    "message": "Project unarchived successfully.",
+    "type": "success"
+  },
+  "S-20019": {
+    "key": "dg_configuration_saved",
+    "message": "DG configuration saved successfully.",
+    "type": "success"
+  },
+  "S-20020": {
+    "key": "dg_configuration_fetched",
+    "message": "DG configuration fetched successfully",
+    "type": "success"
+  },
+  "S-20021": {
+    "key": "dg_fuel_curve_calculated",
+    "message": "DG fuel curve calculated successfully",
+    "type": "success"
+  },
+  "S-20022": {
+    "key": "solar_profile_sourced_fetched",
+    "message": "Solar profile sourced fetched successfully",
+    "type": "success"
+  },
+  "S-20023": {
+    "key": "dispatch_rules_configuration_saved",
+    "message": "Dispatch rules configuration saved successfully",
+    "type": "success"
+  },
+  "S-20024": {
+    "key": "dispatch_rules_configuration_fetched",
+    "message": "Dispatch rules configuration fetched successfully",
+    "type": "success"
+  },
+  "S-20025": {
+    "key": "bess_dg_sizing_configuration_saved",
+    "message": "BESS & DG sizing configuration saved successfully.",
+    "type": "success"
+  },
+  "S-20026": {
+    "key": "bess_dg_sizing_configuration_fetched",
+    "message": "BESS & DG sizing configuration fetched successfully",
+    "type": "success"
+  },
+  "S-20027": {
+    "key": "project_simulation_list_fetched",
+    "message": "Project simulation list fetched successfully",
+    "type": "success"
+  },
+  "S-20028": {
+    "key": "project_simulation_updated",
+    "message": "Project simulation updated successfully",
+    "type": "success"
+  },
+  "S-20029": {
+    "key": "project_simulation_deleted",
+    "message": " Simulation Deleted successfully",
+    "type": "success"
+  },
+
+  "S-20030": {
+    "key": "project_simulation_added",
+    "message": "Simulation added successfully",
+    "type": "success"
+  },
+  "S-20031": {
+    "key": "project_simulation_fetched",
+    "message": "Simulation detailed fetched successfully",
+    "type": "success"
+  },
+  "S-20032": {
+    "key": "project_simulation_result_fetched",
+    "message": "Simulation results fetched successfully",
+    "type": "success"
+  },
+  "S-20033": {
+    "key": "project_simulation_queued",
+    "message": "Simulation job successfully queued.",
+    "type": "success"
+  },
+  "S-20034": {
+    "key": "simulation_progress_fetched",
+    "message": "Simulation progress fetched successfully.",
+    "type": "success"
+  },
+  "S-20035": {
+    "key": "simulation_stopped",
+    "message": "Simulation will stop shortly.",
+    "type": "success"
+  },
+  "S-20036": {
+    "key": "audit_logs_fetched",
+    "message": "Audit logs fetched successfully",
+    "type": "success"
+  },
+  "S-20037": {
+    "key": "simulation_job_queued",
+    "message": "Simulation job successfully queued.",
+    "type": "success"
+  },
+  "S-20038": {
+    "key": "simulation_results_fetched",
+    "message": "Simulation results fetched successfully",
+    "type": "success"
+  },
+  "S-20039": {
+     "key": "hourly_result_fetched",
+    "message": "Hourly result fetched successfully.",
+    "type": "success"
+  },
+
+
+  "S-10017": {
+    "key": "otp_sent",
+    "message": "OTP sent successfully.",
+    "type": "success"
+  },
+  "S-10018": {
+    "key": "otp_verified",
+    "message": "OTP verified successfully.",
+    "type": "success"
+  },
+  "S-10019": {
+    "key": "otp_resent",
+    "message": "OTP resent successfully.",
+    "type": "success"
+  }
+}

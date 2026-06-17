@@ -1,0 +1,267 @@
+{
+  "E-10001": {
+    "key": "generic_error",
+    "message": "Oops something went wrong",
+    "type": "server_error"
+  },
+  "E-10002": {
+    "key": "name_required",
+    "message": "Name is required",
+    "type": "validation_error"
+  },
+  "E-10003": {
+    "key": "email_required",
+    "message": "Email is required",
+    "type": "validation_error"
+  },
+  "E-10004": {
+    "key": "role_required",
+    "message": "Role is required",
+    "type": "validation_error"
+  },
+  "E-10005": {
+    "key": "organization_required",
+    "message": "Organization is required",
+    "type": "validation_error"
+  },
+  "E-10006": {
+    "key": "invalid_name_characters",
+    "message": "Only alphabets, spaces, and dots are allowed.",
+    "type": "validation_error"
+  },
+  "E-10007": {
+    "key": "name_length_invalid",
+    "message": "Name must be between 2 and 100 characters.",
+    "type": "validation_error"
+  },
+  "E-10008": {
+    "key": "invalid_email",
+    "message": "Please enter a valid email address",
+    "type": "validation_error"
+  },
+  "E-10009": {
+    "key": "email_already_registered",
+    "message": "This email address is already registered.",
+    "type": "conflict_error"
+  },
+  "E-10010": {
+    "key": "user_creation_failed",
+    "message": "Unable to add user. Please try again.",
+    "type": "server_error"
+  },
+  "E-10011": {
+    "key": "unauthorized_access",
+    "message": "Unauthorized Access! Sorry, we could not verify the user.",
+    "type": "auth_error"
+  },
+  "E-10012": {
+    "key": "token_expired",
+    "message": "Your auth token has been expired. Please login again",
+    "type": "auth_error"
+  },
+  "E-10013": {
+    "key": "forbidden_action",
+    "message": "You are not authorized to perform this action.",
+    "type": "permission_error"
+  },
+  "E-10014": {
+    "key": "no_data_found",
+    "message": "No data found.",
+    "type": "not_found_error"
+  },
+  "E-10015": {
+    "key": "no_records_found",
+    "message": "No records match the search or filter criteria.",
+    "type": "not_found_error"
+  },
+  "E-10016": {
+    "key": "no_users_found",
+    "message": "No users match your search or filter criteria.",
+    "type": "not_found_error"
+  },
+  "E-10017": {
+    "key": "no_organizations_found",
+    "message": "No organizations match your search criteria.",
+    "type": "not_found_error"
+  },
+  "E-10018": {
+    "key": "organization_name_required",
+    "message": "Organization name is required.",
+    "type": "validation_error"
+  },
+  "E-10019": {
+    "key": "organization_already_exists",
+    "message": "Organization already exists.",
+    "type": "conflict_error"
+  },
+  "E-10020": {
+    "key": "invalid_characters",
+    "message": "Invalid characters entered.",
+    "type": "validation_error"
+  },
+  "E-10021": {
+    "key": "organization_not_active",
+    "message": "This organization is not active. Please select a different organization.",
+    "type": "validation_error"
+  },
+  "E-10022": {
+    "key": "user_delete_failed",
+    "message": "Unable to delete user. Please try again.",
+    "type": "server_error"
+  },
+  "E-10023": {
+    "key": "platform_type_required",
+    "message": "Platform type is required",
+    "type": "validation_error"
+  },
+  "E-10024": {
+    "key": "invalid_role_for_platform",
+    "message": "Invalid role specified for the platform type",
+    "type": "validation_error"
+  },
+  "E-10025": {
+    "key": "assign_org_failed",
+    "message": "Unable to assign organization. Please try again.",
+    "type": "server_error"
+  },
+  "E-10026": {
+    "key": "reassign_org_failed",
+    "message": "Unable to reassign organization. Please try again.",
+    "type": "server_error"
+  },
+  "E-10027": {
+    "key": "user_not_found",
+    "message": "user not found",
+    "type": "server_error"
+  },
+  "E-10028": {
+    "key": "invalid_name_length",
+    "message": "Invalid input length. Name must be between 2 and 100 characters.",
+    "type": "validation_error"
+  },
+  "E-10029": {
+    "key": "invalid_org_name_length",
+    "message": "Invalid input length. Organization name must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10030": {
+    "key": "invalid_search_parameter",
+    "message": "Invalid search parameter.",
+    "type": "validation_error"
+  },
+  "E-10031": {
+    "key": "invalid_filter_criteria",
+    "message": "Invalid filter criteria provided.",
+    "type": "validation_error"
+  },
+  "E-10032": {
+    "key": "invalid_date_range",
+    "message": "Invalid date range provided.",
+    "type": "validation_error"
+  },
+  "E-10033": {
+    "key": "no_assets_found",
+    "message": "No assets match filter or search criteria.",
+    "type": "not_found_error"
+  },
+  "E-10034": {
+    "key": "asset_not_found",
+    "message": "Asset not found.",
+    "type": "not_found_error"
+  },
+  "E-10035": {
+    "key": "organization_not_found",
+    "message": "Organization not found.",
+    "type": "not_found_error"
+  },
+  "E-10036": {
+    "key": "email_field_empty",
+    "message": "Email field cannot be empty.",
+    "type": "validation_error"
+  },
+  "E-10037": {
+    "key": "invalid_email_format",
+    "message": "Invalid email format.",
+    "type": "validation_error"
+  },
+  "E-10038": {
+    "key": "user_not_found_login",
+    "message": "User with the given email does not exist.",
+    "type": "not_found_error"
+  },
+  "E-10039": {
+    "key": "user_account_inactive",
+    "message": "Your account is inactive. Please contact support.",
+    "type": "auth_error"
+  },
+  "E-10040": {
+    "key": "otp_field_empty",
+    "message": "Please enter the OTP",
+    "type": "validation_error"
+  },
+  "E-10041": {
+    "key": "invalid_otp_format",
+    "message": "Please enter a valid 6-digit OTP.",
+    "type": "validation_error"
+  },
+  "E-10042": {
+    "key": "incorrect_otp",
+    "message": "Incorrect OTP. Please try again.",
+    "type": "validation_error"
+  },
+  "E-10043": {
+    "key": "otp_expired",
+    "message": "OTP has expired. Please request a new one.",
+    "type": "validation_error"
+  },
+  "E-10044": {
+    "key": "account_temporarily_blocked",
+    "message": "Your account has been temporarily blocked due to too many failed attempts.",
+    "type": "auth_error"
+  },
+  "E-10045": {
+    "key": "resend_otp_limit_exceeded",
+    "message": "Resend OTP attempt limit exceeded. Please try again later.",
+    "type": "auth_error"
+  },
+  "E-10046": {
+    "key": "digest_name_required",
+    "message": "Digest name is required.",
+    "type": "validation_error"
+  },
+  "E-10047": {
+    "key": "digest_name_length_invalid",
+    "message": "Digest name must be between 2 and 150 characters.",
+    "type": "validation_error"
+  },
+  "E-10048": {
+    "key": "digest_name_already_exists",
+    "message": "Digest name already exists.",
+    "type": "conflict_error"
+  },
+  "E-10049": {
+    "key": "scope_required",
+    "message": "Scope is required.",
+    "type": "validation_error"
+  },
+  "E-10050": {
+    "key": "frequency_required",
+    "message": "Frequency is required.",
+    "type": "validation_error"
+  },
+  "E-10051": {
+    "key": "schedule_required",
+    "message": "Schedule is required.",
+    "type": "validation_error"
+  },
+  "E-10052": {
+    "key": "recipient_required",
+    "message": "At least one recipient must be selected.",
+    "type": "validation_error"
+  },
+  "E-10053": {
+    "key": "digest_not_found",
+    "message": "Digest not found.",
+    "type": "not_found_error"
+  }
+}

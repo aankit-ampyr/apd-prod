@@ -1,0 +1,8 @@
+@import "tailwindcss";
+/* allow tailwind to scan shared components */
+@source "../../../../packages/react-common/src";
+@import "@lazarus/react-common/stylesheet";
+
+.debug {
+  @apply border border-black;
+}
