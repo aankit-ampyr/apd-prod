@@ -1,10 +1,10 @@
 import {useMemo, useState, useRef, useEffect} from 'react';
-import {DashboardRouteHeaderTitles, getNormalizedRoute, Routes, RoutesWithBackButton} from '@/navigation/Routes';
+import {DashboardRouteHeaderTitles, getNormalizedRoute, RoutesWithBackButton} from '@/navigation/Routes';
 import {useLocation, useNavigate, useSearchParams} from 'react-router-dom';
 import {Text, Avatar, Icon} from '@/ui-kits';
 import {useSelector, useDispatch} from 'react-redux';
 import {authDataSelector} from '@/services/redux/selectors';
-import {resetAuth} from '@/services/redux/slice/authSlice';
+import {logoutRequest} from '@/services/redux/slice/authSlice';
 import { useScreenOverride } from '@/hooks';
 
 export const Header = () => {
@@ -59,8 +59,7 @@ export const Header = () => {
   }, []);
 
   const handleLogout = () => {
-    dispatch(resetAuth());
-    navigate(Routes.LOGIN);
+    dispatch(logoutRequest());
   };
 
   return (

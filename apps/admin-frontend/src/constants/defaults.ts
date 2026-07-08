@@ -1,5 +1,4 @@
 import type { SelectInputItem } from "@/interface";
-import { UserRole } from "./enums";
 export { PLATFORM_LABELS } from "@lazarus/react-common/constants";
 
 /**
@@ -17,18 +16,6 @@ export const autoLogoutErrorCodes: any = [
 /**
  * Reusabled Dropdown values
  */
-export const AMD_USER_ROLES: SelectInputItem[] = [
-  {id: UserRole.Analyst, label: 'Analyst'},
-  {id: UserRole.Admin, label: 'Admin'},
-  {id: UserRole.Management, label: 'Management'},
-];
-
-// export const BESS_USER_ROLES: SelectInputItem[] = [
-//   {id: UserRole.Analyst, label: 'Analyst'},
-//   {id: UserRole.Admin, label: 'Admin'},
-//   {id: UserRole.Management, label: 'Management'},
-//   {id: UserRole.Viewer, label: 'Viewer'},
-// ];
 
 export const STATUS_OPTIONS: SelectInputItem[] = [
   {id: 1, label: 'Active'},

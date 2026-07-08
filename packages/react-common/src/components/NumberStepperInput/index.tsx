@@ -93,7 +93,7 @@ export function NumberStepperInput({
       <div className="flex items-center gap-3">
         <Text
           variant="caption"
-          className="text-text-primary! font-InterMedium! my-3"
+          className="text-text-primary! font-InterMedium! my-3 whitespace-nowrap"
         >
           {label}
         </Text>
@@ -112,11 +112,13 @@ export function NumberStepperInput({
         )}
       </div>
 
-      <div className={`flex items-center gap-2 ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}>
+      <div
+        className={`flex items-center gap-2 ${disabled ? "opacity-60 cursor-not-allowed" : ""}`}
+      >
         <button
           onClick={handleDecrement}
           disabled={disabled || Number.parseFloat(value || "0") <= min}
-          className={`w-10 h-10 cursor-pointer border flex items-center justify-center border-border rounded ${
+          className={`w-10 h-10 cursor-pointer border flex items-center justify-center border-border rounded-sm ${
             disabled || Number.parseFloat(value || "0") <= min
               ? "opacity-40 cursor-not-allowed"
               : ""
@@ -131,13 +133,13 @@ export function NumberStepperInput({
           onChange={handleChange}
           onBlur={handleBlur}
           readOnly={disabled}
-          className={`w-20 px-3 py-2 border border-border rounded text-center outline-none ${disabled ? "bg-bg-card cursor-not-allowed" : ""}`}
+          className={`w-20 px-3 py-2 border border-border rounded-sm text-center outline-none ${disabled ? "bg-bg-card cursor-not-allowed" : ""}`}
         />
 
         <button
           onClick={handleIncrement}
           disabled={disabled || Number.parseFloat(value || "0") >= max}
-          className={`w-10 h-10 cursor-pointer border flex items-center justify-center border-border rounded ${
+          className={`w-10 h-10 cursor-pointer border flex items-center justify-center border-border rounded-sm ${
             disabled || Number.parseFloat(value || "0") >= max
               ? "opacity-40 cursor-not-allowed"
               : ""

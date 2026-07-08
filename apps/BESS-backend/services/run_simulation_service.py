@@ -3,6 +3,7 @@ import csv
 import pandas as pd
 import numpy as np
 import calendar
+from fastapi import status
 from typing import List, Optional
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
@@ -10,7 +11,13 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, extract, select
 from sqlalchemy.ext.asyncio import AsyncResult, AsyncSession
 
-from constants.enums import SimulationJobStatus, SimulationStatus, Month
+from constants.enums import (
+    SimulationJobStatus,
+    SimulationStatus,
+    Month,
+    PSPAuditLogScenario,
+    PSPAuditLogModules,
+)
 
 from dtos.simulation_dto import (
     HourlyResult as HourlyResultDTO,
@@ -31,9 +38,7 @@ from models.simulation_model import (
 from utils.log_utils import audit_logs
 from utils.response_utils import Res
 from python_common.utils.common_utils import paginate  # type: ignore
-from python_common.constants.enums import AuditLogModules, AuditLogScenario  # type: ignore
 from simulation_engine import bess_single_sim_task
-from .service_support import ensure_simulation_write_access
 
 
 class RunSingleSimulationService:
@@ -71,6 +76,8 @@ class RunSingleSimulationService:
             "DG Curtailed",
             "SoC (MWh)",
             "SoC %",
+            "Charging Loss (MW)",
+            "Discharging Loss (MW)",
             "Unmet (MW)",
             "Delivery",
             "Solar Curtailed",
@@ -102,6 +109,8 @@ class RunSingleSimulationService:
             SimulationHourlyResult.dg_curtailed,
             SimulationHourlyResult.soc_mwh,
             SimulationHourlyResult.soc_percent,
+            SimulationHourlyResult.charging_loss,
+            SimulationHourlyResult.discharging_loss,
             SimulationHourlyResult.unmet_mw,
             SimulationHourlyResult.delivery,
             SimulationHourlyResult.solar_curtailed,
@@ -135,6 +144,8 @@ class RunSingleSimulationService:
             "dg_curtailed": SimulationHourlyResult.dg_curtailed,
             "soc_mwh": SimulationHourlyResult.soc_mwh,
             "soc_percent": SimulationHourlyResult.soc_percent,
+            "charging_loss": SimulationHourlyResult.charging_loss,
+            "discharging_loss": SimulationHourlyResult.discharging_loss,
             "unmet_mw": SimulationHourlyResult.unmet_mw,
             "delivery": SimulationHourlyResult.delivery,
             "solar_curtailed": SimulationHourlyResult.solar_curtailed,
@@ -166,7 +177,11 @@ class RunSingleSimulationService:
 
         async for db_batch in result.partitions():
             for row in db_batch:
-                writer.writerow(row)
+                row_list = list(row)
+                if row_list[0] and hasattr(row_list[0], "tzinfo"):
+                    row_list[0] = row_list[0].replace(tzinfo=None)
+
+                writer.writerow(row_list)
 
             # Yield the chunk of CSV text to FastAPI
             yield output.getvalue()
@@ -190,13 +205,12 @@ class RunSingleSimulationService:
                 {
                     "timestamp": row.timestamp,
                     "is_dg_running": row.is_dg_running,
-                    "solar_to_load": row.solar_to_load,
-                    "bess_to_load": row.bess_to_load,
                     "dg_to_load": row.dg_to_load,
                     "load_mw": row.load_mw,
                     "solar_curtailed": row.solar_curtailed,
                     "solar_mw": row.solar_mw,
                     "delivery": row.delivery,
+                    "green_energy_to_load_mwh": row.green_energy_to_load_mwh,
                 }
             )
 
@@ -217,11 +231,6 @@ class RunSingleSimulationService:
         df["dg_running_int"] = df["is_dg_running"].astype(int)
         df["delivery_dg_off"] = (df["delivery"] & ~df["is_dg_running"]).astype(int)
 
-        # MWh condition: solar + bess to load ONLY when DG is off
-        df["green_energy_mwh"] = np.where(
-            ~df["is_dg_running"], df["solar_to_load"] + df["bess_to_load"], 0.0
-        )
-
         grouped = (
             df.groupby("month_int")
             .agg(
@@ -230,7 +239,7 @@ class RunSingleSimulationService:
                 green_delivery_hours=("delivery_dg_off", "sum"),
                 generator_hours=("dg_running_int", "sum"),
                 sum_solar_mw=("solar_mw", "sum"),
-                green_energy_to_load_mwh=("green_energy_mwh", "sum"),
+                green_energy_to_load_mwh=("green_energy_to_load_mwh", "sum"),
                 dg_to_load_mwh=("dg_to_load", "sum"),
                 curtailed_mwh=("solar_curtailed", "sum"),
             )
@@ -349,19 +358,17 @@ class RunSingleSimulationService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
         )
         simulation = result.scalar_one_or_none()
 
         if not simulation:
-            return Res.error(status_code="E-20043", message="Simulation not found")
+            return Res.error(
+                status_code="E-20043",
+                message="Simulation not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         # WARNING: Uncomment it once the progress status update is implemented after step 3.
         # if simulation.step < SimulationSetupProgress.BESS_DG_CONFIG:
@@ -375,12 +382,28 @@ class RunSingleSimulationService:
 
         single_sim_jobs = sim_job_result.scalar_one_or_none()
 
+        before_config = None
+        log_action = PSPAuditLogScenario.CUSTOM_CONF_SIMULATION_RUN.value
+
         if single_sim_jobs:
             if single_sim_jobs.status == SimulationJobStatus.COMPLETED:
                 return Res.error(
                     status_code="E-20047",
                     message="Results for this configuration are already available.",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
+            if (
+                single_sim_jobs.status == SimulationJobStatus.INITIATED
+                or single_sim_jobs.status == SimulationJobStatus.IN_PROGRESS
+            ):
+                return Res.error(
+                    status_code="E-20058",
+                    message="Simulation is already running.",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
+            log_action = PSPAuditLogScenario.CUSTOM_CONF_SIMULATION_RERUN.value
+            before_config = f"Simulation Status : {SimulationJobStatus(single_sim_jobs.status).name}"
 
             await bess_db.delete(single_sim_jobs)
             await bess_db.flush()
@@ -391,16 +414,16 @@ class RunSingleSimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
-        # await audit_logs(
-        #     db=bess_db,
-        #     user_id=f"USER-{current_user.get('id')}",
-        #     user_role=current_user.get("role"),
-        #     module=AuditLogModules.SIMULATION.value,
-        #     action=log_action,
-        #     resource_id=resource_id,
-        #     before=before_config,
-        #     after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
-        # )
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=log_action,
+            resource_id=resource_id,
+            before=before_config,
+            after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
+        )
 
         await bess_db.commit()
         await bess_db.refresh(new_simulation_job)
@@ -431,7 +454,9 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         result = await bess_db.execute(
@@ -443,7 +468,9 @@ class RunSingleSimulationService:
 
         if not simulation_result:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         data = SingleSimResultResponse.model_validate(simulation_result)
@@ -474,7 +501,9 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         query = select(SimulationHourlyResult).where(
@@ -509,6 +538,8 @@ class RunSingleSimulationService:
             "dg_curtailed": SimulationHourlyResult.dg_curtailed,
             "soc_mwh": SimulationHourlyResult.soc_mwh,
             "soc_percent": SimulationHourlyResult.soc_percent,
+            "charging_loss": SimulationHourlyResult.charging_loss,
+            "discharging_loss": SimulationHourlyResult.discharging_loss,
             "unmet_mw": SimulationHourlyResult.unmet_mw,
             "delivery": SimulationHourlyResult.delivery,
             "solar_curtailed": SimulationHourlyResult.solar_curtailed,
@@ -528,6 +559,9 @@ class RunSingleSimulationService:
                 if field in sort_map:
                     col = sort_map[field]
                     order_by.append(col.desc() if direction == "desc" else col.asc())
+
+        if not order_by:
+            order_by.append(SimulationHourlyResult.hour.asc())
 
         # Paginate
         pagination = await paginate(
@@ -592,7 +626,9 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         query = select(SimulationHourlyResult).where(
@@ -686,6 +722,8 @@ class RunSingleSimulationService:
         self,
         simulation_id: int,
         bess_db: AsyncSession,
+        current_user: dict,
+        resource_id: str,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         sort: Optional[List[str]] = None,
@@ -702,8 +740,23 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.CUSTOM_CONF_HOURLY_EXPORTED.value,
+            resource_id=resource_id,
+            before=None,
+            after="Action: Custom Configuration Hourly Performance Exported",
+        )
+
+        await bess_db.commit()
 
         return StreamingResponse(
             self._generate_hourly_result_csv(
@@ -725,6 +778,8 @@ class RunSingleSimulationService:
         months: Optional[list[Month]],
         sort: Optional[str],
         bess_db: AsyncSession,
+        current_user: dict,
+        resource_id: str,
         yield_per: int = 1000,
     ):
         result = await bess_db.execute(
@@ -739,7 +794,9 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
         stmt = select(SimulationHourlyResult).where(
             SimulationHourlyResult.custom_job_id == simulation_job.job_id,
@@ -761,6 +818,19 @@ class RunSingleSimulationService:
             simulation_id=simulation_id, year=year, result=hourly_data
         )
 
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.CUSTOM_CONF_RESULT_VIEWED.value,
+            resource_id=resource_id,
+            before=None,
+            after="Action: Detailed Analysis Page Opened",
+        )
+
+        await bess_db.commit()
+
         if sort in ("month", "-month"):
             descending = sort.startswith("-")
             data.result.sort(
@@ -775,6 +845,8 @@ class RunSingleSimulationService:
         simulation_id: int,
         months: Optional[list[Month]],
         sort: Optional[str],
+        current_user: dict,
+        resource_id: str,
         bess_db: AsyncSession,
     ):
         result = await bess_db.execute(
@@ -789,8 +861,23 @@ class RunSingleSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20052", message="Simulation result not found."
+                status_code="E-20052",
+                message="Simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.CUSTOM_CONF_MONTHLY_EXPORTED.value,
+            resource_id=resource_id,
+            before=None,
+            after="Action: Custom Configuration Monthly Performance Exported",
+        )
+
+        await bess_db.commit()
 
         return StreamingResponse(
             self._generate_monthly_result_csv(

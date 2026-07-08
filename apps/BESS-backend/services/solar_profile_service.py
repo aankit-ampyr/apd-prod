@@ -6,25 +6,28 @@ import traceback
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 from uuid import uuid4
 import io
 
 import pandas as pd
-from fastapi import UploadFile
+from fastapi import UploadFile, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from constants.defaults import STATIC_INPUTS_DIR, STATIC_SOLAR_PROFILES
-from constants.enums import SimulationLogStep, SimulationSetupProgress
+from constants.enums import (
+    SimulationLogStep,
+    SimulationSetupProgress,
+    PSPAuditLogModules,
+    PSPAuditLogScenario,
+)
 from dtos.solar_profile_dto import SolarProfileComputeRequest
 from models import SolarProfileSource, LoadProfile, SolarProfileConfig
-from python_common.constants.enums import AuditLogModules, AuditLogScenario
 from utils import FileStorageManager, Res
 from utils.log_utils import audit_logs
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -211,30 +214,30 @@ class SolarProfileService:
             return Res.error(
                 status_code="E-20022",
                 message="Negative solar generation found",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
         if err.startswith("E-20035"):
             return Res.error(
                 status_code="E-20035",
                 message=self.ROW_COUNT_REQUIREMENT_MESSAGE,
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
         if err.startswith("E-20017"):
             return Res.error(
                 status_code="E-20020",
                 message="Invalid file format for the solar profile calculation. Please upload a valid CSV file and try again.",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
         if err.startswith("E-20019"):
             return Res.error(
                 status_code="E-20019",
                 message="Failed to parse CSV",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
         return Res.error(
             status_code="E-20019",
             message="Failed to parse CSV",
-            http_status_code=400,
+            http_status_code=status.HTTP_400_BAD_REQUEST,
         )
 
     def _download_bytes(self, source: SolarProfileSource) -> bytes:
@@ -388,12 +391,6 @@ class SolarProfileService:
         current_user: dict,
     ):
         try:
-            simulation, auth_error = await ensure_simulation_write_access(
-                db=bess_db, simulation_id=simulation_id, current_user=current_user
-            )
-            if auth_error:
-                return auth_error
-
             file_bytes = await file.read()
             size_bytes = len(file_bytes)
 
@@ -402,7 +399,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20021",
                     message="File size exceeds 200MB limit",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             # Fast upload-time validation (exact row count + structural checks).
@@ -425,7 +422,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20049",
                     message="Duplicate file not accepted",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             stored_suffix = uuid4().hex
@@ -462,14 +459,16 @@ class SolarProfileService:
                 "name": record.name,
                 "id": record.id,
             }
-            return Res.success("S-20005", data=data, http_status_code=200)
+            return Res.success(
+                "S-20005", data=data, http_status_code=status.HTTP_200_OK
+            )
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
             return Res.error(
                 status_code="E-20001",
                 message="Unable to upload solar profile CSV",
-                http_status_code=500,
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     async def compute_solar_profile(
@@ -478,16 +477,10 @@ class SolarProfileService:
         simulation_id: int,
         payload: SolarProfileComputeRequest,
         current_user: dict,
-        resource_id: str = None,
+        resource_id: Optional[str] = None,
         is_saved: bool = False,
     ):
         try:
-            simulation, auth_error = await ensure_simulation_write_access(
-                db=bess_db, simulation_id=simulation_id, current_user=current_user
-            )
-            if auth_error:
-                return auth_error
-
             source_type = payload.type  # "static" | "file"
             source_id = payload.source_id
 
@@ -513,7 +506,7 @@ class SolarProfileService:
                     return Res.error(
                         status_code="E-20023",
                         message="Static solar profile source not found",
-                        http_status_code=404,
+                        http_status_code=status.HTTP_404_NOT_FOUND,
                     )
             else:
                 # File mode: Query by source_id from database
@@ -527,7 +520,7 @@ class SolarProfileService:
                     return Res.error(
                         status_code="E-20019",
                         message="Uploaded solar profile source not found",
-                        http_status_code=404,
+                        http_status_code=status.HTTP_404_NOT_FOUND,
                     )
 
                 file_bytes = self._download_bytes(source)
@@ -553,7 +546,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20019",
                     message="Load profile not found for the given simulation",
-                    http_status_code=404,
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
             computed = self._compute_metrics(parsed, load_series)
             config_row = None
@@ -599,14 +592,14 @@ class SolarProfileService:
                     config_row.output_graph_points = output_graph_points
 
                     await depreciate_simulation_job(
-                        simulation_id=simulation_id, db=bess_db
+                        simulation_id=simulation_id, db=bess_db, include_green_job=True
                     )
                     await audit_logs(
                         db=bess_db,
                         user_id=f"USER-{current_user.get('id')}",
                         user_role=current_user.get("role"),
-                        module=AuditLogModules.PROJECT_MANAGEMENT_BESS.value,
-                        action=AuditLogScenario.PROJECT_EDITED.value,
+                        module=PSPAuditLogModules.SIMULATION.value,
+                        action=PSPAuditLogScenario.SOLAR_PROFILE_UPDATED.value,
                         resource_id=resource_id,
                         before=json.dumps(
                             {
@@ -647,14 +640,14 @@ class SolarProfileService:
                     # Update the simulation setup progress
 
                     await depreciate_simulation_job(
-                        simulation_id=simulation_id, db=bess_db
+                        simulation_id=simulation_id, db=bess_db, include_green_job=True
                     )
                     await audit_logs(
                         db=bess_db,
                         user_id=f"USER-{current_user.get('id')}",
                         user_role=current_user.get("role"),
-                        module=AuditLogModules.PROJECT_MANAGEMENT_BESS.value,
-                        action=AuditLogScenario.PROJECT_EDITED.value,
+                        module=PSPAuditLogModules.SIMULATION.value,
+                        action=PSPAuditLogScenario.SOLAR_PROFILE_CREATED.value,
                         resource_id=resource_id,
                         before=None,
                         after=json.dumps(
@@ -685,7 +678,9 @@ class SolarProfileService:
                 },
                 **computed,
             }
-            return Res.success("S-20006", data=data, http_status_code=200)
+            return Res.success(
+                "S-20006", data=data, http_status_code=status.HTTP_200_OK
+            )
 
         except Exception:
             tb = traceback.format_exc()
@@ -694,7 +689,7 @@ class SolarProfileService:
                 status_code="E-20001",
                 message="Unable to compute solar profile",
                 debug=tb,
-                http_status_code=500,
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     async def compute_and_save_solar_profile(
@@ -747,7 +742,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20023",
                     message="Static solar profile source not found",
-                    http_status_code=404,
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
         else:
             # file mode
@@ -761,7 +756,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20019",
                     message="Uploaded solar profile source not found",
-                    http_status_code=404,
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
             source_metadata = {
                 "name": source.name,
@@ -815,7 +810,7 @@ class SolarProfileService:
                 return Res.error(
                     status_code="E-20005",
                     message="No files found",
-                    http_status_code=404,
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
             file_list = [
                 {
@@ -836,5 +831,5 @@ class SolarProfileService:
             return Res.error(
                 status_code="E-20001",
                 message="Unable to fetch files",
-                http_status_code=500,
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

@@ -1,0 +1,108 @@
+version: "3.9"
+
+name: lazarus-dev
+
+services:
+  amd-backend:
+    image: lazarus/amd-backend:dev
+    build:
+      context: .
+      dockerfile: ./apps/AMD-backend/Dockerfile
+    container_name: lazarus-AMD-backend-dev
+    env_file:
+      - ./apps/AMD-backend/.env
+    ports:
+      - "8011:8010"
+
+  amd-frontend:
+    image: lazarus/amd-frontend:dev
+    build:
+      context: .
+      dockerfile: ./apps/AMD-frontend/Dockerfile
+    container_name: lazarus-AMD-frontend-dev
+    env_file:
+      - ./apps/AMD-frontend/.env
+    ports:
+      - "3011:3010"
+    depends_on:
+      - amd-backend
+    restart: unless-stopped
+
+  bess-backend:
+    image: lazarus/bess-backend:dev
+    build:
+      context: .
+      dockerfile: ./apps/BESS-backend/Dockerfile
+    container_name: lazarus-BESS-backend-dev
+    env_file:
+      - ./apps/BESS-backend/.env
+    ports:
+      - "8021:8020"
+    depends_on:
+      - lazarus-redis
+
+  bess-worker:
+    image: lazarus/bess-backend:dev
+    build:
+      context: .
+      dockerfile: ./apps/BESS-backend/Dockerfile
+    container_name: lazarus-BESS-worker-dev
+    env_file:
+      - ./apps/BESS-backend/.env
+    depends_on:
+      - lazarus-redis
+    command:
+      ["/app/.venv/bin/taskiq", "worker", "broker:broker", "--workers", "5"]
+
+  bess-frontend:
+    image: lazarus/bess-frontend:dev
+    build:
+      context: .
+      dockerfile: ./apps/BESS-frontend/Dockerfile
+    container_name: lazarus-BESS-frontend-dev
+    env_file:
+      - ./apps/BESS-frontend/.env
+    ports:
+      - "3021:3020"
+
+  admin-backend:
+    image: lazarus/admin-backend:dev
+    build:
+      context: .
+      dockerfile: ./apps/admin-backend/Dockerfile
+    container_name: lazarus-admin-backend-dev
+    env_file:
+      - ./apps/admin-backend/.env
+    ports:
+      - "8031:8030"
+
+  admin-frontend:
+    image: lazarus/admin-frontend:dev 
+    build:
+      context: .
+      dockerfile: ./apps/admin-frontend/Dockerfile
+    container_name: lazarus-admin-frontend-dev
+    env_file:
+      - ./apps/admin-frontend/.env
+    ports:
+      - "3031:3030"
+
+  lazarus-redis:
+    image: redis:7-alpine
+    container_name: lazarus-redis-dev
+    restart: always
+    ports:
+      - "6378:6379"
+    volumes:
+      - redis_data_dev:/data
+    command: ["redis-server", "--replicaof", "no", "one"]
+    networks:
+      - default
+
+networks:
+  default:
+    external: true
+    name: lazarus-app-default-dev
+
+volumes:
+  redis_data_dev:

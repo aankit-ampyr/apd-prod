@@ -2,7 +2,14 @@ from datetime import datetime, timezone, time
 from sqlalchemy import select, func
 from math import ceil
 from sqlalchemy.ext.asyncio import AsyncSession
-from constants.enums import SimulationSetupProgress, UserRole, SimulationStatus
+from fastapi import status
+from constants.enums import (
+    PSPAuditLogModules,
+    PSPAuditLogScenario,
+    SimulationSetupProgress,
+    UserRole,
+    SimulationStatus,
+)
 import traceback
 from dtos.simulation_dto import SimulationDetails
 from models.simulation_model import (
@@ -17,7 +24,6 @@ from models.simulation_model import (
     SolarProfileSource,
 )
 from models.project_model import Project, ProjectUserAssignment
-from python_common.constants.enums import AuditLogModules, AuditLogScenario
 from utils.log_utils import audit_logs
 from utils.response_utils import Res
 
@@ -77,9 +83,9 @@ class SimulationService:
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{user_id}",
-            user_role=current_user.get("role"),
-            module=AuditLogModules.SIMULATION.value,
-            action=AuditLogScenario.SIMULATION_CREATED.value,
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.SIMULATION_CREATED.value,
             resource_id=project.proj_id,
             before=None,
             after=str(
@@ -108,12 +114,16 @@ class SimulationService:
         self, db: AsyncSession, project_id: int, params, current_user: dict
     ):
         try:
-            user_id = int(current_user.get("id"))
+            user_id = int(current_user.get("id"))  # type: ignore
             user_role = current_user.get("role")
 
             project = await db.get(Project, project_id)
             if not project or project.is_deleted:
-                return Res.error("E-20015", message="Project not found")
+                return Res.error(
+                    status_code="E-20015",
+                    message="Project not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             assignment = await db.execute(
                 select(ProjectUserAssignment).where(
@@ -122,7 +132,11 @@ class SimulationService:
                 )
             )
             if not assignment.scalar_one_or_none():
-                return Res.error("E-20004", message="Not authorized")
+                return Res.error(
+                    status_code="E-20004",
+                    message="Not authorized",
+                    http_status_code=status.HTTP_403_FORBIDDEN,
+                )
 
             query = select(Simulation).where(Simulation.project_id == project_id)
 
@@ -154,9 +168,15 @@ class SimulationService:
                     [params.search, params.status, params.start_date, params.end_date]
                 ):
                     return Res.error(
-                        "E-20005", message="No simulations found for this project."
+                        status_code="E-20005",
+                        message="No simulations found for this project.",
+                        http_status_code=status.HTTP_400_BAD_REQUEST,
                     )
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    status_code="E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             if params.sort == "desc":
                 query = query.order_by(Simulation.updated_at.desc())
@@ -193,10 +213,16 @@ class SimulationService:
                 "next_page": next_page,
                 "current_page": page,
             }
-            return Res.success("S-20027", data=data)
+            return Res.success(
+                "S-20027", data=data, http_status_code=status.HTTP_200_OK
+            )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-20001", message="Something went wrong")
+            return Res.error(
+                status_code="E-20001",
+                message="Something went wrong",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     async def update_simulation(
         self,
@@ -207,7 +233,7 @@ class SimulationService:
         resource_id: str,
     ):
         try:
-            user_id = int(current_user.get("id"))
+            user_id = int(current_user.get("id"))  # type: ignore
             user_role = current_user.get("role")
 
             result = await bess_db.execute(
@@ -216,10 +242,18 @@ class SimulationService:
             simulation = result.scalar_one_or_none()
 
             if not simulation:
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    status_code="E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             if not name or not name.strip():
-                return Res.error("E-10201", message="Name cannot be empty")
+                return Res.error(
+                    "E-10201",
+                    message="Name cannot be empty",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
             existing_simulation = await bess_db.execute(
                 select(Simulation).where(
@@ -232,7 +266,11 @@ class SimulationService:
                 existing_simulation.scalars().first()
             )  # might be having more than one entry, scalar_one_or_none() will fail
             if existing_simulation:
-                return Res.error("E-20045")
+                return Res.error(
+                    status_code="E-20045",
+                    message="Simulation already exists.",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
+                )
 
             project_id = simulation.project_id
             assignment = await bess_db.execute(
@@ -245,7 +283,11 @@ class SimulationService:
             is_assigned_user = assignment.scalar_one_or_none() is not None
 
             if not is_assigned_user and user_role != UserRole.ADMIN:
-                return Res.error("E-20004")
+                return Res.error(
+                    status_code="E-20004",
+                    message="You are not authorized to perform this action.",
+                    http_status_code=status.HTTP_403_FORBIDDEN,
+                )
 
             before_name = simulation.name
             simulation.name = name
@@ -254,9 +296,9 @@ class SimulationService:
             await audit_logs(
                 db=bess_db,
                 user_id=f"USER-{user_id}",
-                user_role=user_role,
-                module=AuditLogModules.SIMULATION.value,
-                action=AuditLogScenario.SIMULATION_EDITED.value,
+                user_role=user_role,  # type: ignore
+                module=PSPAuditLogModules.SIMULATION.value,
+                action=PSPAuditLogScenario.SIMULATION_EDITED.value,
                 resource_id=resource_id,
                 before=str({"Simulation Name": before_name}),
                 after=str({"Simulation Name": simulation.name}),
@@ -277,11 +319,16 @@ class SimulationService:
                     "last_updated": simulation.updated_at.isoformat(),
                     "project_id": simulation.project_id,
                 },
+                http_status_code=status.HTTP_200_OK,
             )
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
-            return Res.error("E-20001")
+            return Res.error(
+                status_code="E-20001",
+                message="Oops! Something went wrong.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     async def delete_simulation(
         self,
@@ -293,19 +340,25 @@ class SimulationService:
         try:
             sim = await bess_db.get(Simulation, simulation_id)
             if not sim:
-                return Res.success("S-20029", data={"id": simulation_id})
+                return Res.success(
+                    "S-20029",
+                    data={"id": simulation_id},
+                    http_status_code=status.HTTP_200_OK,
+                )
 
             if current_user.get("role") not in [UserRole.ADMIN, UserRole.ANALYST]:
                 return Res.error(
-                    "E-20004", message="Not authorized to delete simulation."
+                    status_code="E-20004",
+                    message="Not authorized to delete simulation.",
+                    http_status_code=status.HTTP_403_FORBIDDEN,
                 )
 
             await audit_logs(
                 db=bess_db,
                 user_id=f"USER-{current_user.get('id')}",
-                user_role=current_user.get("role"),
-                module=AuditLogModules.SIMULATION.value,
-                action=AuditLogScenario.SIMULATION_DELETED.value,
+                user_role=current_user.get("role"),  # type: ignore
+                module=PSPAuditLogModules.SIMULATION.value,
+                action=PSPAuditLogScenario.SIMULATION_DELETED.value,
                 resource_id=resource_id,
                 before=str(
                     {
@@ -318,17 +371,25 @@ class SimulationService:
 
             await bess_db.delete(sim)
             await bess_db.commit()
-            return Res.success("S-20029", data={"id": simulation_id})
+            return Res.success(
+                "S-20029",
+                data={"id": simulation_id},
+                http_status_code=status.HTTP_200_OK,
+            )
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
-            return Res.error("E-20001", message="Unable to delete simulation.")
+            return Res.error(
+                status_code="E-20001",
+                message="Unable to delete simulation.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
     async def get_simulation_details(
         self, bess_db: AsyncSession, simulation_id: int, current_user: dict
     ):
         try:
-            user_id = int(current_user.get("id"))
+            user_id = int(current_user.get("id"))  # type: ignore
             user_role = current_user.get("role")
 
             query = (
@@ -377,7 +438,11 @@ class SimulationService:
             result = await bess_db.execute(query)
             result = result.first()
             if not result:
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    status_code="E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             (
                 simulation,
@@ -392,7 +457,11 @@ class SimulationService:
             ) = result
 
             if not simulation:
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    status_code="E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             # Attach joined properties to avoid lazy-load issues during Pydantic validation
             simulation.load_profile = load_profile
@@ -428,12 +497,19 @@ class SimulationService:
             is_assigned_user = assignment.scalar_one_or_none() is not None
 
             if not is_assigned_user and user_role != UserRole.ADMIN and not is_owner:
-                return Res.error("E-20004")
+                return Res.error("E-20004", http_status_code=status.HTTP_403_FORBIDDEN)
 
             data = SimulationDetails.model_validate(simulation)
 
-            return Res.success("S-20031", data=data.model_dump(mode="json"))
+            return Res.success(
+                status_code="S-20031",
+                data=data.model_dump(mode="json"),
+                http_status_code=status.HTTP_200_OK,
+            )
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
-            return Res.error("E-20001")
+            return Res.error(
+                status_code="E-20001",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

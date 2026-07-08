@@ -107,7 +107,7 @@ class AnalysisController:
         year: int = Query(...),
         db: AsyncSession = Depends(get_db),
         current_user: dict = Depends(
-            allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value)
+            allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value,UserRole.MANAGER.value)
         ),
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
@@ -563,7 +563,7 @@ class AnalysisController:
         month: int = Query(...), 
         year: int = Query(...), 
         db: AsyncSession = Depends(get_db), 
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value))
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value,UserRole.MANAGER.value))
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
             return Res.error("E-10013", message="Unauthorized: AMD platform required")
@@ -575,7 +575,7 @@ class AnalysisController:
         month: int = Query(...), 
         year: int = Query(...), 
         db: AsyncSession = Depends(get_db), 
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value))
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value,UserRole.MANAGER.value))
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
             return Res.error("E-10013", message="Unauthorized: AMD platform required")
@@ -588,7 +588,7 @@ class AnalysisController:
             month: int = Query(...), 
             year: int = Query(...), 
             db: AsyncSession = Depends(get_db), 
-            current_user=Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value))
+            current_user=Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value,UserRole.MANAGER.value))
         ):
             if Platform.AMD.value not in current_user.get("platform", []): 
                 return Res.error("E-10013", message="Unauthorized: AMD platform required")
@@ -600,7 +600,7 @@ class AnalysisController:
             month: int = Query(...), 
             year: int = Query(...), 
             db: AsyncSession = Depends(get_db), 
-            current_user=Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value))
+            current_user=Depends(allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value,UserRole.MANAGER.value))
         ):
             if Platform.AMD.value not in current_user.get("platform", []): 
                 return Res.error("E-10013", message="Unauthorized: AMD platform required")
@@ -846,3 +846,127 @@ class AnalysisController:
             current_user=current_user,
     
         )
+    
+    async def get_revenue_by_stream_analysis(
+        self,
+        asset_id: int,
+        year: int = Query(...),
+        months: List[int] = Query(None),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):  
+        if Platform.AMD.value not in current_user.get("platform", []): 
+                return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.get_revenue_by_stream_analysis(
+           db=db,
+            asset_id=asset_id,
+            year=year,
+            months=months,
+            current_user=current_user,
+    
+        )
+      
+      
+    async def get_monthly_revenue_comparison(
+        self,
+        asset_id: int,
+        year: int = Query(...),
+        month: int = Query(None),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.get_monthly_revenue_comparison(
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            month=month,
+            current_user=current_user,
+    
+        )
+    
+    async def export_revenue_by_stream_analysis(
+        self,
+        asset_id: int,
+        months: List[int] = Query(None),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):  
+        if Platform.AMD.value not in current_user.get("platform", []): 
+                return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.export_revenue_by_stream_analysis(
+            db=db,
+            asset_id=asset_id,
+            months=months,
+            year=year,
+            current_user=current_user,
+        )
+  
+    
+    
+    async def export_monthly_revenue_comparison(
+        self,
+        asset_id: int,
+        year: int = Query(...),
+        months: List[int] = Query(None),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.export_monthly_revenue_comparison(
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            months=months,
+            current_user=current_user,
+        )
+    
+    async def get_executive_summary(
+        self,
+        asset_id: int,
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.get_executive_summary(
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            current_user=current_user,
+        )
+    
+    async def export_executive_summary(
+        self,
+        asset_id: int,
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value,UserRole.MANAGER.value)
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+        return await self.service.export_executive_summary(
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            current_user=current_user,
+        )
+
+    
+    

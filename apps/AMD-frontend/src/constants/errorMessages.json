@@ -589,61 +589,6 @@
     "message": "This action cannot be perform on solar asset",
     "type": "validation_error"
   },
-  "E-10201": {
-    "key": "only_numeric_values_allowed",
-    "message": "Only numeric values are allowed.",
-    "type": "validation_error"
-  },
-  "E-10202": {
-    "key": "negative_values_not_allowed",
-    "message": "Negative values are not allowed.",
-    "type": "validation_error"
-  },
-  "E-10203": {
-    "key": "value_between_80_and_90",
-    "message": "Value must be between 80% and 90%.",
-    "type": "validation_error"
-  },
-  "E-10204": {
-    "key": "value_between_0_5_and_3_0",
-    "message": "Value must be between 0.5 and 3.0.",
-    "type": "validation_error"
-  },
-  "E-10205": {
-    "key": "industry_low_lte_mid",
-    "message": "Industry Low must be less than or equal to Industry Mid.",
-    "type": "validation_error"
-  },
-  "E-10206": {
-    "key": "industry_mid_lte_high",
-    "message": "Industry Mid must be less than or equal to Industry High.",
-    "type": "validation_error"
-  },
-  "E-10207": {
-    "key": "industry_low_lte_high",
-    "message": "Industry Low must be less than or equal to Industry High.",
-    "type": "validation_error"
-  },
-  "E-10208": {
-    "key": "benchmark_config_validation_failed",
-    "message": "Benchmark configuration validation failed.",
-    "type": "validation_error"
-  },
-  "E-10209": {
-    "key": "only_integers_allowed",
-    "message": "Invalid input. Only integers allowed. Please check values.",
-    "type": "validation_error"
-  },
-  "E-10210": {
-    "key": "monthly_hardcoded_values_validation_failed",
-    "message": "Monthly hardcoded values validation failed.",
-    "type": "validation_error"
-  },
-  "E-10211": {
-    "key": "atmost 2 decimal places",
-    "message": "Value must have atmost 2 decimal places",
-    "type": "validation_error"
-  },
   "E-10121": {
     "key": "analysis_not_allowed_on_solar_asset",
     "message": "The analysis cannot be performed on solar asset",
@@ -700,8 +645,473 @@
     "type": "server_error"
   },
   "E-10132": {
-    "key": "",
+    "key": "optimized_dataset_not_found",
     "message": "Optimized dataset not found",
     "type": "server_error"
+  },
+  "E-10133": {
+    "key": "required_columns_missing_optimized_dataset",
+    "message": "Required columns are missing in the optimized dataset for KPI calculation.",
+    "type": "validation_error"
+  },
+  "E-10134": {
+    "key": "invalid_market_strategy_value",
+    "message": "Invalid market strategy value provided.",
+    "type": "validation_error"
+  },
+  "E-10135": {
+    "key": "failed_to_aggregate_optimized_market_analysis_data",
+    "message": "Failed to aggregate optimized market analysis data.",
+    "type": "server_error"
+  },
+  "E-10136": {
+    "key": "missing_market_price_columns_volatility",
+    "message": "Required columns are missing in the market price dataset for volatility calculation.",
+    "type": "validation_error"
+  },
+  "E-10137": {
+    "key": "failed_to_calculate_price_volatility_analysis",
+    "message": "Failed to calculate price volatility analysis.",
+    "type": "server_error"
+  },
+  "E-10138": {
+    "key": "cannot_submit_onboarded_asset_for_approval",
+    "message": "Cannot submit onboarded asset for approval",
+    "type": "validation_error"
+  },
+  "E-10139": {
+    "key": "missing_actual_strategy_columns",
+    "message": "Required Actual Strategy columns are missing from merged dataset.",
+    "type": "validation_error"
+  },
+  "E-10140": {
+    "key": "failed_to_calculate_actual_strategy_market_assignment",
+    "message": "Failed to calculate Actual Strategy market assignment.",
+    "type": "server_error"
+  },
+  "E-10141": {
+    "key": "missing_market_price_columns_correlation",
+    "message": "Required market price columns are missing for correlation matrix calculation.",
+    "type": "validation_error"
+  },
+  "E-10142": {
+    "key": "insufficient_records_correlation_matrix",
+    "message": "Insufficient valid records available for correlation matrix calculation.",
+    "type": "validation_error"
+  },
+  "E-10143": {
+    "key": "std_dev_calculation_failed",
+    "message": "Standard deviation cannot be calculated for one or more markets.",
+    "type": "validation_error"
+  },
+  "E-10144": {
+    "key": "failed_to_calculate_price_correlation_matrix",
+    "message": "Failed to calculate price correlation matrix.",
+    "type": "server_error"
+  },
+  "E-10145": {
+    "key": "iar_dataset_not_available",
+    "message": "IAR dataset is not available.",
+    "type": "not_found_error"
+  },
+  "E-10146": {
+    "key": "actual_revenue_dataset_not_available",
+    "message": "Actual revenue dataset is not available.",
+    "type": "not_found_error"
+  },
+  "E-10147": {
+    "key": "missing_iar_columns",
+    "message": "Required IAR columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10148": {
+    "key": "missing_actual_revenue_columns",
+    "message": "Required actual revenue columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10149": {
+    "key": "asset_capacity_missing",
+    "message": "Asset capacity is missing.",
+    "type": "validation_error"
+  },
+  "E-10150": {
+    "key": "variance_calculation_failed",
+    "message": "Variance calculation failed.",
+    "type": "server_error"
+  },
+  "E-10151": {
+    "key": "division_by_zero_variance_calculation",
+    "message": "Division by zero occurred during variance calculation.",
+    "type": "validation_error"
+  },
+  "E-10152": {
+    "key": "revenue_calculation_failed",
+    "message": "Revenue calculation failed.",
+    "type": "server_error"
+  },
+  "E-10153": {
+    "key": "revenue_iar_vs_actual_comparison_failed",
+    "message": "Failed to calculate Revenue IAR vs Actual comparison.",
+    "type": "server_error"
+  },
+  "E-10154": {
+    "key": "optimized_dataset_not_found",
+    "message": "Optimized dataset not found.",
+    "type": "not_found_error"
+  },
+  "E-10155": {
+    "key": "missing_merged_dataset_columns",
+    "message": "Required merged dataset columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10156": {
+    "key": "missing_optimized_dataset_columns",
+    "message": "Required optimized dataset columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10157": {
+    "key": "failed_to_calculate_multi_market_optimized_vs_actual_revenue",
+    "message": "Failed to calculate optimized vs actual revenue.",
+    "type": "server_error"
+  },
+  "E-10158": {
+    "key": "failed_to_calculate_capture_rate",
+    "message": "Failed to calculate capture rate.",
+    "type": "server_error"
+  },
+  "E-10159": {
+    "key": "division_by_zero_capture_rate_calculation",
+    "message": "Division by zero occurred during capture rate calculation.",
+    "type": "validation_error"
+  },
+  "E-10160": {
+    "key": "missing_ancillary_revenue_columns",
+    "message": "Required ancillary revenue columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10161": {
+    "key": "missing_ancillary_availability_columns",
+    "message": "Required ancillary availability columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10162": {
+    "key": "missing_ancillary_clearing_price_columns",
+    "message": "Required ancillary clearing price columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10163": {
+    "key": "missing_timestamp_or_hour_column",
+    "message": "Required timestamp or hour column is missing.",
+    "type": "validation_error"
+  },
+  "E-10164": {
+    "key": "missing_ancillary_revenue_columns_imbalance",
+    "message": "Required ancillary revenue columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10165": {
+    "key": "missing_ancillary_availability_columns_imbalance",
+    "message": "Required ancillary availability columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10166": {
+    "key": "opportunity_cost_analysis_kpi_calculation_failed",
+    "message": "Opportunity cost analysis KPI calculation failed.",
+    "type": "server_error"
+  },
+  "E-10167": {
+    "key": "service_revenue_by_hour_calculation_failed",
+    "message": "Service revenue by hour calculation failed.",
+    "type": "server_error"
+  },
+  "E-10168": {
+    "key": "missing_imbalance_revenue_column",
+    "message": "Required imbalance revenue column is missing.",
+    "type": "validation_error"
+  },
+  "E-10169": {
+    "key": "missing_imbalance_charge_column",
+    "message": "Required imbalance charge column is missing.",
+    "type": "validation_error"
+  },
+  "E-10170": {
+    "key": "imbalance_summary_calculation_failed",
+    "message": "Imbalance summary calculation failed.",
+    "type": "server_error"
+  },
+  "E-10171": {
+    "key": "daily_imbalance_breakdown_calculation_failed",
+    "message": "Daily imbalance breakdown calculation failed.",
+    "type": "server_error"
+  },
+  "E-10172": {
+    "key": "top_5_worst_imbalance_days_calculation_failed",
+    "message": "Top 5 worst imbalance days calculation failed.",
+    "type": "server_error"
+  },
+  "E-10173": {
+    "key": "imbalance_by_hour_calculation_failed",
+    "message": "Imbalance by hour of day calculation failed.",
+    "type": "server_error"
+  },
+  "E-10174": {
+    "key": "top_5_worst_imbalance_days_export_generation_failed",
+    "message": "Top 5 worst imbalance days export generation failed.",
+    "type": "server_error"
+  },
+  "E-10175": {
+    "key": "missing_power_mw_column",
+    "message": "Required Power_MW column is missing.",
+    "type": "validation_error"
+  },
+  "E-10176": {
+    "key": "missing_optimised_net_mwh_multi_column",
+    "message": "Required Optimised_Net_MWh_Multi column is missing.",
+    "type": "validation_error"
+  },
+  "E-10177": {
+    "key": "missing_power_mw_column_battery_health",
+    "message": "Required Power_MW column is missing.",
+    "type": "validation_error"
+  },
+  "E-10178": {
+    "key": "missing_optimised_net_mwh_multi_battery_health",
+    "message": "Required Optimised_Net_MWh_Multi column is missing.",
+    "type": "validation_error"
+  },
+  "E-10179": {
+    "key": "battery_capacity_missing_asset_config",
+    "message": "Battery capacity is missing from asset configuration.",
+    "type": "validation_error"
+  },
+  "E-10180": {
+    "key": "battery_capacity_must_be_greater_than_zero",
+    "message": "Battery capacity must be greater than zero.",
+    "type": "validation_error"
+  },
+  "E-10181": {
+    "key": "missing_optimised_net_mwh_daily_column",
+    "message": "Required Optimised_Net_MWh_Daily column is missing.",
+    "type": "validation_error"
+  },
+  "E-10182": {
+    "key": "missing_optimised_net_mwh_efa_column",
+    "message": "Required Optimised_Net_MWh_EFA column is missing.",
+    "type": "validation_error"
+  },
+  "E-10183": {
+    "key": "invalid_cycle_calculation_method",
+    "message": "Invalid cycle calculation method selected.",
+    "type": "validation_error"
+  },
+  "E-10184": {
+    "key": "degradation_per_cycle_percentage_not_configured",
+    "message": "Degradation per cycle percentage is not configured.",
+    "type": "validation_error"
+  },
+  "E-10185": {
+    "key": "warranty_threshold_not_configured",
+    "message": "Warranty threshold is not configured.",
+    "type": "validation_error"
+  },
+  "E-10186": {
+    "key": "daily_cycle_value_missing",
+    "message": "Daily cycle value is missing for one or more strategies.",
+    "type": "validation_error"
+  },
+  "E-10187": {
+    "key": "annual_degradation_limit_configuration_missing",
+    "message": "Annual degradation limit configuration is missing.",
+    "type": "validation_error"
+  },
+  "E-10188": {
+    "key": "warranty_limit_configuration_missing",
+    "message": "Warranty limit configuration is missing.",
+    "type": "validation_error"
+  },
+  "E-10189": {
+    "key": "unable_to_calculate_degradation_per_cycle",
+    "message": "Unable to calculate degradation per cycle.",
+    "type": "server_error"
+  },
+  "E-10190": {
+    "key": "invalid_projected_annual_degradation_value",
+    "message": "Invalid projected annual degradation value.",
+    "type": "validation_error"
+  },
+  "E-10191": {
+    "key": "missing_day_ahead_price_epex_column",
+    "message": "Required Day Ahead Price EPEX column is missing.",
+    "type": "validation_error"
+  },
+  "E-10192": {
+    "key": "missing_arbitrage_revenue_columns",
+    "message": "Required arbitrage revenue columns are missing.",
+    "type": "validation_error"
+  },
+  "E-10193": {
+    "key": "usable_capacity_missing_asset_config",
+    "message": "Usable capacity is missing from asset configuration.",
+    "type": "validation_error"
+  },
+  "E-10194": {
+    "key": "usable_capacity_less_than_or_equal_to_zero",
+    "message": "Usable capacity is less than or equal to zero.",
+    "type": "validation_error"
+  },
+  "E-10195": {
+    "key": "missing_optimised_arbitrage_revenue_column",
+    "message": "Required Optimised_Arbitrage_Revenue column is missing.",
+    "type": "validation_error"
+  },
+  "E-10196": {
+    "key": "missing_industry_benchmark_configuration",
+    "message": "Required Industry Benchmark configuration is missing.",
+    "type": "validation_error"
+  },
+  "E-10197": {
+    "key": "missing_daily_tb_spread_trend_data",
+    "message": "Required Daily TB Spread Trend data is missing.",
+    "type": "validation_error"
+  },
+  "E-10198": {
+    "key": "missing_daily_arbitrage_revenue_or_tb2_capture_rate_data",
+    "message": "Required Daily Arbitrage Revenue or TB2 Capture Rate data is missing.",
+    "type": "validation_error"
+  },
+  "E-10199": {
+    "key": "tb_spread_details_export_generation_failed",
+    "message": "TB Spread Details export generation failed.",
+    "type": "server_error"
+  },
+  "E-10200": {
+    "key": "warranty_limit_configuration_not_available",
+    "message": "Warranty limit configuration is not available.",
+    "type": "not_found_error"
+  },
+  "E-10201": {
+    "key": "only_numeric_values_allowed",
+    "message": "Only numeric values are allowed.",
+    "type": "validation_error"
+  },
+  "E-10202": {
+    "key": "negative_values_not_allowed",
+    "message": "Negative values are not allowed.",
+    "type": "validation_error"
+  },
+  "E-10203": {
+    "key": "value_between_80_and_90",
+    "message": "Value must be between 80% and 90%.",
+    "type": "validation_error"
+  },
+  "E-10204": {
+    "key": "value_between_0_5_and_3_0",
+    "message": "Value must be between 0.5 and 3.0.",
+    "type": "validation_error"
+  },
+  "E-10205": {
+    "key": "industry_low_lte_mid",
+    "message": "Industry Low must be less than or equal to Industry Mid.",
+    "type": "validation_error"
+  },
+  "E-10206": {
+    "key": "industry_mid_lte_high",
+    "message": "Industry Mid must be less than or equal to Industry High.",
+    "type": "validation_error"
+  },
+  "E-10207": {
+    "key": "industry_low_lte_high",
+    "message": "Industry Low must be less than or equal to Industry High.",
+    "type": "validation_error"
+  },
+  "E-10208": {
+    "key": "benchmark_config_validation_failed",
+    "message": "Benchmark configuration validation failed.",
+    "type": "validation_error"
+  },
+  "E-10209": {
+    "key": "only_integers_allowed",
+    "message": "Invalid input. Only integers allowed. Please check values.",
+    "type": "validation_error"
+  },
+  "E-10210": {
+    "key": "monthly_hardcoded_values_validation_failed",
+    "message": "Monthly hardcoded values validation failed.",
+    "type": "validation_error"
+  },
+  "E-10211": {
+    "key": "atmost 2 decimal places",
+    "message": "Value must have atmost 2 decimal places",
+    "type": "validation_error"
+  },
+  "E-10219": {
+    "key": "no_analysis_data_available_for_selected_year",
+    "message": "No analysis data is available for the selected year.",
+    "type": "not_found_error"
+  },
+  "E-10220": {
+    "key": "pdf_invoice_extraction_failed",
+    "message": "PDF invoice extraction failed. The file may be corrupted, password-protected, or unreadable.",
+    "type": "validation_error"
+  },
+  "E-10221": {
+    "key": "invoice_not_found",
+    "message": "Invoice not found",
+    "type": "validation_error"
+  },
+  "E-10222": {
+    "key": "settlement_csv_invoice_mismatch",
+    "message": "Settlement CSV does not match the uploaded invoice PDF. Please upload the settlement file for the same invoice.",
+    "type": "validation_error"
+  },
+  "E-10223": {
+    "key": "settlement_csv_missing_required_column",
+    "message": "Settlement CSV is missing required column. Please upload a valid settlement file with the expected column format.",
+    "type": "validation_error"
+  },
+  "E-10224": {
+    "key": "invoice_date_reporting_period_mismatch",
+    "message": "Invoice date does not match the selected reporting period. Please upload the correct invoice for this period.",
+    "type": "validation_error"
+  },
+  "E-10225": {
+    "key": "csv_invoice_date_extraction_failed",
+    "message": "Unable to extract invoice date from the uploaded CSV file.",
+    "type": "validation_error"
+  },
+  "E-10226": {
+    "key": "invoice_date_reporting_period_mismatch",
+    "message": "Settlement CSV date does not match the uploaded invoice PDF date. Please upload the settlement file for the same invoice.",
+    "type": "validation_error"
+  },
+  "E-10227": {
+    "key": "csv_invoice_payment_extraction_failed",
+    "message": "Unable to extract invoice payment from the uploaded CSV file.",
+    "type": "validation_error"
+  },
+  "E-10228": {
+    "key": "invoice_settlement_csv_not_found",
+    "message": "Invoice Settlement CSV not found.",
+    "type": "validation_error"
+  },
+  "E-10229": {
+    "key": "invoice_settlement_invalid_file_type",
+    "message": "Invoice settlement file must be CSV (.csv format only).",
+    "type": "validation_error"
+  },
+  "E-10230": {
+    "key": "invoice_pdf_file_size_exceeded",
+    "message": "Invoice PDF size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10231": {
+    "key": "settlement_csv_file_size_exceeded",
+    "message": "Settlement CSV size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10232": {
+    "key": "invoice_pdf_invalid_file_type",
+    "message": "Only PDF files are supported. Please upload a valid PDF invoice.",
+    "type": "validation_error"
   }
 }

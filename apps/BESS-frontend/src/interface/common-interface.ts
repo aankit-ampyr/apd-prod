@@ -1,4 +1,4 @@
-import type { ActionType, AuditLogModules, AuditLogScenario, Platform, ResourceType, UserRole } from '@/constants';
+import type { ActionType, Platform, ResourceType, UserRole } from '@/constants';
 export { SortType } from '@lazarus/react-common/interface';
 export { Auth } from '@lazarus/react-common/interface';
 export type ENV = 'loc' | 'dev' | 'qa' | 'uat' | 'prod';
@@ -113,6 +113,18 @@ export interface Simulation {
       dg_max: number;
       dg_step_size: number;
     };
+    green_energy_config : {
+      solar_min : number;
+      solar_max : number;
+      solar_step : number;
+      bess_min : number;
+      bess_max : number;
+      dg_min : number;
+      dg_max : number;
+      dg_step : number;
+      min_green_energy : number;
+      max_wastage : number;
+    }
   };
 }
 
@@ -164,6 +176,8 @@ export interface CustomHourlyResults {
   dg_curtailed: number;
   soc_mwh: number;
   soc_percent: number;
+  charging_loss: number;
+  discharging_loss: number;
   unmet_mw: number;
   delivery: boolean;
   daily_cycles: number;
@@ -226,9 +240,35 @@ export interface MultiYearProjectionResults {
   delivery_met_mwh: number;
   charging_loss: number;
   discharging_loss: number;
+  unserved_mwh: number;
   final_soc_pct: number;
   solar_gen_during_load: number;
   solar_curtailed_during_load: number;
   solar_curtailed: number;
   created_at: string;
+}
+
+export interface GreenAnalysisResults {
+  simulation_id: number;
+  job_id: number;
+  solar_mwp: number;
+  bess_mwh: number;
+  duration_hr: number;
+  power_mw: number;
+  containers: number;
+  dg_mw: number;
+  delivery_pct: number;
+  green_pct: number;
+  green_energy_pct: number;
+  green_hours_pct: number;
+  green_hours_mar_oct_pct: number;
+  wastage_pct: number;
+  delivery_hours : number;
+  load_hours : number;
+  green_hours : number;
+  dg_hours : number;
+  dg_starts : number;
+  bess_cycles : number;
+  unserved_mwh : number;
+  fuel_consumption_l : number;
 }

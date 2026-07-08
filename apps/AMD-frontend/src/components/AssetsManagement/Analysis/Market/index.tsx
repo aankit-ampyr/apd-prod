@@ -45,7 +45,7 @@ type BestMarketRow = NonNullable<AssetMarketAnalytics['best_markets']['buying_ma
 type MarketStatisticsRow = NonNullable<AssetMarketAnalytics['statistics']['rows']>[number];
 
 const marketUtilizationOptions: SelectInputItem[] = [
-  {id: AssetMarketUtilizationTypes.MULTI_MARKET, label: 'Multi-Market'},
+  {id: AssetMarketUtilizationTypes.MULTI_MARKET, label: 'Multi Market'},
   {id: AssetMarketUtilizationTypes.EPEX_ONLY_DAILY, label: 'EPEX-only (daily)'},
   {id: AssetMarketUtilizationTypes.EPEX_ONLY_EFA, label: 'EPEX-only (EFA)'},
   {id: AssetMarketUtilizationTypes.ACTUAL, label: 'Actual'},
@@ -183,7 +183,7 @@ export function AssetMarket(props: MarketOptimizationProps) {
       deltaLabel: 'vs EPEX-Daily',
     },
     {
-      label: 'Multi-Market Revenue',
+      label: 'Multi Market Revenue',
       value: summary?.multi_market?.total_revenue ? renderCurrency(summary.multi_market?.total_revenue) : '-',
       description: 'Cross-market optimization',
       delta: summary?.multi_market?.improvement ?? 0,
@@ -192,7 +192,7 @@ export function AssetMarket(props: MarketOptimizationProps) {
     {
       label: 'Potential Optimised Revenue',
       value: summary?.additional_revenue ? renderCurrency(summary.additional_revenue) : '-',
-      description: 'Multi-market - EPEX only daily',
+      description: 'Optimized - EPEX only daily',
       valueColor: 'var(--color-success)',
       bgGradientStartColor: '#E0FFEF',
       borderColor: '#A1E5AB',

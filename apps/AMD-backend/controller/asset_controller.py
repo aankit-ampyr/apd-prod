@@ -329,7 +329,7 @@ class AssetController:
             db=db, asset_id=asset_id, month=month, year=year, current_user=current_user
         )
 
-    async def download_file_history(
+    async def download_file(
         self,
         file_id: int,
         asset_id: int,
@@ -342,7 +342,7 @@ class AssetController:
         if Platform.AMD.value not in current_user.get("platform", []):
             return Res.error("E-10013", message="Unauthorized: AMD platform required")
 
-        return await self.service.download_file_history(
+        return await self.service.download_file(
             db=db, asset_id=asset_id, file_id=file_id, current_user=current_user
         )
 

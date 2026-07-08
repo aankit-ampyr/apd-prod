@@ -13,6 +13,7 @@ from dtos.simulation_dto import (
     CustomSimulationConfigPayload,
     MultiYearCalculation,
     GreenEnergyConfig,
+    DetailGreenConfigPayload,
 )
 from services import (
     LoadSimulationService,
@@ -24,6 +25,7 @@ from services import (
     CustomSimConfigService,
     MultiYearSimService,
     GreenEnergyConfigService,
+    DetailGreenConfigService,
 )
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -40,6 +42,7 @@ class SimulationSetupController:
         self.custom_config_service = CustomSimConfigService()
         self.multi_y_config_service = MultiYearSimService()
         self.green_energy_service = GreenEnergyConfigService()
+        self.detail_green_config_service = DetailGreenConfigService()
 
     async def compute_load_profile(self, payload: LoadProfilePayload):
         return await self.load_service.compute_load_profile(payload=payload)
@@ -52,8 +55,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -80,8 +81,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -113,8 +112,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -143,8 +140,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -176,8 +171,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -223,7 +216,7 @@ class SimulationSetupController:
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN)),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
     ):
         return await self.simulation_service.delete_simulation(
@@ -237,7 +230,11 @@ class SimulationSetupController:
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
+            )
+        ),
     ):
         return await self.simulation_service.get_simulation_details(
             bess_db=bess_db, simulation_id=simulation_id, current_user=current_user
@@ -251,8 +248,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -281,9 +276,7 @@ class SimulationSetupController:
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
             )
         ),
     ):
@@ -300,9 +293,7 @@ class SimulationSetupController:
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
             )
         ),
     ):
@@ -321,16 +312,17 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
+        resource_id: str = Depends(get_resource_id),
     ):
         return await self.multi_y_config_service.save_multi_y_config(
             bess_db=bess_db,
             simulation_id=simulation_id,
             config=payload,
             current_user=current_user,
+            resource_id=resource_id,
         )
 
     async def upsert_green_energy_config(
@@ -341,8 +333,6 @@ class SimulationSetupController:
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -363,4 +353,35 @@ class SimulationSetupController:
     ):
         return await self.green_energy_service.get_green_config(
             bess_db=bess_db, simulation_id=simulation_id
+        )
+
+    async def upsert_detail_green_config(
+        self,
+        simulation_id: int,
+        payload: DetailGreenConfigPayload,
+        bess_db=Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN,
+                UserRole.ANALYST,
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.detail_green_config_service.create_or_update_detail_green_config(
+            bess_db=bess_db,
+            simulation_id=simulation_id,
+            payload=payload,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def get_detail_green_config(
+        self,
+        simulation_id: int,
+        bess_db=Depends(get_bess_db),
+    ):
+        return await self.detail_green_config_service.get_detail_green_config(
+            bess_db=bess_db,
+            simulation_id=simulation_id,
         )

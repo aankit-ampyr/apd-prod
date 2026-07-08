@@ -46,14 +46,16 @@ export const SystemSetupTabs = ({activeTab, onChange, completedTabs = {}}: TabsP
             key={tab?.id}
             onClick={() => onChange(tab?.id)}
             className={cn(
-              'flex items-center gap-2 px-2 lg:px-12 py-1 lg:py-2 rounded-sm transition-all cursor-pointer',
+              'flex items-center gap-2 px-2 lg:px-10 py-1 lg:py-2 rounded-sm transition-all cursor-pointer',
               'text-sm font-medium',
               isActive ? 'bg-white shadow text-black' : 'text-gray-500 hover:text-black',
             )}>
-            <Icon name={tab?.icon} size={16} />
-            <Text variant={'body1'} className={cn(isActive ? 'text-secondary-deep!' : 'text-text-secondary!', 'lg:text-[16px]!')}>
-              {tab?.label}
-            </Text>
+            <div className="flex items-start xl:items-center gap-2">
+              <Icon name={tab?.icon} size={16} className="mt-2 xl:mt-0" />
+              <Text variant={'body1'} className={cn(isActive ? 'text-secondary-deep!' : 'text-text-secondary!', 'lg:text-[16px]! text-left xl:text-center')}>
+                {tab?.label}
+              </Text>
+            </div>
             {isCompleted && (
               <div className="w-3 h-3 lg:w-5 lg:h-5 bg-success rounded-full flex items-center justify-center shrink-0">
                 <Icon name="tick" className="text-white" size={width < 1024 ? 7 : 12} />

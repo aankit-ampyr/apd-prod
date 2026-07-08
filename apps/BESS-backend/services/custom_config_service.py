@@ -1,15 +1,15 @@
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from constants.enums import SimulationLogStep, SimulationSetupProgress
 from dtos.simulation_dto import CustomSimulationConfigPayload
 from models.simulation_model import CustomSimulationConfig, DieselGeneratorConfiguration
-from python_common.constants.enums import AuditLogModules, AuditLogScenario
+from constants.enums import PSPAuditLogModules, PSPAuditLogScenario
 from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -23,11 +23,6 @@ class CustomSimConfigService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
 
         result = await bess_db.execute(
             select(DieselGeneratorConfiguration).where(
@@ -40,14 +35,14 @@ class CustomSimConfigService:
             return Res.error(
                 status_code="E-20040",
                 message="DG Config not found.",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if dg.is_included and payload.dg_capacity is None:
             return Res.error(
                 status_code="E-20044",
                 message="Missing required parameters",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         query = select(CustomSimulationConfig).where(
@@ -67,6 +62,7 @@ class CustomSimConfigService:
             for key, value in payload_dict.items():
                 setattr(custom_config, key, value)
             after_config = jsonable_encoder(custom_config)
+            action = PSPAuditLogScenario.CUSTOM_CONF_CREATED.value
         else:
             custom_config = CustomSimulationConfig(
                 simulation_id=simulation_id,
@@ -76,6 +72,7 @@ class CustomSimConfigService:
             )
             bess_db.add(custom_config)
             after_config = jsonable_encoder(custom_config)
+            action = PSPAuditLogScenario.CUSTOM_CONF_EDITED.value
 
         await progress_simulation_setup(
             simulation_id=simulation_id,
@@ -89,9 +86,9 @@ class CustomSimConfigService:
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
-            user_role=current_user.get("role"),
-            module=AuditLogModules.SIMULATION.value,
-            action=AuditLogScenario.SIMULATION_EDITED.value,
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=action,
             resource_id=resource_id,
             before=before_config,
             after=after_config,
@@ -117,7 +114,7 @@ class CustomSimConfigService:
             return Res.error(
                 status_code="E-20053",
                 message="Custom configuratrion not found.",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         data = CustomSimulationConfigPayload.model_validate(config)

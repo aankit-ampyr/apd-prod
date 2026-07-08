@@ -4,7 +4,7 @@ import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import {Text, Avatar, Icon} from '@/ui-kits';
 import {useSelector, useDispatch} from 'react-redux';
 import {authDataSelector} from '@/services/redux/selectors';
-import {resetAuth} from '@/services/redux/slice/authSlice';
+import {logoutRequest} from '@/services/redux/slice/authSlice';
 import {
   initiateSimulationData,
   projectSimulationData,
@@ -60,8 +60,7 @@ export const Header = () => {
   }, []);
 
   const handleLogout = () => {
-    dispatch(resetAuth());
-    navigate(Routes.LOGIN);
+    dispatch(logoutRequest());
   };
 
   return (
@@ -89,7 +88,7 @@ export const Header = () => {
           <Icon name="arrow-left" size={20} />
         </button>
       )}
-      <Text variant="h1" className="text-text-primary! grow">
+      <Text variant="h2" className="text-text-primary! grow lg:text-h3 xl:text-h2">
         {dashboardHeaderTitle}
       </Text>
 

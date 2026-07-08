@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { DataTableColumn } from "../../interface";
 import { cn } from "../../utils";
 import { getColumnWidthStyles } from "./utils";
@@ -11,13 +11,36 @@ interface DataTableProps {
   totalPages: number;
   currentPage: number;
   totalResult: number;
-  onPageChange: (page: number) => void;
+  onPageChange?: (page: number) => void;
   pageSize?: number;
   errorMessage?: string;
+  highlightedRowIndex?: number;
+  highLightedRowClassName?: string;
   loading?: boolean;
   showFooter?: boolean;
   stickyHeader?: boolean;
   rowAlign?: "items-center" | "items-start" | "items-end";
+  persistHorizontalScrollKey?: string;
+  onRowClick?: (row: any, rowIndex: number) => void;
+}
+
+export function getPaginationRange(args: {
+  totalResult: number;
+  currentPage: number;
+  pageSize: number;
+  dataLength: number;
+  totalPages: number;
+}) {
+  const { totalResult, currentPage, pageSize, dataLength, totalPages } = args;
+  if (totalResult === 0) {
+    return [0, 0];
+  }
+  let start = (currentPage - 1) * pageSize + 1;
+  let end = (currentPage - 1) * pageSize + dataLength;
+  if (currentPage === totalPages || totalResult <= pageSize) {
+    end = totalResult;
+  }
+  return [start, end];
 }
 
 export const DataTable: React.FC<DataTableProps> = (props) => {
@@ -30,11 +53,16 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
     currentPage,
     totalPages,
     totalResult,
+    highlightedRowIndex,
+    highLightedRowClassName,
     pageSize = 10,
+    onRowClick,
     errorMessage,
     loading,
     showFooter = true,
+    persistHorizontalScrollKey,
   } = props;
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const getAlignClass = (align: DataTableColumn<any>["align"]) => {
     switch (align) {
@@ -60,32 +88,62 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
     }
   };
 
-  const [rangeStart, rangeEnd] = useMemo(() => {
-    if (totalResult === 0) {
-      return [0, 0];
-    }
-    let start = (currentPage - 1) * pageSize + 1;
-    let end = (currentPage - 1) * pageSize + data.length;
-    if (currentPage === totalPages || totalResult <= pageSize) {
-      end = totalResult;
-    }
-    return [start, end];
-  }, [currentPage, totalPages, data.length, totalResult, pageSize]);
+  const [rangeStart, rangeEnd] = useMemo(() => getPaginationRange({
+    totalResult,
+    currentPage,
+    pageSize,
+    dataLength: data.length,
+    totalPages,
+  }), [currentPage, totalPages, data.length, totalResult, pageSize]);
 
   const empty = useMemo(() => {
     return data.length === 0;
   }, [data.length]);
 
+  const saveHorizontalScroll = () => {
+    if (!persistHorizontalScrollKey || typeof window === "undefined") {
+      return;
+    }
+
+    const scrollLeft = scrollContainerRef.current?.scrollLeft;
+    if (typeof scrollLeft === "number") {
+      sessionStorage.setItem(persistHorizontalScrollKey, String(scrollLeft));
+    }
+  };
+
+  useLayoutEffect(() => {
+    if (!persistHorizontalScrollKey || typeof window === "undefined") {
+      return;
+    }
+
+    const scrollLeft = Number(
+      sessionStorage.getItem(persistHorizontalScrollKey),
+    );
+    if (!Number.isNaN(scrollLeft) && scrollContainerRef.current) {
+      scrollContainerRef.current.scrollLeft = scrollLeft;
+    }
+  }, [persistHorizontalScrollKey]);
+
+  useEffect(() => {
+    return () => {
+      saveHorizontalScroll();
+    };
+  }, [persistHorizontalScrollKey]);
+
   return (
-    <div>
-      <div className="w-full border border-bg-card rounded-lg overflow-hidden shadow-sm font-sans">
+    <div className="flex flex-col h-full overflow-hidden w-full">
+      <div className="w-full flex-1 flex flex-col border border-bg-card rounded-lg overflow-hidden shadow-sm font-sans">
         <div
+          ref={scrollContainerRef}
+          onScroll={
+            persistHorizontalScrollKey ? saveHorizontalScroll : undefined
+          }
           className={cn(
-            "overflow-x-auto relative data-table-scroll",
-            stickyHeader && "overflow-y-auto max-h-150",
+            "overflow-x-auto relative data-table-scroll flex-1",
+            stickyHeader && "overflow-y-auto",
           )}
         >
-          <table className="w-full min-w-200">
+          <table className="w-full table-auto">
             {/* Header */}
             <thead
               className={cn(
@@ -97,7 +155,7 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
                 {columns.map((col, index) => (
                   <th
                     key={index}
-                    className={`px-4 text-nowrap! font-InterSemiBold! text-secondary! py-4 ${getAlignClass(col.headerAlign || col.align)} ${col.headerClassName || ""}`}
+                    className={`px-4 h-14 text-nowrap! font-InterSemiBold! text-secondary! ${getAlignClass(col.headerAlign || col.align)} ${col.headerClassName || ""}`}
                     style={
                       empty
                         ? {
@@ -131,15 +189,24 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
                 data.map((row, rowIndex) => (
                   <tr
                     key={rowIndex}
-                    className="hover:bg-slate-50 transition-colors duration-150"
+                    className={cn("hover:bg-slate-50 transition-colors duration-150", highlightedRowIndex === rowIndex && (highLightedRowClassName || "bg-primary-tint-2"))}
+                    onClick={() => onRowClick?.(row, rowIndex)}
                   >
                     {columns.map((col, colIndex) => (
                       <td
                         key={`${rowIndex}-${colIndex}`}
-                        className={`px-4 py-4 text-sm text-secondary font-FigtreeSemiBold whitespace-nowrap ${getAlignClass(col.align)} ${getRowAlignClass(rowAlign as any)}`}
+                        className={`px-4 h-14 text-sm text-secondary font-FigtreeSemiBold whitespace-nowrap ${getAlignClass(col.align)} ${getRowAlignClass(rowAlign as any)}`}
                         style={getColumnWidthStyles(col.width)}
                       >
-                        {col.render ? col.render(row, col.width) : col.renderCell ? col.renderCell({row, index: rowIndex, width: col.width}) : null}
+                        {col.render
+                          ? col.render(row, col.width)
+                          : col.renderCell
+                            ? col.renderCell({
+                                row,
+                                index: rowIndex,
+                                width: col.width,
+                              })
+                            : null}
                       </td>
                     ))}
                   </tr>
@@ -166,7 +233,7 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
         {/* Footer */}
       </div>
       {showFooter && (
-        <div className="border-gray-200 py-4 flex items-center justify-between">
+        <div className="border-gray-200 py-4 flex items-center justify-between shrink-0">
           <Text
             variant="caption2"
             className="text-ui_blue font-medium text-text-placeholder!"
@@ -176,7 +243,7 @@ export const DataTable: React.FC<DataTableProps> = (props) => {
           <Pagination
             currentPage={currentPage}
             totalPages={totalPages}
-            onPageChange={onPageChange}
+            onPageChange={(page) => onPageChange?.(page)}
           />
         </div>
       )}

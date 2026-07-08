@@ -100,3 +100,12 @@ def get_datetime_from_hour_of_year(
     hour_of_day = target_datetime.hour
 
     return target_datetime, hour_of_day
+
+
+def is_within_march_to_october(
+    hour_of_year: int, year: int, zero_indexed: bool = True
+) -> bool:
+    base_date = datetime(year, 1, 1, 0, 0)
+    hours_to_add = hour_of_year if zero_indexed else (hour_of_year - 1)
+    target_date = base_date + timedelta(hours=hours_to_add)
+    return 3 <= target_date.month <= 10

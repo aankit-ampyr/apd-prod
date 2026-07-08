@@ -222,7 +222,12 @@ export const downloadElementAsImage = async (
 export const formatCurrencyToPound = (
   value: number,
   allowDecimal: boolean = true,
+  short: boolean = false,
 ) => {
+  if (short) {
+    const formatted = formatNumber(Math.abs(value));
+    return value < 0 ? `-£${formatted}` : `£${formatted}`;
+  }
   const formatter = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "GBP",
@@ -230,9 +235,9 @@ export const formatCurrencyToPound = (
     maximumFractionDigits: allowDecimal ? 2 : 0,
   });
 
-  const absFormatted = formatter.format(Math.abs(value)).replace("£", "");
+  const absFormatted = formatter.format(Math.abs(value)).replace("£", "").trim();
 
-  return value < 0 ? `£-${absFormatted}` : `£${absFormatted}`;
+  return value < 0 ? `-£${absFormatted}` : `£${absFormatted}`;
 };
 
 export const formatMegaWatt = (value: number) => {
@@ -363,25 +368,27 @@ export function formatPercentage(value: number | null | undefined) {
 }
 
 export const formatNumber = (value: number): string => {
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(
-      value % 1_000_000_000 === 0 ? 0 : 1
-    )}B`;
+  const abs = Math.abs(value);
+
+  if (abs >= 1_000_000_000) {
+    return `${(value / 1_000_000_000)
+      .toFixed(1)
+      .replace(/\.0$/, "")}B`;
   }
 
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(
-      value % 1_000_000 === 0 ? 0 : 1
-    )}M`;
+  if (abs >= 1_000_000) {
+    return `${(value / 1_000_000)
+      .toFixed(1)
+      .replace(/\.0$/, "")}M`;
   }
 
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(
-      value % 1_000 === 0 ? 0 : 1
-    )}k`;
+  if (abs >= 1_000) {
+    return `${(value / 1_000)
+      .toFixed(1)
+      .replace(/\.0$/, "")}k`;
   }
 
-  return `${value}`;
+  return value.toString();
 };
 
 // export const 

@@ -1,10 +1,18 @@
 import math
 from typing import Optional
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 import traceback
 from constants.defaults import SIZING_STRATEGY
-from constants.enums import SimulationSetupProgress
+from constants.enums import (
+    PSPAuditLogModules,
+    PSPAuditLogScenario,
+    SimulationLogStep,
+    SimulationSetupProgress,
+    UserRole,
+)
 from dtos.simulation_dto import (
     CapacityBreakdown,
     CapacityMetric,
@@ -26,7 +34,7 @@ from services.service_support import (
     depreciate_simulation_job,
     progress_simulation_setup,
 )
-from utils.log_utils import audit_logs
+from utils.log_utils import audit_logs, compare_and_log
 from utils.response_utils import Res
 
 
@@ -124,7 +132,9 @@ class MultiYearSimService:
 
         if not custom_config:
             return Res.error(
-                status_code="E-20053", message="Custom configuratrion not found"
+                status_code="E-20053",
+                message="Custom configuratrion not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         output = self.__calc_yearly_degradation(
@@ -136,7 +146,11 @@ class MultiYearSimService:
         response_data = config.model_dump(mode="json")
         response_data["output"] = output.model_dump(mode="json")
 
-        return Res.success(status_code="S-20041", data=response_data)
+        return Res.success(
+            status_code="S-20041",
+            data=response_data,
+            http_status_code=status.HTTP_200_OK,
+        )
 
     async def save_multi_y_config(
         self,
@@ -144,6 +158,7 @@ class MultiYearSimService:
         simulation_id: int,
         config: MultiYearCalculation,
         current_user: dict,
+        resource_id: str,
     ):
         try:
             multi_y_projection_res = await bess_db.execute(
@@ -154,12 +169,33 @@ class MultiYearSimService:
             multi_y_projection = multi_y_projection_res.scalar_one_or_none()
 
             if not multi_y_projection:
+                before_config = {}
                 multi_y_projection = MultiYearProjection(simulation_id=simulation_id)
                 bess_db.add(multi_y_projection)
+
+                action = PSPAuditLogScenario.MULTI_YEAR_CONF_CREATED.value
+            else:
+                before_config = jsonable_encoder(multi_y_projection)
+                action = PSPAuditLogScenario.MULTI_YEAR_CONF_EDITED.value
 
             multi_y_projection.factory_degradation = config.factory_degradation
             multi_y_projection.annual_degradation = config.annual_degradation
             multi_y_projection.sizing_strategy = config.sizing_strategy.value
+
+            after_config = jsonable_encoder(multi_y_projection)
+
+            await compare_and_log(
+                db=bess_db,
+                user_id=f"USER-{current_user.get('id')}",
+                user_role=current_user.get("role"),  # type: ignore
+                module=PSPAuditLogModules.SIMULATION.value,
+                action=action,
+                resource_id=resource_id,
+                before=before_config,
+                after=after_config,
+                remove_id=True,
+                sim_module_type=SimulationLogStep.MULTI_YEAR_PROJECTION,
+            )
 
             await bess_db.flush()
             await bess_db.commit()
@@ -187,7 +223,9 @@ class MultiYearSimService:
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
-            return Res.error("E-20001")
+            return Res.error(
+                "E-20001", http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
     async def get_or_create_multi_y_config(
         self,
@@ -196,7 +234,7 @@ class MultiYearSimService:
         current_user: dict,
     ):
         try:
-            user_id = int(current_user.get("id"))
+            user_id = int(current_user.get("id"))  # type: ignore
             user_role = current_user.get("role")
 
             query = (
@@ -230,7 +268,11 @@ class MultiYearSimService:
             result = await bess_db.execute(query)
             result = result.first()
             if not result:
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    "E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             (
                 simulation,
@@ -242,7 +284,11 @@ class MultiYearSimService:
             ) = result
 
             if not simulation:
-                return Res.error("E-20043", message="Simulation not found")
+                return Res.error(
+                    "E-20043",
+                    message="Simulation not found",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
+                )
 
             simulation.load_profile = load_profile
             if solar_profile:
@@ -262,6 +308,13 @@ class MultiYearSimService:
             multi_y_projection = multi_y_projection_res.scalar_one_or_none()
 
             if not multi_y_projection:
+                # WARNING: Loose conditon it will allow creation if the ANALYST is an assign user
+                if user_role != UserRole.ADMIN and user_role != UserRole.ANALYST:
+                    return Res.error(
+                        status_code="E-20006",
+                        message="No data found.",
+                        http_status_code=status.HTTP_404_NOT_FOUND,
+                    )
                 multi_y_projection = MultiYearProjection(simulation_id=simulation_id)
                 bess_db.add(multi_y_projection)
                 await bess_db.flush()
@@ -281,8 +334,14 @@ class MultiYearSimService:
                 }
             )
 
-            return Res.success("S-20042", data=data.model_dump(mode="json"))
+            return Res.success(
+                "S-20042",
+                data=data.model_dump(mode="json"),
+                http_status_code=status.HTTP_200_OK,
+            )
         except Exception:
             await bess_db.rollback()
             traceback.print_exc()
-            return Res.error("E-20001")
+            return Res.error(
+                "E-20001", http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

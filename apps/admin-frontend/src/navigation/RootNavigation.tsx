@@ -1,24 +1,11 @@
-import {BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate} from 'react-router-dom';
-import {
-  AuditLog,
-  Home,
-  Settings,
-  UserManagement,
-  LoginScreen,
-  OTPVerificationScreen,
-} from '@/screens';
+import {BrowserRouter, Navigate, Route, Routes, useNavigate} from 'react-router-dom';
+import {AuditLog, Settings, UserManagement, LoginScreen, OTPVerificationScreen} from '@/screens';
 import {Routes as WebRoutes} from './Routes';
 import {DashboardLayout} from '@/components';
 import {useDispatch, useSelector} from 'react-redux';
 import {authStatus, authSuccessStatus} from '@/services/redux/selectors';
 import {useEffect} from 'react';
-import { resetAuthMessage } from '@/services/redux/slice';
-
-const ProtectedRoute = () => {
-  const isAuthenticated = useSelector(authStatus);
-  const fallback = WebRoutes.LOGIN;
-  return isAuthenticated ? <Outlet /> : <Navigate to={fallback} />;
-};
+import {resetAuthMessage} from '@/services/redux/slice';
 
 export function RootNavigator() {
   return (
@@ -30,6 +17,7 @@ export function RootNavigator() {
 
 export function RoutesWrapper() {
   const authSuccessState = useSelector(authSuccessStatus);
+  const isAuthenticated = useSelector(authStatus);
   const navigate = useNavigate();
   const dispatch = useDispatch();
   useEffect(() => {
@@ -46,19 +34,32 @@ export function RoutesWrapper() {
       }
     }
   }, [authSuccessState, navigate, dispatch]);
+
+  // Public routes for unauthenticated users
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path={WebRoutes.LOGIN} element={<LoginScreen />} />
+        <Route path={WebRoutes.OTP_VERIFICATION} element={<OTPVerificationScreen />} />
+        <Route path="*" element={<Navigate to={WebRoutes.LOGIN} />} />
+      </Routes>
+    );
+  }
+  // protected routes for authenticated users
   return (
     <Routes>
-      {/* Default Route */}
-      <Route path={WebRoutes.LOGIN} element={<LoginScreen />} />
-      <Route path={WebRoutes.OTP_VERIFICATION} element={<OTPVerificationScreen />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route path={WebRoutes.HOME} element={<Home />}/>
-          <Route path={WebRoutes.USER_MANAGEMENT} element={<UserManagement />} />
-          <Route path={WebRoutes.AUDIT_LOG} element={<AuditLog />} />
-          <Route path={WebRoutes.SETTINGS} element={<Settings />} />
-        </Route>
+      <Route element={<DashboardLayout />}>
+        <Route path={WebRoutes.USER_MANAGEMENT} element={<UserManagement />} />
+        <Route path={WebRoutes.AUDIT_LOG} element={<AuditLog />} />
+        <Route path="*" element={<Navigate to={WebRoutes.USER_MANAGEMENT} />} />
       </Route>
     </Routes>
   );
+}
+
+export function Root() {
+  const isAuthenticated = useSelector(authStatus);
+  const initailRoute = WebRoutes.USER_MANAGEMENT;
+
+  return isAuthenticated ? <Navigate to={initailRoute} /> : <Navigate to={WebRoutes.LOGIN} />;
 }

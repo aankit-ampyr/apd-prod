@@ -41,6 +41,21 @@ export interface GroupedTableBaseSubColumn {
   ) => React.ReactNode;
 }
 
+export interface HorizontalTableMetric<T> {
+  key: string;
+  rowHeader: React.ReactNode;
+  align?: Align;
+  rowHeaderClassName?: string;
+  cellClassName?: string;
+  render?: (column: T, index: number) => React.ReactNode;
+}
+
+export interface HorizontalTableColumn<T> {
+  align?: Align;
+  className?: string;
+  render: (column: T, index: number) => React.ReactNode;
+}
+
 export interface SelectInputItem<T = unknown> {
   id: string | number;
   label: string;

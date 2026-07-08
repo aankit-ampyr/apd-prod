@@ -1,5 +1,5 @@
-import { call, put, takeLatest, select } from 'redux-saga/effects';
-import { SUCCESS_KEY } from '@/constants';
+import {call, put, takeLatest, select} from 'redux-saga/effects';
+import {SUCCESS_KEY} from '@/constants';
 import {
   bessContainerConfig,
   calculateLoadProfile,
@@ -42,6 +42,17 @@ import {
   stopMultiYearProjection,
   getMultiYearSimulationResult,
   getMultiYearProjectionProgress,
+  greenAnalysis,
+  greenAnalysisData,
+  runGreenAnalysis,
+  stopGreenAnalysis,
+  getGreenAnalysisResults,
+  getGreenAnalysisProgress,
+  detailedGreenAnalysis,
+  detailedGreenAnalysisData,
+  runDetailedGreenAnalysis,
+  getDetailedGreenAnalysisProgress,
+  getDetailedGreenAnalysisResult,
 } from '@/services/api';
 
 import {
@@ -162,6 +173,9 @@ import {
   multiYearProjectionResultRequest,
   multiYearProjectionResultSuccess,
   multiYearProjectionResultFailure,
+  getMultiYearSilentRequest,
+  getMultiYearSilentSuccess,
+  getMultiYearSilentFailure,
   runMultiYearProjectionRequest,
   runMultiYearProjectionSuccess,
   runMultiYearProjectionFailure,
@@ -174,18 +188,65 @@ import {
   multiYearProjectionProgressFailure,
   multiYearProjectionProgressSuccess,
   multiYearProjectionProgressRequest,
+  getMultiYearProgressSilentRequest,
+  getMultiYearProgressSilentSuccess,
+  getMultiYearProgressSilentFailure,
+  greenAnalysisRequest,
+  greenAnalysisSuccess,
+  greenAnalysisFailure,
+  greenAnalysisDataRequest,
+  greenAnalysisDataSuccess,
+  greenAnalysisDataFailure,
+  getGreenAnalysisSilentRequest,
+  getGreenAnalysisSilentSuccess,
+  getGreenAnalysisSilentFailure,
+  runGreenAnalysisRequest,
+  stopGreenAnalysisRequest,
+  runGreenAnalysisSuccess,
+  runGreenAnalysisFailure,
+  stopGreenAnalysisSuccess,
+  stopGreenAnalysisFailure,
+  greenAnalysisResultsRequest,
+  greenAnalysisResultsSuccess,
+  greenAnalysisResultsFailure,
+  greenAnalysisProgressRequest,
+  greenAnalysisProgressSuccess,
+  greenAnalysisProgressFailure,
+  getGreenAnalysisProgressSilentRequest,
+  getGreenAnalysisProgressSilentSuccess,
+  getGreenAnalysisProgressSilentFailure,
+  getCustomConfigSilentRequest,
+  getCustomConfigSilentSuccess,
+  getCustomConfigSilentFailure,
+  getDGSizingSilentRequest,
+  getDGSizingSilentSuccess,
+  getDGSizingSilentFailure,
+  detailedGreenAnalysisRequest,
+  detailedGreenAnalysisSuccess,
+  detailedGreenAnalysisFailure,
+  detailedGreenAnalysisDataRequest,
+  detailedGreenAnalysisDataSuccess,
+  detailedGreenAnalysisDataFailure,
+  runDetailedGreenAnalysisRequest,
+  runDetailedGreenAnalysisSuccess,
+  runDetailedGreenAnalysisFailure,
+  detailedGreenAnalysisProgressRequest,
+  detailedGreenAnalysisProgressSuccess,
+  detailedGreenAnalysisProgressFailure,
+  detailedGreenAnalysisResultRequest,
+  detailedGreenAnalysisResultSuccess,
+  detailedGreenAnalysisResultFailure,
 } from '../slice/simulationWizardSlice';
 
-import { deleteProjectSuccess } from '../slice/projectsSlice';
-import { initiateSimulationData, projectSimulationData, simulationData, simulationProject } from '../selectors/simulationWizardSelector';
-
+import {deleteProjectSuccess} from '../slice/projectsSlice';
+import {initiateSimulationData, projectSimulationData, simulationData, simulationProject} from '../selectors/simulationWizardSelector';
 
 // ======================================
 // Load Profile Saga
 // ======================================
 function* loadProfileSaga(action: ReturnType<typeof loadProfileRequest>): Generator {
   try {
-    const { simulation_id, params, payload } = action.payload;
+    const {simulation_id, params, payload} = action.payload;
 
     const response: any = yield call(calculateLoadProfile, simulation_id, params, payload);
 
@@ -201,12 +262,12 @@ function* loadProfileSaga(action: ReturnType<typeof loadProfileRequest>): Genera
 
 function* initiateSimulationSaga(action: ReturnType<typeof initiateSimulationRequest>): Generator {
   try {
-    const { project_id, project_name } = action.payload;
+    const {project_id, project_name} = action.payload;
 
     const response: any = yield call(initiateProjectSimulation, project_id);
 
     if (response.data.status === SUCCESS_KEY) {
-      yield put(initiateSimulationSuccess({ data: response.data, project_name }));
+      yield put(initiateSimulationSuccess({data: response.data, project_name}));
     } else {
       yield put(initiateSimulationFailure(response.data));
     }
@@ -217,14 +278,14 @@ function* initiateSimulationSaga(action: ReturnType<typeof initiateSimulationReq
 
 function* saveLoadProfileSaga(action: ReturnType<typeof saveLoadProfileRequest>): Generator {
   try {
-    const { simulation_id, params, payload } = action.payload;
+    const {simulation_id, params, payload} = action.payload;
 
     const response: any = yield call(loadProfileSave, simulation_id, params, payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(saveLoadProfileSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(saveLoadProfileFailure(response.data));
     }
@@ -235,7 +296,7 @@ function* saveLoadProfileSaga(action: ReturnType<typeof saveLoadProfileRequest>)
 
 function* getLoadProfileSaga(action: ReturnType<typeof getLoadProfileRequest>): Generator {
   try {
-    const { simulation_id, params } = action.payload;
+    const {simulation_id, params} = action.payload;
 
     const response: any = yield call(getLoadProfileData, simulation_id, params);
 
@@ -254,14 +315,9 @@ function* getLoadProfileSaga(action: ReturnType<typeof getLoadProfileRequest>): 
 // ======================================
 function* solarProfileSaga(action: ReturnType<typeof solarProfileRequest>): Generator {
   try {
-    const { simulation_id, params, payload } = action.payload;
+    const {simulation_id, params, payload} = action.payload;
 
-    const response: any = yield call(
-      calculateSolarProfile,
-      simulation_id,
-      params,
-      payload,
-    );
+    const response: any = yield call(calculateSolarProfile, simulation_id, params, payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(solarProfileSuccess(response.data));
@@ -278,7 +334,7 @@ function* solarProfileSaga(action: ReturnType<typeof solarProfileRequest>): Gene
 // ======================================
 function* uploadSolarCSVSaga(action: ReturnType<typeof uploadSolarCSVRequest>): Generator {
   try {
-    const { simulation_id, file } = action.payload;
+    const {simulation_id, file} = action.payload;
 
     const formData = new FormData();
     formData.append('file', file);
@@ -300,14 +356,14 @@ function* uploadSolarCSVSaga(action: ReturnType<typeof uploadSolarCSVRequest>): 
 // ======================================
 function* saveSolarProfileSaga(action: ReturnType<typeof saveSolarProfileRequest>): Generator {
   try {
-    const { simulation_id, payload } = action.payload;
+    const {simulation_id, payload} = action.payload;
 
     const response: any = yield call(saveSolarProfileData, simulation_id, payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(saveSolarProfileSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(saveSolarProfileFailure(response.data));
     }
@@ -321,7 +377,7 @@ function* saveSolarProfileSaga(action: ReturnType<typeof saveSolarProfileRequest
 // ======================================
 function* getSolarProfileSaga(action: ReturnType<typeof getSolarProfileRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
     const response: any = yield call(getSolarProfileData, simulation_id);
 
@@ -340,13 +396,13 @@ function* getSolarProfileSaga(action: ReturnType<typeof getSolarProfileRequest>)
 // ======================================
 function* bessContainerConfigSaga(action: ReturnType<typeof bessContainerConfigRequest>): Generator {
   try {
-    const { simulation_id, params, payload } = action.payload;
+    const {simulation_id, params, payload} = action.payload;
 
     const response: any = yield call(bessContainerConfig, simulation_id, params, payload);
     if (response.data.status === SUCCESS_KEY) {
       yield put(bessContainerConfigSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(bessContainerConfigFailure(response.data));
     }
@@ -355,10 +411,9 @@ function* bessContainerConfigSaga(action: ReturnType<typeof bessContainerConfigR
   }
 }
 
-
 function* getBessConfigDataSaga(action: ReturnType<typeof getBessConfigRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
     const response: any = yield call(getBessConfigData, simulation_id);
 
@@ -377,9 +432,11 @@ function* GetSolarProfileSourceSaga(action: ReturnType<typeof getSolarProfileSou
   const data2 = yield select(projectSimulationData);
   const simulation_data = data1 ?? data2;
   try {
-    if (!simulation_data?.id) { return; }
+    if (!simulation_data?.id) {
+      return;
+    }
 
-    const response: any = yield call(getSolarProfileSource, { simulation_id: simulation_data?.id });
+    const response: any = yield call(getSolarProfileSource, {simulation_id: simulation_data?.id});
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getSolarProfileSourceSuccess(response.data));
@@ -407,17 +464,14 @@ function* deleteProjectSuccessSaga(action: ReturnType<typeof deleteProjectSucces
 
 function* generatorDgSaga(action: ReturnType<typeof generatorDgRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
-    const response: any = yield call(
-      generatorDg,
-      action.payload,
-    );
+    const response: any = yield call(generatorDg, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(generatorDgSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(generatorDgFailure(response.data));
     }
@@ -428,11 +482,8 @@ function* generatorDgSaga(action: ReturnType<typeof generatorDgRequest>): Genera
 
 function* getGeneratorDgSaga(action: ReturnType<typeof getGeneratorDgRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getGeneratorDgData,
-      simulation_id,
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getGeneratorDgData, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getGeneratorDgSuccess(response.data));
@@ -446,11 +497,7 @@ function* getGeneratorDgSaga(action: ReturnType<typeof getGeneratorDgRequest>): 
 
 function* generatorDgFuelCurveSaga(action: ReturnType<typeof generatorDgFuelCurveRequest>): Generator {
   try {
-
-    const response: any = yield call(
-      generatorDgFuelCurve,
-      action.payload,
-    );
+    const response: any = yield call(generatorDgFuelCurve, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(generatorDgFuelCurveSuccess(response.data));
@@ -464,17 +511,14 @@ function* generatorDgFuelCurveSaga(action: ReturnType<typeof generatorDgFuelCurv
 
 function* dispatchRuleSaga(action: ReturnType<typeof dispatchRuleRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
-    const response: any = yield call(
-      dispatchRule,
-      action.payload,
-    );
+    const response: any = yield call(dispatchRule, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(dispatchRuleSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(dispatchRuleFailure(response.data));
     }
@@ -485,13 +529,9 @@ function* dispatchRuleSaga(action: ReturnType<typeof dispatchRuleRequest>): Gene
 
 function* getDispatchRuleSaga(action: ReturnType<typeof getDispatchRuleRequest>): Generator {
   try {
+    const {simulation_id} = action.payload;
 
-    const { simulation_id } = action.payload;
-
-    const response: any = yield call(
-      getDispatchRuleData,
-      simulation_id,
-    );
+    const response: any = yield call(getDispatchRuleData, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       // Dispatch success action with response data
@@ -506,17 +546,14 @@ function* getDispatchRuleSaga(action: ReturnType<typeof getDispatchRuleRequest>)
 
 function* DGSizingSaga(action: ReturnType<typeof dgSizingRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
-    const response: any = yield call(
-      dgSizing,
-      action.payload,
-    );
+    const response: any = yield call(dgSizing, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(dgSizingSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
-      yield put(simulationProgressRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
+      yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(dgSizingFailure(response.data));
     }
@@ -527,13 +564,9 @@ function* DGSizingSaga(action: ReturnType<typeof dgSizingRequest>): Generator {
 
 function* getDGSizingSaga(action: ReturnType<typeof getDGSizingRequest>): Generator {
   try {
+    const {simulation_id} = action.payload;
 
-    const { simulation_id } = action.payload;
-
-    const response: any = yield call(
-      getDgSizingData,
-      simulation_id,
-    );
+    const response: any = yield call(getDgSizingData, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getDGSizingSuccess(response.data));
@@ -545,17 +578,27 @@ function* getDGSizingSaga(action: ReturnType<typeof getDGSizingRequest>): Genera
   }
 }
 
+function* getDGSizingSilentSaga(action: ReturnType<typeof getDGSizingSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+
+    const response: any = yield call(getDgSizingData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getDGSizingSilentSuccess(response.data));
+    } else {
+      yield put(getDGSizingSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getDGSizingSilentFailure(error.response?.data || error.response));
+  }
+}
 
 function* getSimulationListSaga(action: ReturnType<typeof getSimulationListRequest>): Generator {
   try {
+    const {project_id, ...params} = action.payload;
 
-    const { project_id, ...params } = action.payload;
-
-    const response: any = yield call(
-      getSimulationList,
-      project_id,
-      params,
-    );
+    const response: any = yield call(getSimulationList, project_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getSimulationListSuccess(response.data));
@@ -567,16 +610,10 @@ function* getSimulationListSaga(action: ReturnType<typeof getSimulationListReque
   }
 }
 
-
 function* updateSimulationSaga(action: ReturnType<typeof updateProjectSimulationRequest>): Generator {
   try {
-
-    const { simulation_id, ...data } = action.payload;
-    const response: any = yield call(
-      updateSimulation,
-      simulation_id,
-      data,
-    );
+    const {simulation_id, ...data} = action.payload;
+    const response: any = yield call(updateSimulation, simulation_id, data);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(updateProjectSimulationSuccess(response.data));
@@ -588,15 +625,10 @@ function* updateSimulationSaga(action: ReturnType<typeof updateProjectSimulation
   }
 }
 
-
 function* deleteSimulationSaga(action: ReturnType<typeof deleteProjectSimulationRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      deleteSimulation,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(deleteSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(deleteProjectSimulationSuccess(response.data));
@@ -608,14 +640,10 @@ function* deleteSimulationSaga(action: ReturnType<typeof deleteProjectSimulation
   }
 }
 
-
 function* initiateProjectSimulationSaga(action: ReturnType<typeof initiateProjectSimulationRequest>): Generator {
   try {
-    const { project_id } = action.payload;
-    const response: any = yield call(
-      initiateSimulation,
-      project_id,
-    );
+    const {project_id} = action.payload;
+    const response: any = yield call(initiateSimulation, project_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(initiateProjectSimulationSuccess(response.data));
@@ -627,14 +655,10 @@ function* initiateProjectSimulationSaga(action: ReturnType<typeof initiateProjec
   }
 }
 
-
 function* getProjectSimulationSaga(action: ReturnType<typeof getProjectSimulationRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getProjectSimulation,
-      simulation_id,
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getProjectSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getProjectSimulationSuccess(response.data));
@@ -651,11 +675,8 @@ function* getProjectSimulationSaga(action: ReturnType<typeof getProjectSimulatio
 // ======================================
 function* refreshProjectSimulationSaga(action: ReturnType<typeof refreshProjectSimulationRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getProjectSimulation,
-      simulation_id,
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getProjectSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(refreshProjectSimulationSuccess(response.data));
@@ -669,12 +690,8 @@ function* refreshProjectSimulationSaga(action: ReturnType<typeof refreshProjectS
 
 function* runSimulationSaga(action: ReturnType<typeof runSimulationRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      runSimulation,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(runSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(runSimulationSuccess(response.data));
@@ -688,12 +705,8 @@ function* runSimulationSaga(action: ReturnType<typeof runSimulationRequest>): Ge
 
 function* stopSimulationSaga(action: ReturnType<typeof stopSimulationRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      stopSimulation,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(stopSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(stopSimulationSuccess(response.data));
@@ -707,12 +720,8 @@ function* stopSimulationSaga(action: ReturnType<typeof stopSimulationRequest>): 
 
 function* simulationProgressSaga(action: ReturnType<typeof simulationProgressRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getSimulationProgress,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getSimulationProgress, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(simulationProgressSuccess(response.data));
@@ -724,15 +733,10 @@ function* simulationProgressSaga(action: ReturnType<typeof simulationProgressReq
   }
 }
 
-
 function* simulationResultsSaga(action: ReturnType<typeof simulationResultsRequest>): Generator {
   try {
-    const { simulation_id, ...params } = action.payload;
-    const response: any = yield call(
-      getSimulationResults,
-      simulation_id,
-      params
-    );
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getSimulationResults, simulation_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(simulationResultsSuccess(response.data));
@@ -746,16 +750,13 @@ function* simulationResultsSaga(action: ReturnType<typeof simulationResultsReque
 
 function* customConfigSaga(action: ReturnType<typeof customConfigRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
+    const {simulation_id} = action.payload;
 
-    const response: any = yield call(
-      customConfig,
-      action.payload,
-    );
+    const response: any = yield call(customConfig, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(customConfigSuccess(response.data));
-      yield put(refreshProjectSimulationRequest({ simulation_id }));
+      yield put(refreshProjectSimulationRequest({simulation_id}));
     } else {
       yield put(customConfigFailure(response.data));
     }
@@ -766,13 +767,9 @@ function* customConfigSaga(action: ReturnType<typeof customConfigRequest>): Gene
 
 function* getCustomConfigSaga(action: ReturnType<typeof getCustomConfigRequest>): Generator {
   try {
+    const {simulation_id} = action.payload;
 
-    const { simulation_id } = action.payload;
-
-    const response: any = yield call(
-      getCustomConfig,
-      simulation_id,
-    );
+    const response: any = yield call(getCustomConfig, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(getCustomConfigSuccess(response.data));
@@ -784,14 +781,26 @@ function* getCustomConfigSaga(action: ReturnType<typeof getCustomConfigRequest>)
   }
 }
 
+function* getCustomConfigSilentSaga(action: ReturnType<typeof getCustomConfigSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+
+    const response: any = yield call(getCustomConfig, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getCustomConfigSilentSuccess(response.data));
+    } else {
+      yield put(getCustomConfigSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getCustomConfigSilentFailure(error.response?.data || error.response));
+  }
+}
+
 function* runCustomSimulationSaga(action: ReturnType<typeof runCustomSimulationRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      runCustomSimulation,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(runCustomSimulation, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(runCustomSimulationSuccess(response.data));
@@ -803,14 +812,10 @@ function* runCustomSimulationSaga(action: ReturnType<typeof runCustomSimulationR
   }
 }
 
-
 function* customSimulationResultSaga(action: ReturnType<typeof customSimulationResultRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getCustomSimulationResults,
-      simulation_id,
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getCustomSimulationResults, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(customSimulationResultSuccess(response.data));
@@ -824,12 +829,8 @@ function* customSimulationResultSaga(action: ReturnType<typeof customSimulationR
 
 function* customHourlySimulationResultsSaga(action: ReturnType<typeof customHourlySimulationResultsRequest>): Generator {
   try {
-    const { simulation_id, ...params } = action.payload;
-    const response: any = yield call(
-      getHourlySimulationResults,
-      simulation_id,
-      params
-    );
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getHourlySimulationResults, simulation_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(customHourlySimulationResultsSuccess(response.data));
@@ -843,12 +844,8 @@ function* customHourlySimulationResultsSaga(action: ReturnType<typeof customHour
 
 function* customMonthlySimulationResultsSaga(action: ReturnType<typeof customMonthlySimulationResultsRequest>): Generator {
   try {
-    const { simulation_id, ...params } = action.payload;
-    const response: any = yield call(
-      getMonthlySimulationResults,
-      simulation_id,
-      params
-    );
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getMonthlySimulationResults, simulation_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(customMonthlySimulationResultsSuccess(response.data));
@@ -862,12 +859,8 @@ function* customMonthlySimulationResultsSaga(action: ReturnType<typeof customMon
 
 function* customHourlyChartSaga(action: ReturnType<typeof customHourlyChartRequest>): Generator {
   try {
-    const { simulation_id, ...params } = action.payload;
-    const response: any = yield call(
-      getHourlyChart,
-      simulation_id,
-      params
-    );
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getHourlyChart, simulation_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(customHourlyChartSuccess(response.data));
@@ -881,11 +874,7 @@ function* customHourlyChartSaga(action: ReturnType<typeof customHourlyChartReque
 
 function* multiYearProjectionSaga(action: ReturnType<typeof multiYearProjectionRequest>): Generator {
   try {
-
-    const response: any = yield call(
-      multiYearProjection,
-      action.payload,
-    );
+    const response: any = yield call(multiYearProjection, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionSuccess(response.data));
@@ -899,10 +888,7 @@ function* multiYearProjectionSaga(action: ReturnType<typeof multiYearProjectionR
 
 function* multiYearProjectionComputeSaga(action: ReturnType<typeof multiYearProjectionComputeRequest>): Generator {
   try {
-    const response: any = yield call(
-      multiYearProjectionCompute,
-      action.payload,
-    );
+    const response: any = yield call(multiYearProjectionCompute, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionComputeSuccess(response.data));
@@ -916,11 +902,8 @@ function* multiYearProjectionComputeSaga(action: ReturnType<typeof multiYearProj
 
 function* multiYearProjectionResultSaga(action: ReturnType<typeof multiYearProjectionResultRequest>): Generator {
   try {
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      multiYearProjectionData,
-      simulation_id,
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(multiYearProjectionData, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionResultSuccess(response.data));
@@ -932,14 +915,25 @@ function* multiYearProjectionResultSaga(action: ReturnType<typeof multiYearProje
   }
 }
 
+function* getMultiYearSilentSaga(action: ReturnType<typeof getMultiYearSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(multiYearProjectionData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getMultiYearSilentSuccess(response.data));
+    } else {
+      yield put(getMultiYearSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getMultiYearSilentFailure(error.response?.data || error.response));
+  }
+}
+
 function* runMultiYearProjectionSaga(action: ReturnType<typeof runMultiYearProjectionRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      runMultiYearProjection,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(runMultiYearProjection, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(runMultiYearProjectionSuccess(response.data));
@@ -953,12 +947,8 @@ function* runMultiYearProjectionSaga(action: ReturnType<typeof runMultiYearProje
 
 function* stopMultiYearProjectionSaga(action: ReturnType<typeof stopMultiYearProjectionRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      stopMultiYearProjection,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(stopMultiYearProjection, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(stopMultiYearProjectionSuccess(response.data));
@@ -972,12 +962,8 @@ function* stopMultiYearProjectionSaga(action: ReturnType<typeof stopMultiYearPro
 
 function* multiYearProjectionResultsSaga(action: ReturnType<typeof multiYearProjectionResultsRequest>): Generator {
   try {
-    const { simulation_id, ...params } = action.payload;
-    const response: any = yield call(
-      getMultiYearSimulationResult,
-      simulation_id,
-      params
-    );
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getMultiYearSimulationResult, simulation_id, params);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionResultsSuccess(response.data));
@@ -991,12 +977,8 @@ function* multiYearProjectionResultsSaga(action: ReturnType<typeof multiYearProj
 
 function* multiYearProjectionProgressSaga(action: ReturnType<typeof multiYearProjectionProgressRequest>): Generator {
   try {
-
-    const { simulation_id } = action.payload;
-    const response: any = yield call(
-      getMultiYearProjectionProgress,
-      simulation_id
-    );
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getMultiYearProjectionProgress, simulation_id);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionProgressSuccess(response.data));
@@ -1005,6 +987,214 @@ function* multiYearProjectionProgressSaga(action: ReturnType<typeof multiYearPro
     }
   } catch (error: any) {
     yield put(multiYearProjectionProgressFailure(error.response?.data || error.response));
+  }
+}
+
+function* getMultiYearProgressSilentSaga(action: ReturnType<typeof getMultiYearProgressSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getMultiYearProjectionProgress, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getMultiYearProgressSilentSuccess(response.data));
+    } else {
+      yield put(getMultiYearProgressSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getMultiYearProgressSilentFailure(error.response?.data || error.response));
+  }
+}
+
+function* greenAnalysisSaga(action: ReturnType<typeof greenAnalysisRequest>): Generator {
+  try {
+    const response: any = yield call(greenAnalysis, action.payload);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(greenAnalysisSuccess(response.data));
+    } else {
+      yield put(greenAnalysisFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(greenAnalysisFailure(error.response?.data || error.response));
+  }
+}
+
+function* getGreenAnalysisSaga(action: ReturnType<typeof greenAnalysisDataRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(greenAnalysisData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(greenAnalysisDataSuccess(response.data));
+    } else {
+      yield put(greenAnalysisDataFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(greenAnalysisDataFailure(error.response?.data || error.response));
+  }
+}
+
+function* getGreenAnalysisSilentSaga(action: ReturnType<typeof getGreenAnalysisSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(greenAnalysisData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getGreenAnalysisSilentSuccess(response.data));
+    } else {
+      yield put(getGreenAnalysisSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getGreenAnalysisSilentFailure(error.response?.data || error.response));
+  }
+}
+
+function* runGreenAnalysisSaga(action: ReturnType<typeof runGreenAnalysisRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(runGreenAnalysis, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(runGreenAnalysisSuccess(response.data));
+    } else {
+      yield put(runGreenAnalysisFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(runGreenAnalysisFailure(error.response?.data || error.response));
+  }
+}
+
+function* stopGreenAnalysisSaga(action: ReturnType<typeof stopGreenAnalysisRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(stopGreenAnalysis, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(stopGreenAnalysisSuccess(response.data));
+    } else {
+      yield put(stopGreenAnalysisFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(stopGreenAnalysisFailure(error.response?.data || error.response));
+  }
+}
+
+function* greenAnalysisResultsSaga(action: ReturnType<typeof greenAnalysisResultsRequest>): Generator {
+  try {
+    const {simulation_id, ...params} = action.payload;
+    const response: any = yield call(getGreenAnalysisResults, simulation_id, params);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(greenAnalysisResultsSuccess(response.data));
+    } else {
+      yield put(greenAnalysisResultsFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(greenAnalysisResultsFailure(error.response?.data || error.response));
+  }
+}
+
+function* greenAnalysisProgressSaga(action: ReturnType<typeof greenAnalysisProgressRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getGreenAnalysisProgress, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(greenAnalysisProgressSuccess(response.data));
+    } else {
+      yield put(greenAnalysisProgressFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(greenAnalysisProgressFailure(error.response?.data || error.response));
+  }
+}
+
+function* getGreenAnalysisProgressSilentSaga(action: ReturnType<typeof getGreenAnalysisProgressSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getGreenAnalysisProgress, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getGreenAnalysisProgressSilentSuccess(response.data));
+    } else {
+      yield put(getGreenAnalysisProgressSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getGreenAnalysisProgressSilentFailure(error.response?.data || error.response));
+  }
+}
+
+function* detailedGreenAnalysisSaga(action: ReturnType<typeof detailedGreenAnalysisRequest>): Generator {
+  try {
+    const response: any = yield call(detailedGreenAnalysis, action.payload);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(detailedGreenAnalysisSuccess(response.data));
+    } else {
+      yield put(detailedGreenAnalysisFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(detailedGreenAnalysisFailure(error.response?.data || error.response));
+  }
+}
+
+function* getDetailedGreenAnalysisSaga(action: ReturnType<typeof detailedGreenAnalysisDataRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(detailedGreenAnalysisData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(detailedGreenAnalysisDataSuccess(response.data));
+    } else {
+      yield put(detailedGreenAnalysisDataFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(detailedGreenAnalysisDataFailure(error.response?.data || error.response));
+  }
+}
+
+function* runDetailedGreenAnalysisSaga(action: ReturnType<typeof runDetailedGreenAnalysisRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(runDetailedGreenAnalysis, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(runDetailedGreenAnalysisSuccess(response.data));
+    } else {
+      yield put(runDetailedGreenAnalysisFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(runDetailedGreenAnalysisFailure(error.response?.data || error.response));
+  }
+}
+
+function* detailedGreenAnalysisProgressSaga(action: ReturnType<typeof detailedGreenAnalysisProgressRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getDetailedGreenAnalysisProgress, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(detailedGreenAnalysisProgressSuccess(response.data));
+    } else {
+      yield put(detailedGreenAnalysisProgressFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(detailedGreenAnalysisProgressFailure(error.response?.data || error.response));
+  }
+}
+
+function* detailedGreenAnalysisResultSaga(action: ReturnType<typeof detailedGreenAnalysisResultRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getDetailedGreenAnalysisResult, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(detailedGreenAnalysisResultSuccess(response.data));
+    } else {
+      yield put(detailedGreenAnalysisResultFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(detailedGreenAnalysisResultFailure(error.response?.data || error.response));
   }
 }
 
@@ -1032,6 +1222,7 @@ export default function* simulationWizardSaga(): Generator {
   yield takeLatest(getDispatchRuleRequest.type, getDispatchRuleSaga);
   yield takeLatest(dgSizingRequest.type, DGSizingSaga);
   yield takeLatest(getDGSizingRequest.type, getDGSizingSaga);
+  yield takeLatest(getDGSizingSilentRequest.type, getDGSizingSilentSaga);
   yield takeLatest(getSimulationListRequest.type, getSimulationListSaga);
   yield takeLatest(updateProjectSimulationRequest.type, updateSimulationSaga);
   yield takeLatest(deleteProjectSimulationRequest.type, deleteSimulationSaga);
@@ -1044,6 +1235,7 @@ export default function* simulationWizardSaga(): Generator {
   yield takeLatest(simulationResultsRequest.type, simulationResultsSaga);
   yield takeLatest(customConfigRequest.type, customConfigSaga);
   yield takeLatest(getCustomConfigRequest.type, getCustomConfigSaga);
+  yield takeLatest(getCustomConfigSilentRequest.type, getCustomConfigSilentSaga);
   yield takeLatest(runCustomSimulationRequest.type, runCustomSimulationSaga);
   yield takeLatest(customSimulationResultRequest.type, customSimulationResultSaga);
   yield takeLatest(customHourlySimulationResultsRequest.type, customHourlySimulationResultsSaga);
@@ -1052,8 +1244,23 @@ export default function* simulationWizardSaga(): Generator {
   yield takeLatest(multiYearProjectionRequest.type, multiYearProjectionSaga);
   yield takeLatest(multiYearProjectionComputeRequest.type, multiYearProjectionComputeSaga);
   yield takeLatest(multiYearProjectionResultRequest.type, multiYearProjectionResultSaga);
+  yield takeLatest(getMultiYearSilentRequest.type, getMultiYearSilentSaga);
   yield takeLatest(runMultiYearProjectionRequest.type, runMultiYearProjectionSaga);
   yield takeLatest(stopMultiYearProjectionRequest.type, stopMultiYearProjectionSaga);
   yield takeLatest(multiYearProjectionResultsRequest.type, multiYearProjectionResultsSaga);
   yield takeLatest(multiYearProjectionProgressRequest.type, multiYearProjectionProgressSaga);
+  yield takeLatest(getMultiYearProgressSilentRequest.type, getMultiYearProgressSilentSaga);
+  yield takeLatest(greenAnalysisRequest.type, greenAnalysisSaga);
+  yield takeLatest(greenAnalysisDataRequest.type, getGreenAnalysisSaga);
+  yield takeLatest(getGreenAnalysisSilentRequest.type, getGreenAnalysisSilentSaga);
+  yield takeLatest(runGreenAnalysisRequest.type, runGreenAnalysisSaga);
+  yield takeLatest(stopGreenAnalysisRequest.type, stopGreenAnalysisSaga);
+  yield takeLatest(greenAnalysisResultsRequest.type, greenAnalysisResultsSaga);
+  yield takeLatest(greenAnalysisProgressRequest.type, greenAnalysisProgressSaga);
+  yield takeLatest(getGreenAnalysisProgressSilentRequest.type, getGreenAnalysisProgressSilentSaga);
+  yield takeLatest(detailedGreenAnalysisRequest.type, detailedGreenAnalysisSaga);
+  yield takeLatest(detailedGreenAnalysisDataRequest.type, getDetailedGreenAnalysisSaga);
+  yield takeLatest(runDetailedGreenAnalysisRequest.type, runDetailedGreenAnalysisSaga);
+  yield takeLatest(detailedGreenAnalysisProgressRequest.type, detailedGreenAnalysisProgressSaga);
+  yield takeLatest(detailedGreenAnalysisResultRequest.type, detailedGreenAnalysisResultSaga);
 }

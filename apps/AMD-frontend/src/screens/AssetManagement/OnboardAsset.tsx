@@ -375,7 +375,9 @@ export function OnboardAssetScreen() {
       )}
       wrapperClassName={cn(
         'flex flex-col rounded-[40px]!',
-        [AssetSteps.AggregatorScada, AssetSteps.IAR].includes(step) && !isLoading && 'bg-transparent shadow-none p-0 rounded-none!',
+        [AssetSteps.AggregatorScada, AssetSteps.IAR].includes(step) &&
+          !isLoading &&
+          'bg-transparent shadow-none p-0 rounded-none!',
         'max-w-280 w-full',
         isAssetOnboarded && currentAsset?.type === AssetType.Solar && 'grow-0! pt-10 pb-14',
       )}
@@ -383,16 +385,20 @@ export function OnboardAssetScreen() {
         <WithFallback
           isLoading={isLoading}
           fallback={
-            <div className="absolute top-15 -translate-y-1/2 flex items-center">
-              <StepsWithUnderscore
-                className="justify-center trans"
-                loading={true}
-                maxStep={5}
-                gotoStep={() => {}}
-                steps={steps}
-                currentStep={step}
-              />
-            </div>
+            matchesRoute(location.pathname, Routes.VIEW_ASSET) ? (
+              <React.Fragment />
+            ) : (
+              <div className="absolute top-15 -translate-y-1/2 flex items-center">
+                <StepsWithUnderscore
+                  className="justify-center trans"
+                  loading={true}
+                  maxStep={5}
+                  gotoStep={() => {}}
+                  steps={steps}
+                  currentStep={step}
+                />
+              </div>
+            )
           }>
           {isAssetOnboarded ? (
             <React.Fragment />
@@ -400,7 +406,9 @@ export function OnboardAssetScreen() {
             <div className="absolute top-15 -translate-y-1/2 flex items-center">
               {showHeaderStep && currentAsset?.type !== AssetType.Solar && (
                 <StepsWithUnderscore
-                  className={isPendingApprovalNavigationLocked ? '[&>button:not(:last-child)]:cursor-not-allowed' : undefined}
+                  className={
+                    isPendingApprovalNavigationLocked ? '[&>button:not(:last-child)]:cursor-not-allowed' : undefined
+                  }
                   maxStep={5}
                   gotoStep={isPendingApprovalNavigationLocked ? () => {} : handleStepChange}
                   steps={steps}
@@ -454,7 +462,9 @@ export function OnboardAssetScreen() {
                       description={
                         <>
                           This asset has been submitted for review.{' '}
-                          <span className="text-text-primary! font-InterMedium!">({`Submitted on ${formatDate(currentAsset?.submitted_at, 'dd-MM-yyyy')}`})</span>
+                          <span className="text-text-primary! font-InterMedium!">
+                            ({`Submitted on ${formatDate(currentAsset?.submitted_at, 'dd-MM-yyyy')}`})
+                          </span>
                         </>
                       }
                       className="max-w-240 w-full mb-8 bg-[#FFF8F0] border-[#DE7700]"

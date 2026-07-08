@@ -64,7 +64,7 @@ interface CheckboxProps {
   checked?: boolean;
   indeterminate?: boolean;
   size?: CheckboxVariants['size'];
-  label?: string;
+  label?: string | React.ReactNode;
   className?: string,
   labelClassName?: string;
   disabled?: boolean;

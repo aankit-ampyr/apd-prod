@@ -25,3 +25,6 @@ dist-ssr
 
 .env
 .env.local
+
+# Ignored task files
+capacity_market_tasks.md

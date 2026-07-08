@@ -1,5 +1,5 @@
 import {combineReducers} from '@reduxjs/toolkit';
-import authReducer, {resetAuth, resetAuthWithReason} from './slice/authSlice';
+import authReducer, {logoutSuccess, resetAuthWithReason} from './slice/authSlice';
 import userReducer from './slice/userSlice';
 import projectReducer from './slice/projectsSlice';
 import simulationWizardReducer from './slice/simulationWizardSlice';
@@ -19,7 +19,7 @@ const appReducer = combineReducers({
  * Preserves pre-signup files (email-tagged for security) for user convenience
  */
 const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
-  if (action.type === resetAuth.type || action.type === resetAuthWithReason.type) {
+  if (action.type === logoutSuccess.type || action.type === resetAuthWithReason.type) {
     const sessionEndReason = action.payload?.reason || null;
     state = undefined;
 

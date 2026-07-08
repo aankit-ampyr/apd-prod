@@ -4,6 +4,7 @@ import {Images} from '@lazarus/react-common/assets';
 import {useEffect, useState} from 'react';
 import {FileRemovalConfirmModal} from './FileRemovalConfirmModal';
 import {Divider} from '@lazarus/react-common/components';
+import {useConfirm} from '@/hooks';
 
 // Limits the validation card to an easy-to-scan preview; users can expand the list
 // only when a file returns more validation errors than we want to show by default.
@@ -21,7 +22,7 @@ interface FilePreview {
   variant?: 'inline' | 'card';
   lastUpdated?: string;
   onRemove?: () => void;
-  disabled?:boolean;
+  disabled?: boolean;
   projection?: {
     start?: string;
     end?: string;
@@ -47,7 +48,7 @@ export function FilePreview(props: FilePreview) {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const handleRemoveClick = () => {
     if (disabled) return;
-    setConfirmOpen(true)
+    setConfirmOpen(true);
   };
   const handleConfirm = () => {
     setConfirmOpen(false);
@@ -138,9 +139,11 @@ export function FilePreview(props: FilePreview) {
               </Text>
             </div>
 
-            {!disabled && <button disabled={disabled} onClick={handleRemoveClick} className="cursor-pointer">
-              <Icon name="cross" className="absolute top-0 right-0 z-999" />
-            </button>}
+            {!disabled && (
+              <button disabled={disabled} onClick={handleRemoveClick} className="cursor-pointer">
+                <Icon name="cross" className="absolute top-0 right-0 z-999" />
+              </button>
+            )}
           </div>
           <div className="p-4 w-full border border-border justify-between rounded-sm bg-white flex items-center gap-4">
             <span className="flex items-center gap-2">
@@ -180,6 +183,98 @@ export function FilePreview(props: FilePreview) {
         onConfirm={handleConfirm}
         fileName={name || ''}
       />
+    </div>
+  );
+}
+
+interface FilePreview2<T> extends Pick<FilePreview, 'name' | 'size' | 'disabled' | 'isLoading' | 'onRemove'> {
+  fileInfoPoints: Array<{
+    label: string;
+    value: (file: T) => string | React.ReactNode;
+  }>;
+  file?: T;
+}
+export function FilePreview2<T>(props: FilePreview2<T>) {
+  const {fileInfoPoints, disabled, isLoading, name, onRemove, size, file} = props;
+
+  /**
+   * ====================
+   * Hooks
+   * ====================
+   */
+  const removalConfirm = useConfirm();
+
+  /**
+   * ====================
+   * Functions
+   * ===================
+   */
+  const handleRemoveClick = async () => {
+    if (disabled) return;
+
+    const confirmed = await removalConfirm({
+      render: ({onCancel, onConfirm}) => (
+        <FileRemovalConfirmModal onClose={onCancel} onConfirm={onConfirm} open={true} fileName={name}/>
+      ),
+    });
+    if (confirmed) {
+      onRemove?.();
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex flex-col gap-1 items-center">
+        <div className="flex gap-2 items-start">
+          <Icon name="file-tick" className="size-5 mt-1" />
+          <Text variant="body2">{name}</Text>
+        </div>
+        <Text variant="caption" className="text-text-secondary!">
+          {size && formatFileSize(size)}
+        </Text>
+        <div className="flex gap-2 mt-2 items-center">
+          {isLoading && <img src={Images.loading} className="size-4" />}
+          {isLoading && <Text variant="body2">Validating File</Text>}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="flex grow self-stretch flex-col gap-1">
+      <div className="flex gap-2 items-start">
+        <Icon name="file-tick" className="size-5 mt-1" />
+
+        <div className="flex flex-col gap-1">
+          <Text variant="body2">{name}</Text>
+          <Text variant="caption" className="text-text-secondary!">
+            {size && formatFileSize(size)}
+          </Text>
+        </div>
+
+        {!disabled && (
+          <button disabled={disabled} onClick={handleRemoveClick} className=" ml-auto cursor-pointer">
+            <Icon name="cross" />
+          </button>
+        )}
+      </div>
+
+      {file && fileInfoPoints.length > 0 && (
+        <div className="flex gap-4 mt-2 justify-between bg-white border border-border rounded-sm p-4">
+          {fileInfoPoints.map((point, index) => {
+            const value = point.value(file);
+            return (
+              <>
+                <div key={index} className="flex gap-1">
+                  <Text variant="14M">{point.label} : </Text>
+                  {typeof value === 'string' ? <Text variant="14R">{value}</Text> : value}
+                </div>
+
+                {index !== fileInfoPoints.length - 1 && <Divider orientation="vertical" className="bg-disabled" />}
+              </>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

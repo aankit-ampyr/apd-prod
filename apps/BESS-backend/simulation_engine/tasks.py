@@ -5,6 +5,8 @@ from taskiq import TaskiqDepends, Context
 from broker import broker
 
 from .simulations import (
+    run_detailed_green_sizing_simulation,
+    run_green_sizing_simulation,
     run_multi_year_projection,
     run_simulation_single_config,
     run_sizing_simulation,
@@ -70,6 +72,44 @@ async def multi_year_projection_sim_task(
     try:
         async with redis:
             return await run_multi_year_projection(
+                simulation_id=simulation_id,
+                job_id=job_id,
+                redis=redis,
+                db=db,
+            )
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@broker.task(task_name="green_year_sizing_simulation")
+async def green_year_sizing_simulation(
+    simulation_id: int,
+    job_id: int,
+    db: AsyncSession = TaskiqDepends(get_db),
+    redis: Redis = TaskiqDepends(get_redis),
+):
+    try:
+        async with redis:
+            return await run_green_sizing_simulation(
+                simulation_id=simulation_id,
+                job_id=job_id,
+                redis=redis,
+                db=db,
+            )
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+@broker.task(task_name="detailed_green_simulation")
+async def detailed_green_simulation(
+    simulation_id: int,
+    job_id: int,
+    db: AsyncSession = TaskiqDepends(get_db),
+    redis: Redis = TaskiqDepends(get_redis),
+):
+    try:
+        async with redis:
+            return await run_detailed_green_sizing_simulation(
                 simulation_id=simulation_id,
                 job_id=job_id,
                 redis=redis,

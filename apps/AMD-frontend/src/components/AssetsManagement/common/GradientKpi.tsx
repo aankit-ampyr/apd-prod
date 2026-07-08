@@ -62,6 +62,8 @@ export type GradientKPIObject = {
   tooltipMessage?: React.ReactNode;
   tooltipPosition?: TooltipPosition;
   helperLabel?: string | React.ReactNode;
+  backgroundImage?: string;
+  backgroundImageClassName?: string;
 };
 
 interface MarketPriceKPIProps extends GradientKPIObject {
@@ -127,7 +129,17 @@ export function GradientKPI(props: MarketPriceKPIProps) {
         style={{
           background: `linear-gradient(to bottom right, ${bgGradientStart}, ${pallete.bgGradientEnd})`,
         }}
-        className={cn('border-border border rounded-lg px-6 py-4', className)}>
+        className={cn('border-border border rounded-lg px-6 py-4 relative overflow-hidden', className)}>
+        
+        {props.backgroundImage && (
+          <img
+            src={props.backgroundImage}
+            alt=""
+            className={cn('absolute pointer-events-none select-none object-contain', props.backgroundImageClassName)} 
+          />
+        )}
+        
+        <div className="relative z-10 flex flex-col h-full">
         <div className="flex gap-2 items-center">
           {icon && (
             <div
@@ -174,6 +186,7 @@ export function GradientKPI(props: MarketPriceKPIProps) {
           ) : (
             helperLabel
           ))}
+        </div>
       </div>
     </WithFallback>
   );

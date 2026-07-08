@@ -176,6 +176,21 @@ import {
   getAssetBenchmarkMultiMarketOptimizedVsActualSuccess,
   getAssetBenchmarkMultiMarketOptimizedVsActualFailure,
 
+  // get executive analysis monthly revenue comparision
+  getExecutiveAnalysisMonthlyRevenueComparisonFailure,
+  getExecutiveAnalysisMonthlyRevenueComparisonRequest,
+  getExecutiveAnalysisMonthlyRevenueComparisonSuccess,
+
+  // get executive analysis revenu by stream
+  getExecutiveAnalysisRevenueByStreamFailure,
+  getExecutiveAnalysisRevenueByStreamRequest,
+  getExecutiveAnalysisRevenueByStreamSuccess,
+
+  // get executive analysis summary
+  getExecutiveAnalysisSummaryFailure,
+  getExecutiveAnalysisSummaryRequest,
+  getExecutiveAnalysisSummarySuccess,
+
   // get files request
   currentAssetFilesRequest,
   currentAssetFilesSuccess,
@@ -186,10 +201,26 @@ import {
   filterAggregatorScadaFilesSuccess,
   filterAggregatorScadaFilesFailure,
 
+  // filter merged dataset files
+  filterInvoiceFilesRequest,
+  filterInvoiceFilesSuccess,
+  filterInvoiceFilesFailure,
+  
+  // filter invoice settlement files
+  filterInvoiceSettlementFilesRequest,
+  filterInvoiceSettlementFilesSuccess,
+  filterInvoiceSettlementFilesFailure,
+
+
   // update asset reporting period
   updateAssetReportingPeriodRequest,
   updateAssetReportingPeriodSuccess,
   updateAssetReportingPeriodFailure,
+
+  // update asset invoice reporting period
+  updateAssetInvoiceReportingPeriodRequest,
+  updateAssetInvoiceReportingPeriodSuccess,
+  updateAssetInvoiceReportingPeriodFailure,
 
   // remove asset files
   removeAssetFileRequest,
@@ -255,6 +286,27 @@ import {
   getAssetTBSpreadDetailsRequest,
   getAssetTBSpreadDetailsSuccess,
   getAssetTBSpreadDetailsFailure,
+
+  // upload invoices
+  uploadInvoicesRequest,
+  uploadInvoicesSuccess,
+  uploadInvoicesFailure,
+
+  // delete invoice
+  deleteInvoiceRequest,
+  deleteInvoiceSuccess,
+  deleteInvoiceFailure,
+
+  // upload invoice settlement
+  uploadInvoiceSettlementRequest,
+  uploadInvoiceSettlementSuccess,
+  uploadInvoiceSettlementFailure,
+
+  // delete invoice settlement
+  deleteInvoiceSettlementRequest,
+  deleteInvoiceSettlementSuccess,
+  deleteInvoiceSettlementFailure,
+
 } from '../slice/assetSlice';
 import {
   getAssets,
@@ -306,6 +358,15 @@ import {
   getAssetBatteryHealthWarrantyExceedance,
   getAssetTBSpreadSummary,
   getAssetTBSpreadDetails,
+  getAssetExecutiveAnalysisMonthRevenueComparison,
+  getAssetExecutiveAnalysisRevenueByStream,
+  getAssetExecutiveAnalysisSummary,
+  uploadInvoice,
+  deleteInvoice,
+  getInvoicesList,
+  uploadInvoiceSettlement,
+  deleteInvoiceSettlement,
+  getInvoicesSettlementList,
 } from '@/services/api';
 import {SUCCESS_KEY} from '@/constants';
 
@@ -828,6 +889,38 @@ function* FilterAssetAggregatorScadaFileSaga(action: ReturnType<typeof filterAgg
   }
 }
 
+function* FilterInvoiceFilesSaga(action: ReturnType<typeof filterInvoiceFilesRequest>): Generator {
+  try {
+    // Call both APIs in parallel - update active period and filter files
+    const filesResponse: any = yield call(getInvoicesList, action.payload);
+
+    // Check if both calls succeeded
+    if (filesResponse.data.status === SUCCESS_KEY) {
+      yield put(filterInvoiceFilesSuccess(filesResponse.data));
+    } else {
+      yield put(filterInvoiceFilesFailure(filesResponse.data));
+    }
+  } catch (error: any) {
+    yield put(filterInvoiceFilesFailure(error.response?.data || error.response));
+  }
+}
+
+function* FilterInvoiceSettlementFilesSaga(action: ReturnType<typeof filterInvoiceSettlementFilesRequest>): Generator {
+  try {
+    // Call both APIs in parallel - update active period and filter files
+    const filesResponse: any = yield call(getInvoicesSettlementList, action.payload);
+
+    // Check if both calls succeeded
+    if (filesResponse.data.status === SUCCESS_KEY) {
+      yield put(filterInvoiceSettlementFilesSuccess(filesResponse.data));
+    } else {
+      yield put(filterInvoiceSettlementFilesFailure(filesResponse.data));
+    }
+  } catch (error: any) {
+    yield put(filterInvoiceSettlementFilesFailure(error.response?.data || error.response));
+  }
+}
+
 function* UpdateAssetReportingPeriodSaga(action: ReturnType<typeof updateAssetReportingPeriodRequest>): Generator {
   try {
     const response: any = yield call(editAssetDetails, {
@@ -842,6 +935,23 @@ function* UpdateAssetReportingPeriodSaga(action: ReturnType<typeof updateAssetRe
     }
   } catch (error: any) {
     yield put(updateAssetReportingPeriodFailure(error.response?.data || error.response));
+  }
+}
+
+function* UpdateAssetInvoiceReportingPeriodSaga(action: ReturnType<typeof updateAssetInvoiceReportingPeriodRequest>): Generator {
+  try {
+    const response: any = yield call(editAssetDetails, {
+      id: action.payload.assetId,
+      active_invoice_month: action.payload.month,
+      active_invoice_year: action.payload.year,
+    });
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(updateAssetInvoiceReportingPeriodSuccess(response.data));
+    } else {
+      yield put(updateAssetInvoiceReportingPeriodFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(updateAssetInvoiceReportingPeriodFailure(error.response?.data || error.response));
   }
 }
 
@@ -1030,6 +1140,139 @@ function* GetAssetTBSpreadDetailsSaga(action: ReturnType<typeof getAssetTBSpread
   }
 }
 
+function* GetAssetExecutiveAnalysisMonthlyRevenueComparison(
+  action: ReturnType<typeof getExecutiveAnalysisMonthlyRevenueComparisonRequest>,
+): Generator {
+  try {
+    const response: any = yield call(getAssetExecutiveAnalysisMonthRevenueComparison, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getExecutiveAnalysisMonthlyRevenueComparisonSuccess(response.data));
+    } else {
+      yield put(getExecutiveAnalysisMonthlyRevenueComparisonFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getExecutiveAnalysisMonthlyRevenueComparisonFailure(error.response?.data || error.response));
+  }
+}
+
+function* GetExecutiveAnalysisSummary(action: ReturnType<typeof getExecutiveAnalysisSummaryRequest>): Generator {
+  try {
+    const response: any = yield call(getAssetExecutiveAnalysisSummary, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getExecutiveAnalysisSummarySuccess(response.data));
+    } else {
+      yield put(getExecutiveAnalysisSummaryFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getExecutiveAnalysisSummaryFailure(error.response?.data || error.response));
+  }
+}
+
+function* GetExecutiveAnalysisRevenueByStream(
+  action: ReturnType<typeof getExecutiveAnalysisRevenueByStreamRequest>,
+): Generator {
+  try {
+    const response: any = yield call(getAssetExecutiveAnalysisRevenueByStream, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getExecutiveAnalysisRevenueByStreamSuccess(response.data));
+    } else {
+      yield put(getExecutiveAnalysisRevenueByStreamFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getExecutiveAnalysisRevenueByStreamFailure(error.response?.data || error.response));
+  }
+}
+
+function* UploadInvoiceSaga(action: ReturnType<typeof uploadInvoicesRequest>): Generator {
+  const file = action.payload?.formData?.get('file') as File;
+  try {
+    const response: any = yield call(uploadInvoice, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(uploadInvoicesSuccess(response.data));
+    } else {
+      yield put(
+        uploadInvoicesFailure({
+          status: response?.data?.status,
+          message: response?.data?.message,
+          status_code: response?.data?.status_code,
+          data: {
+            file: file?.name || '',
+          },
+        }),
+      );
+    }
+  } catch (error: any) {
+    yield put(
+      uploadInvoicesFailure({
+        status: error.response?.data?.status || error.response?.status,
+        message: error.response?.data?.message || error.response?.message || error.message,
+        status_code: error.response?.data?.status_code || error.response?.status,
+        data: {
+          file: file?.name || '',
+        },
+      }),
+    );
+  }
+}
+
+function* DeleteInvoiceSaga(action: ReturnType<typeof deleteInvoiceRequest>): Generator {
+  try {
+    const response: any = yield call(deleteInvoice, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(deleteInvoiceSuccess(response.data));
+    } else {
+      yield put(deleteInvoiceFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(deleteInvoiceFailure(error.response?.data || error.response));
+  }
+}
+
+function* UploadInvoiceSettlementSaga(action: ReturnType<typeof uploadInvoiceSettlementRequest>): Generator {
+  const file = action.payload?.formData?.get('file') as File;
+  try {
+    const response: any = yield call(uploadInvoiceSettlement, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(uploadInvoiceSettlementSuccess(response.data));
+    } else {
+      yield put(
+        uploadInvoiceSettlementFailure({
+          status: response?.data?.status,
+          message: response?.data?.message,
+          status_code: response?.data?.status_code,
+          data: {
+            file: file?.name || '',
+          },
+        }),
+      );
+    }
+  } catch (error: any) {
+    yield put(
+      uploadInvoiceSettlementFailure({
+        status: error.response?.data?.status || error.response?.status,
+        message: error.response?.data?.message || error.response?.message || error.message,
+        status_code: error.response?.data?.status_code || error.response?.status,
+        data: {
+          file: file?.name || '',
+        },
+      }),
+    );
+  }
+}
+
+function* DeleteInvoiceSettlementSaga(action: ReturnType<typeof deleteInvoiceSettlementRequest>): Generator {
+  try {
+    const response: any = yield call(deleteInvoiceSettlement, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(deleteInvoiceSettlementSuccess(response.data));
+    } else {
+      yield put(deleteInvoiceSettlementFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(deleteInvoiceSettlementFailure(error.response?.data || error.response));
+  }
+}
+
 export default function* AssetSaga(): Generator {
   yield takeEvery(assetListRequest.type, AssetListSaga);
   yield takeLatest(reassignAssetOwnershipRequest.type, ReassignAssetOwnershipSaga);
@@ -1069,16 +1312,19 @@ export default function* AssetSaga(): Generator {
 
   yield takeLeading(assetOperationalAnalyticsRequest.type, AssetOperationalAnalyticsSaga);
   yield takeLatest(assetSocDistributionRequest.type, AssetSocDistributionSaga);
-  yield takeLeading(getIndustryComparisonRequest.type, GetIndustryComparisonSaga);
-  yield takeLeading(getAssetBenchmarkRevenueIARvsActualRequest.type, GetAssetBenchmarkRevenueIARvsActualSaga);
-  yield takeLeading(
+  yield takeLatest(getIndustryComparisonRequest.type, GetIndustryComparisonSaga);
+  yield takeLatest(getAssetBenchmarkRevenueIARvsActualRequest.type, GetAssetBenchmarkRevenueIARvsActualSaga);
+  yield takeLatest(
     getAssetBenchmarkMultiMarketOptimizedVsActualRequest.type,
     GetAssetBenchmarkMultiMarketOptimizedVsActualSaga,
   );
 
   yield takeLatest(currentAssetFilesRequest.type, GetAssetFilesSaga);
   yield takeLatest(filterAggregatorScadaFilesRequest.type, FilterAssetAggregatorScadaFileSaga);
+  yield takeLatest(filterInvoiceFilesRequest.type, FilterInvoiceFilesSaga);
+  yield takeLatest(filterInvoiceSettlementFilesRequest.type, FilterInvoiceSettlementFilesSaga);
   yield takeLatest(updateAssetReportingPeriodRequest.type, UpdateAssetReportingPeriodSaga);
+  yield takeLatest(updateAssetInvoiceReportingPeriodRequest.type, UpdateAssetInvoiceReportingPeriodSaga);
   yield takeLatest(getAssetImbalanceAnalysisSummaryRequest.type, GetAssetImbalanceAnalysisSummarySaga);
   yield takeLatest(getAssetImbalanceDailyBreakdownRequest.type, GetAssetImbalanceDailyBreakdownSaga);
   yield takeLatest(getAssetImbalanceTopWorstDaysRequest.type, GetAssetImbalanceWorstDaysSaga);
@@ -1097,6 +1343,17 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(getAssetBatteryHealthWarrantyExceedanceRequest.type, GetAssetBatteryHealthWarrantyExceedanceSaga);
   yield takeLatest(getAssetTBSpreadSummaryRequest.type, GetAssetTBSpreadSummarySaga);
   yield takeLatest(getAssetTBSpreadDetailsRequest.type, GetAssetTBSpreadDetailsSaga);
+  yield takeLatest(
+    getExecutiveAnalysisMonthlyRevenueComparisonRequest.type,
+    GetAssetExecutiveAnalysisMonthlyRevenueComparison,
+  );
+  yield takeLatest(getExecutiveAnalysisRevenueByStreamRequest.type, GetExecutiveAnalysisRevenueByStream);
+  yield takeLatest(getExecutiveAnalysisSummaryRequest.type, GetExecutiveAnalysisSummary);
+
+  yield takeLatest(uploadInvoicesRequest.type, UploadInvoiceSaga);
+  yield takeLatest(deleteInvoiceRequest.type, DeleteInvoiceSaga);
+  yield takeLatest(uploadInvoiceSettlementRequest.type, UploadInvoiceSettlementSaga);
+  yield takeLatest(deleteInvoiceSettlementRequest.type, DeleteInvoiceSettlementSaga);
 
   // refresh cached all-assets list after onboard/edit success
   yield takeLatest(onboardAssetSuccess.type, function* () {

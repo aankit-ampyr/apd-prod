@@ -92,6 +92,8 @@ interface TextInputProps {
   incrementDisabled?: boolean;
   autoFocus?: boolean;
   onKeyDown?: (e: React.KeyboardEvent<HTMLInputElement>) => void;
+  inputInfo?: string;
+  showInputInfoIcon?: boolean;
 }
 
 export const TextInput: React.FC<TextInputProps> = (props) => {
@@ -121,7 +123,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
     labelClassName,
     allowedRegex,
     info,
-    readonly=false,
+    readonly = false,
     infoMessage,
     integer = false,
     showStepper = false,
@@ -134,6 +136,8 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
     incrementDisabled = false,
     autoFocus,
     onKeyDown,
+    inputInfo,
+    showInputInfoIcon = true,
   } = props;
 
   const [isFocused, setIsFocused] = React.useState(false);
@@ -217,6 +221,20 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
           )}
         >
           {label} {required && <span className="text-error">*</span>}{" "}
+          {inputInfo && (
+            <div className="flex items-center gap-1 mb-2">
+              {showInputInfoIcon && (
+                <Icon
+                  name="questionCircle"
+                  className="text-text-placeholder! size-3.5"
+                />
+              )}
+
+              <Text variant="12R" className="text-text-placeholder!">
+                {inputInfo}
+              </Text>
+            </div>
+          )}
           {info && (
             <span className="relative group">
               <Tooltip
@@ -236,7 +254,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
         focus={isFocused}
         className={cn(
           "flex items-center gap-2 px-2 py-2",
-          readonly ? cn("bg-bg-card/50 border-0!", readOnlyClassName) : '',
+          readonly ? cn("bg-bg-card/50 border-0!", readOnlyClassName) : "",
           wrapperClassName,
         )}
       >
@@ -266,7 +284,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
           )}
           {/* Stepper buttons */}
           {showStepper && (integer || allowFloat) && (
-            <div className="flex items-center h-full ml-2 border-l border-gray-300">
+            <div className="flex self-stretch  -my-2 ml-2 border-l border-gray-300">
               <button
                 type="button"
                 onClick={onDecrement}

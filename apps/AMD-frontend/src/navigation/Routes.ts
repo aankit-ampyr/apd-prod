@@ -2,7 +2,7 @@ import {matchesRoute} from '@/utils';
 import {UserRole} from '@/constants';
 import {IconTypes} from '@/interface';
 
-type SidebarSection = 'CONFIGURATION' | 'SYSTEM';
+type SidebarSection = 'CONFIGURATION' | 'SYSTEM' | 'ANALYTICS';
 type RouteSideBarConfigItem<T> = T | ((role: UserRole) => T);
 
 export type RouteConfig = {
@@ -20,7 +20,6 @@ export type RouteConfig = {
 
 export type RouteKeys = (
   'INDEX' |
-  'HOME' |
   'USER_MANAGEMENT' |
   'ORGANIZATIONS' |
   'ASSET_MANAGEMENT' |
@@ -36,7 +35,10 @@ export type RouteKeys = (
   'VIEW_ASSET_ANALYSIS' |
   'VIEW_ASSET_BENCHMARK' |
   'VIEW_ANALYSIS' |
-  'VIEW_BENCHMARK'
+  'VIEW_BENCHMARK' | 
+  'EXECUTIVE_ANALYSIS' | 
+  "INVOICE_ANALYSIS" | 
+  "VIEW_INVOICE_ANALYSIS"
 );
 
 type AppRoutesConfig = Record<RouteKeys, RouteConfig>;
@@ -51,11 +53,6 @@ export const AppRoutes: AppRoutesConfig = {
     path: '/',
     roles: [UserRole.Admin, UserRole.Management, UserRole.Analyst],
     isPublic: true,
-  },
-  HOME: {
-    path: '/home',
-    title: 'Home',
-    roles: [UserRole.Admin, UserRole.Management, UserRole.Analyst],
   },
 
   USER_MANAGEMENT: {
@@ -173,7 +170,7 @@ export const AppRoutes: AppRoutesConfig = {
     sidebar: {
       icon: 'bar2',
       label: 'View Analysis',
-      section: 'CONFIGURATION',
+      section: 'ANALYTICS',
     },
   },
   VIEW_BENCHMARK: {
@@ -183,8 +180,34 @@ export const AppRoutes: AppRoutesConfig = {
     sidebar: {
       icon: 'search-analysis',
       label: 'Benchmark Analysis',
-      section: 'CONFIGURATION',
+      section: 'ANALYTICS',
     },
+  },
+  EXECUTIVE_ANALYSIS: {
+    path: '/executive-analysis',
+    title: 'Executive Analysis',
+    roles: [UserRole.Admin, UserRole.Management],
+    sidebar: {
+      icon: 'scale-imbalance',
+      label: 'Executive Analysis',
+      section: 'ANALYTICS',
+    },
+  },
+  INVOICE_ANALYSIS: {
+    path: '/invoice-analysis',
+    title: 'Invoice Analysis',
+    roles: [UserRole.Admin, UserRole.Analyst],
+    sidebar: {
+      icon: 'ticket',
+      label: 'Invoice Analysis',
+      section: 'ANALYTICS',
+    },
+  },
+  VIEW_INVOICE_ANALYSIS: {
+    path: '/asset-management/:id/invoice-analysis',
+    title: 'Invoice Analysis',
+    roles: [UserRole.Admin, UserRole.Analyst],
+    allowBackButton: true,
   },
 };
 

@@ -211,5 +211,10 @@
     "key": "otp_resent",
     "message": "OTP resent successfully.",
     "type": "success"
+  },
+  "S-10092": {
+    "key": "settlement_files_list_retrieved",
+    "message": "User logged out successfully.",
+    "type": "success"
   }
 }

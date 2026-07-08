@@ -85,8 +85,9 @@ const MultiSelectDropDown: React.FC<MultiSelectDropDownProps> = (props) => {
     >
       {/* Select All */}
       {showSelectAll && (
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onMouseDown={(e) => e.preventDefault()}
           onClick={handleSelectAll}
           className={cn(
@@ -98,15 +99,16 @@ const MultiSelectDropDown: React.FC<MultiSelectDropDownProps> = (props) => {
           <Text variant="caption" className="font-InterMedium!">
             Select All ({selectableOptions.length})
           </Text>
-        </button>
+        </div>
       )}
       {options?.map((option) => {
         const isSelected = values?.includes(option?.id);
         if (itemRenderer) {
           return (
-            <button
+            <div
               key={option.id}
-              type="button"
+              role="button"
+              tabIndex={0}
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => handleSelect(option)}
               className={cn(
@@ -115,7 +117,7 @@ const MultiSelectDropDown: React.FC<MultiSelectDropDownProps> = (props) => {
               )}
             >
               {itemRenderer(option, isSelected)}
-            </button>
+            </div>
           );
         }
 
@@ -143,9 +145,10 @@ interface DropdownItemProps {
 const MultiSelectDropdownItem: React.FC<DropdownItemProps> = (props) => {
   const { option, isSelected, itemClassName, onSelect } = props;
   return (
-    <button
+    <div
       key={option.id}
-      type="button"
+      role="button"
+      tabIndex={0}
       onMouseDown={(e) => e.preventDefault()}
       onClick={() => onSelect(option)}
       className={cn(
@@ -178,7 +181,7 @@ const MultiSelectDropdownItem: React.FC<DropdownItemProps> = (props) => {
           {option?.subLabel}
         </Text>
       </div>
-    </button>
+    </div>
   );
 };
 

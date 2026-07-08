@@ -9,6 +9,7 @@ from pydantic import (
     computed_field,
 )
 from constants.enums import (
+    BessState,
     LoadPattern,
     BESSContainerSize,
     ProjectStatus,
@@ -20,7 +21,6 @@ from constants.enums import (
     LoadServingPriority,
     SizingStrategy,
 )
-from simulation_engine.schemas import HourlyResult as _HourlyResult
 
 
 LOAD_MW_ERROR_MSG = "Load must be between 1.00 and 500.00 MW"
@@ -321,12 +321,15 @@ class BessDgSizingResponse(BessDgSizingPayload):
     updated_at: datetime
 
 
-class SimulationProgress(BaseModel):
+class BaseSimulationProgress(BaseModel):
     simulation_job_id: int
+    status: SimulationJobStatus
+
+
+class SimulationProgress(BaseSimulationProgress):
     current_config: int
     total_config: int
     progress_percentage: float = Field(..., ge=0, le=100)
-    status: SimulationJobStatus
 
 
 class SimulationResult(BaseModel):
@@ -435,9 +438,34 @@ class CustomSimulationConfigPayload(BaseModel):
     created_at: Optional[datetime] = None
 
 
-class HourlyResult(_HourlyResult):
+class HourlyResult(BaseModel):
     id: int
     simulation_id: int
+    timestamp: datetime
+    hour: int = 0
+    day: int = 0
+    hour_of_day: int = 0
+    load_mw: float = 0
+    solar_mw: float = 0.0
+    solar_to_load: float = 0.0
+    solar_to_bess: float = 0.0
+    bess_to_load: float = 0.0
+    bess_power_mw: float = 0.0
+    bess_state: BessState = BessState.IDLE
+    dg_output_mw: float = 0.0
+    is_dg_running: bool = False
+    dg_to_load: float = 0.0
+    dg_to_bess: float = 0.0
+    dg_curtailed: float = 0.0
+    soc_mwh: float = 0.0
+    soc_percent: float = 0.0
+    unmet_mw: float = 0.0
+    delivery: bool = False
+    solar_curtailed: float = 0.0
+    daily_cycles: float = 0.0
+    green_energy_to_load_mwh: float = 0.0
+    charging_loss: float = 0.0
+    discharging_loss: float = 0.0
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -750,14 +778,53 @@ class MultiYearProjectionResult(BaseModel):
     charging_loss: float
     discharging_loss: float
     final_soc_pct: float
+    unserved_mwh: float
     solar_gen_during_load: float
     solar_curtailed_during_load: float
     solar_curtailed: float
     created_at: datetime
 
 
+class EnergyInMetrics(BaseModel):
+    solar_avg: float
+    solar_total: float
+    dg_avg: float
+    dg_total: float
+    initial_capacity: float
+    initial_bess_soc: float
+    initial_bess_energy: float
+    total_bess_energy: float
+    total_energy: float
+
+
+class EnergyOutMetrics(BaseModel):
+    total_solar_to_load: float
+    total_bess_to_load: float
+    total_dg_to_load: float
+    total_energy_to_load: float
+    solar_curtailed_pct: float
+    solar_curtailed_mwh: float
+    dg_curtailed_pct: float
+    dg_curtailed_mwh: float
+    charging_loss_mwh: float
+    discharging_loss_mwh: float
+    cycle_loss: float
+    final_bess_soc: float
+    final_bess_energy: float
+    total_bess_energy: float
+    total_energy: float
+
+
+class MultiYearSummary(BaseModel):
+    no_of_years: int
+    balance: float
+    energy_in: EnergyInMetrics
+    energy_out: EnergyOutMetrics
+
+
 class MultiYearProjectionResponse(BaseModel):
     simulation_id: int
+    summary: Optional[MultiYearSummary]
     results: List[MultiYearProjectionResult]
 
 
@@ -771,9 +838,13 @@ class GreenEnergyConfig(BaseModel):
     bess_max: int = Field(ge=5, le=1000)
     dg_min: int = Field(ge=0, le=200)
     dg_max: int = Field(ge=0, le=200)
-    dg_step: int = Field(ge=5, le=25)
+    dg_step_size: int = Field(ge=5, le=25)
     min_green_energy: int = Field(ge=0, le=100)
-    max_wastage: int = Field(ge=0, le=100)
+    max_wastage: Optional[int] = Field(
+        None,
+        ge=0,
+        le=100,
+    )
 
 
 class GreenEnergyConfigResponse(GreenEnergyConfig):
@@ -853,3 +924,60 @@ class SimulationDetails(BaseModel):
             kwargs["exclude"] = exclude
 
         return super().model_dump(**kwargs)
+
+
+class GreenResult(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    simulation_id: int
+    job_id: int
+    solar_mwp: float
+    bess_mwh: float
+    duration_hr: float
+    power_mw: float
+    containers: int
+    dg_mw: float
+    delivery_pct: float
+    green_pct: float
+    green_energy_pct: float
+    green_hours_mar_oct_pct: float
+    wastage_pct: float
+    delivery_hours: float
+    load_hours: float
+    green_hours: float
+    dg_hours: float
+    dg_starts: int
+    bess_cycles: float
+    unserved_mwh: float
+    fuel_consumption_l: float
+    created_at: datetime
+
+
+class GreenResultResponse(BaseModel):
+    simulation_id: int
+    results: list[GreenResult]
+    min_green_energy: int
+    max_wastage: Optional[int]
+    total_configs: int
+    total_pages: int
+    current_page: int
+    next_page: Optional[int]
+
+
+class DetailGreenConfigPayload(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    duration_class: BESSContainerSize
+    solar_peak: int = Field(ge=10, le=500)
+    bess_capacity: int = Field(ge=5, le=1000)
+    dg_capacity: int = Field(ge=0, le=200)
+
+
+class DetailGreenResponse(DetailGreenConfigPayload):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    simulation_id: int
+    created_at: datetime
+    updated_at: datetime

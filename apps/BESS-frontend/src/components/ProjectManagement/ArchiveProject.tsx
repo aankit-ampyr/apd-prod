@@ -16,13 +16,13 @@ const ArchiveProject: React.FC<ArchiveProjectProps> = ({open, onCancel, onArchiv
       <Text variant="body2" className="text-text-secondary!">
         Archiving will remove this project from the default project list and make it read-only.
       </Text>
-      <Alert
+      {/* <Alert
         textClassName="text-text-secondary! text-[14px]!"
         iconClassName="mt-0!"
         message="This action cannot be undone. "
         variant="warning"
         className="w-full! items-center! p-3! border-0.6 border-warning!"
-      />
+      /> */}
       <div className="flex justify-end gap-2 mt-4">
         <Button variant="secondary" className="" onClick={onCancel}>
           Cancel

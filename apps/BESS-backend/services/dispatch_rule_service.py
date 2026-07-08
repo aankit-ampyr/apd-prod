@@ -1,5 +1,6 @@
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from models import BESSContainerConfiguration, DispatchRuleConfiguration
 from dtos.simulation_dto import DispatchRulePayload, DispatchRuleResponse
@@ -14,7 +15,6 @@ from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -116,7 +116,7 @@ class DispatchRuleService:
             return Res.error(
                 status_code="E-20041",
                 message="DG trigger type is required when DG is enabled.",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         # 3. Validate allowed trigger types based on schedule mode
@@ -144,7 +144,7 @@ class DispatchRuleService:
             return Res.error(
                 status_code="E-20041",
                 message="Invalid DG trigger type for the selected DG schedule mode.",
-                http_status_code=400,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         # 4. Validate start and end times when required
@@ -153,7 +153,7 @@ class DispatchRuleService:
                 return Res.error(
                     status_code="E-20041",
                     message="Start and End times are required for the selected DG schedule.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if not (0 <= payload.dg_start_time <= 23) or not (
@@ -162,14 +162,14 @@ class DispatchRuleService:
                 return Res.error(
                     status_code="E-20041",
                     message="Start and End times must be between 0 and 23.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.dg_start_time == payload.dg_end_time:
                 return Res.error(
                     status_code="E-20041",
                     message="Start and End times cannot be the same.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         # 5. SOC threshold validation
@@ -181,28 +181,28 @@ class DispatchRuleService:
                 return Res.error(
                     status_code="E-20041",
                     message="SOC thresholds are required for SOC trigger.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.dg_soc_off_threshold < payload.dg_soc_on_threshold:
                 return Res.error(
                     status_code="E-20041",
                     message="Invalid parameter passed.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.dg_soc_on_threshold < bess_min_soc:
                 return Res.error(
                     status_code="E-20041",
                     message="dg_soc_on_threshold must be within configured BESS SOC bounds.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.dg_soc_off_threshold > bess_max_soc:
                 return Res.error(
                     status_code="E-20041",
                     message="dg_soc_off_threshold must be within configured BESS SOC bounds.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         # 6. Cycle charging validation
@@ -211,21 +211,21 @@ class DispatchRuleService:
                 return Res.error(
                     status_code="E-20041",
                     message="min_load and stop_soc are required when cycle charging is enabled.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if not (50 <= payload.min_load <= 90):
                 return Res.error(
                     status_code="E-20041",
                     message="min_load must be between 50% and 90%.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if not (0 <= payload.stop_soc <= 100):
                 return Res.error(
                     status_code="E-20041",
                     message="stop_soc must be between 0% and 100%.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             # stop_soc should be at least 20% higher than dg_soc_on_threshold
@@ -236,14 +236,14 @@ class DispatchRuleService:
                 return Res.error(
                     status_code="E-20041",
                     message="stop_soc must be at least 20% higher than dg_soc_on_threshold.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.stop_soc > bess_max_soc:
                 return Res.error(
                     status_code="E-20041",
                     message="stop_soc must be within configured BESS SOC bounds.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         return None
@@ -256,12 +256,6 @@ class DispatchRuleService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
         bess_min_soc, bess_max_soc = await self._get_bess_soc_bounds(
             simulation_id=simulation_id, bess_db=bess_db
         )
@@ -305,7 +299,9 @@ class DispatchRuleService:
             db=bess_db,
         )
 
-        await depreciate_simulation_job(simulation_id=simulation_id, db=bess_db)
+        await depreciate_simulation_job(
+            simulation_id=simulation_id, db=bess_db, include_green_job=True
+        )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -338,7 +334,7 @@ class DispatchRuleService:
             return Res.error(
                 status_code="E-20041",
                 message="Dispatch rule configuration not found.",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         bess_min_soc, bess_max_soc = await self._get_bess_soc_bounds(

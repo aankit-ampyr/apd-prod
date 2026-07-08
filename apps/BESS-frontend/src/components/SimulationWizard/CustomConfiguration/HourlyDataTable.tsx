@@ -67,6 +67,8 @@ interface HourlyDataRow {
   dgCurtailed: number;
   socMWh: number;
   socPercent: number;
+  chargingLoss: number;
+  disChargingLoss: number;
   unmetMW: number;
   delivery: string;
   solarCurtailed: number;
@@ -274,6 +276,8 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         solarCurtailed: Number(item.solar_curtailed?.toFixed(2)),
         dailyCycles: Number(item.daily_cycles?.toFixed(2)),
         greenEnergyToLoadMWh: Number(item.green_energy_to_load_mwh?.toFixed(2)),
+        chargingLoss: Number(item.charging_loss?.toFixed(2)),
+        disChargingLoss: Number(item.discharging_loss?.toFixed(2)),
       }))
     : [];
 
@@ -553,6 +557,34 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
       render: row => renderCell(row.socPercent),
     },
     {
+      name: 'charginLoss',
+      title: (
+        <ColumnHeader
+          label="Charging Loss (MW)"
+          sort={getSortDirection('soc_percent')}
+          onSortChange={() => handleSortChange('soc_percent')}
+          tooltip="State of charge percentage"
+        />
+      ),
+      width: {minWidth: '100px'},
+      align: 'center',
+      render: row => renderCell(row.chargingLoss),
+    },
+    {
+      name: 'disChargingLoss',
+      title: (
+        <ColumnHeader
+          label="Discharging Loss (MW)"
+          sort={getSortDirection('discharging_loss')}
+          onSortChange={() => handleSortChange('discharging_loss')}
+          tooltip="State of charge percentage"
+        />
+      ),
+      width: {minWidth: '100px'},
+      align: 'center',
+      render: row => renderCell(row.disChargingLoss),
+    },
+    {
       name: 'unmetMW',
       title: (
         <ColumnHeader label="Unmet (MW)" sort={getSortDirection('unmet_mw')} onSortChange={() => handleSortChange('unmet_mw')} tooltip="Unmet energy demand" />
@@ -657,7 +689,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
 
       <div className={`flex w-full items-center ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
         {!isFullScreen && (
-          <div className="mb-4 flex items-center gap-4">
+          <div className="flex items-center gap-4">
             <DateRangePicker
               isFilter
               values={pendingDateRange}
@@ -690,13 +722,23 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
             )}
           </div>
         )}
-        <div className="flex items-center gap-5 pt-1">
-          <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
-          {isFullScreen ? (
-            <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
-          ) : (
-            <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+        <div className={`flex ${isFullScreen ? 'justify-between' : 'justify-end'} w-full gap-5`}>
+          {isFullScreen && (
+            <div className="flex flex-col">
+              <Text variant="h3">Hourly Data Table</Text>
+              <Text variant="14R" className="text-text-secondary! my-1.5">
+                Delivery and green energy breakdown by Hour
+              </Text>
+            </div>
           )}
+          <div className="flex items-center gap-5">
+            <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
+            {isFullScreen ? (
+              <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
+            ) : (
+              <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -710,6 +752,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
           onPageChange={setCurrentPage}
           pageSize={PAGE_SIZE}
           stickyHeader
+          persistHorizontalScrollKey={simulation_id ? `bess-hourly-results-${simulation_id}` : undefined}
         />
       </div>
     </div>

@@ -4,7 +4,6 @@ import {
   AuditLog,
   DigestManagement,
   Help,
-  Home,
   Organizations,
   SettingsScreen,
   UserManagement,
@@ -13,6 +12,9 @@ import {
   OnboardAssetScreen,
   AssetBenchmarkAnalysis,
   AssetAnalysis,
+  NotFound,
+  ExecutiveAnalysisScreen,
+  InvoiceAnalysisScreen,
 } from '@/screens';
 import {Routes as WebRoutes} from './Routes';
 import {DashboardLayout} from '@/components';
@@ -20,13 +22,20 @@ import {useDispatch, useSelector} from 'react-redux';
 import {authStatus, authSuccessStatus} from '@/services/redux/selectors';
 import {useEffect} from 'react';
 import {resetAssetFileUploadError, resetAuthMessage, resetCurrentSelectedAsset} from '@/services/redux/slice';
-import {useRole, useRouteLeave, useScreenOverride} from '@/hooks';
+import {useLandingRoute, useRole, useRouteLeave, useScreenOverride} from '@/hooks';
 import {toast} from 'sonner';
 
 const ProtectedRoute = () => {
   const isAuthenticated = useSelector(authStatus);
   const fallback = WebRoutes.LOGIN;
   return isAuthenticated ? <Outlet /> : <Navigate to={fallback} />;
+};
+
+const PublicRoute = () => {
+  const isAuthenticated = useSelector(authStatus);
+  const defaultRoute = useLandingRoute();
+
+  return isAuthenticated ? <Navigate to={defaultRoute} replace /> : <Outlet />;
 };
 
 export const router = createBrowserRouter([
@@ -38,12 +47,17 @@ export const router = createBrowserRouter([
         element: <Root />,
       },
       {
-        path: WebRoutes.LOGIN,
-        element: <LoginScreen />,
-      },
-      {
-        path: WebRoutes.OTP_VERIFICATION,
-        element: <OTPVerificationScreen />,
+        element: <PublicRoute />,
+        children: [
+          {
+            path: WebRoutes.LOGIN,
+            element: <LoginScreen />,
+          },
+          {
+            path: WebRoutes.OTP_VERIFICATION,
+            element: <OTPVerificationScreen />,
+          },
+        ],
       },
       {
         element: <ProtectedRoute />,
@@ -51,7 +65,6 @@ export const router = createBrowserRouter([
           {
             element: <DashboardLayout />,
             children: [
-              {path: WebRoutes.HOME, element: <Home />},
               {path: WebRoutes.USER_MANAGEMENT, element: <UserManagement />},
               {path: WebRoutes.ORGANIZATIONS, element: <Organizations />},
               {path: WebRoutes.ASSET_MANAGEMENT, element: <AssetManagement />},
@@ -66,9 +79,16 @@ export const router = createBrowserRouter([
               {path: WebRoutes.VIEW_ANALYSIS, element: <AssetAnalysis key={'seprate'} />},
               {path: WebRoutes.VIEW_ASSET_BENCHMARK, element: <AssetBenchmarkAnalysis key={'integrated'} />},
               {path: WebRoutes.VIEW_BENCHMARK, element: <AssetBenchmarkAnalysis key={'seperate'} />},
+              {path: WebRoutes.EXECUTIVE_ANALYSIS, element: <ExecutiveAnalysisScreen />},
+              {path: WebRoutes.INVOICE_ANALYSIS, element: <InvoiceAnalysisScreen key={'seperate'} />},
+              {path: WebRoutes.VIEW_INVOICE_ANALYSIS, element: <InvoiceAnalysisScreen key={'integrated'} />},
             ],
           },
         ],
+      },
+      {
+        path: '*',
+        element: <AuthAwareFallback />,
       },
     ],
   },
@@ -108,6 +128,11 @@ export function AppLayout() {
         dispatch(resetAuthMessage());
         navigate(initailRoute());
       }
+
+      // user logged out successfully
+      if (authSuccessState === 'S-10092') {
+        navigate(WebRoutes.LOGIN);
+      }
     }
   }, [authSuccessState, navigate, dispatch]);
 
@@ -143,22 +168,30 @@ export function AppLayout() {
   useRouteLeave(WebRoutes.VIEW_BENCHMARK, () => {
     dispatch(resetCurrentSelectedAsset());
   });
+  useRouteLeave(WebRoutes.EXECUTIVE_ANALYSIS, () => {
+    dispatch(resetCurrentSelectedAsset());
+  });
+  useRouteLeave(WebRoutes.VIEW_INVOICE_ANALYSIS, () => {
+    dispatch(resetCurrentSelectedAsset());
+  });
+  useRouteLeave(WebRoutes.INVOICE_ANALYSIS, () => {
+    dispatch(resetCurrentSelectedAsset());
+  });
 
   return <Outlet />;
 }
 
 export function Root() {
   const isAuthenticated = useSelector(authStatus);
-  const {isManagement, isAnalyst} = useRole();
-  const initailRoute = () => {
-    if (isManagement) {
-      return WebRoutes.VIEW_ANALYSIS;
-    }
-    if (isAnalyst) {
-      return WebRoutes.ASSET_MANAGEMENT;
-    }
-    return WebRoutes.USER_MANAGEMENT;
-  };
+  const defaultRoute = useLandingRoute();
 
-  return isAuthenticated ? <Navigate to={initailRoute()} /> : <Navigate to={WebRoutes.LOGIN} />;
+  return isAuthenticated ? <Navigate to={defaultRoute} replace /> : <Navigate to={WebRoutes.LOGIN} replace />;
 }
+
+function AuthAwareFallback() {
+  const isAuthenticated = useSelector(authStatus);
+
+  return isAuthenticated
+    ? <NotFound />
+    : <Navigate to={WebRoutes.LOGIN} replace />;
+};

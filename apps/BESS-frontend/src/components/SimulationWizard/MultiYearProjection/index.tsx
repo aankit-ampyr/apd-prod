@@ -13,18 +13,22 @@ import {
   showDetailedMultiYearProjectionAnalysisSelector,
   simulationProgressData,
   simulationResultsData,
-  simulationProgressLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {IOSSingleSlider} from '@lazarus/react-common/components';
-import {Button, Icon, Radio, Skeleton, Text} from '@/ui-kits';
-import {useCallback, useEffect, useState} from 'react';
+import {Button, Icon, Radio, Skeleton, Text, Tooltip} from '@/ui-kits';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {useDispatch, useSelector} from 'react-redux';
 import {
+  clearMultiYearProjectionProgressData,
+  getMultiYearProgressSilentRequest,
+  getMultiYearSilentRequest,
   multiYearProjectionComputeRequest,
   multiYearProjectionProgressRequest,
   multiYearProjectionRequest,
   multiYearProjectionResultRequest,
+  refreshProjectSimulationRequest,
+  simulationProgressRequest,
   setShowDetailedMultiYearProjectionAnalysis,
 } from '@/services/redux/slice/simulationWizardSlice';
 import {MultiYearSizingStrategy, SimulationSetupProgress} from '@/constants/enums';
@@ -33,6 +37,8 @@ import {StopSimulation} from '../DGSizing/StopSimulation';
 import {useMultiYearProjectionSimulation} from './hooks/useMultiYearProjectionSimulation';
 import {ViewDetailedAnalysis} from './ViewDetailedAnalysis';
 import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
+import {allProjectsData, authDataSelector} from '@/services/redux/selectors';
+import {useSimulationStatus} from '../SimulationStatusContext';
 
 interface MultiYearProjectionProps {
   setIsStepsHidden?: (hidden: boolean) => void;
@@ -89,11 +95,20 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
   const projectionComputeData = useSelector(multiYearProjectionComputeData);
   const projectionSaveSuccess = useSelector(multiYearProjectionSaveSuccess);
   const projectionResultLoading = useSelector(multiYearProjectionResultLoading);
-  const progressLoading = useSelector(simulationProgressLoading);
   const showDetailedMultiYearProjectionAnalysis = useSelector(showDetailedMultiYearProjectionAnalysisSelector);
   const simulProgressData = useSelector(simulationProgressData);
   const projectionProgressData = useSelector(multiYearProgressData);
+  const authData = useSelector(authDataSelector);
+  const allProjData = useSelector(allProjectsData);
+  const projectId = simulData?.project_id ?? proSimulData?.project_id;
+  const currentProject = allProjData?.find((project: any) => Number(project?.id) === projectId);
+  const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some((user: any) => user.id === authData.id));
+  const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
+  const isReadOnly = isAssignedUser || isProjectAssignmentPending;
+
   const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
+  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+
   const multiYearProjectionRunSuccess = useSelector(multiYearRunSuccess);
 
   const simulation_id = simulData?.id ?? proSimulData?.id;
@@ -106,22 +121,32 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
   const [sizingStrategy, setSizingStrategy] = useState<SizingStrategy>('year1');
   const [isSaved, setIsSaved] = useState(false);
   const [hasUserEditedAfterProjectionCompletion, setHasUserEditedAfterProjectionCompletion] = useState(false);
+  const projectionRefreshPollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const stopProjectionRefreshPolling = useCallback(() => {
+    if (projectionRefreshPollingRef.current) {
+      clearTimeout(projectionRefreshPollingRef.current);
+      projectionRefreshPollingRef.current = null;
+    }
+  }, []);
 
   const handleProjectionCompleted = useCallback(
     (_processedYears: number) => {
       setIsSaved(true);
       setHasUserEditedAfterProjectionCompletion(false);
       if (simulation_id) {
-        dispatch(multiYearProjectionResultRequest({simulation_id: Number(simulation_id)}));
-        dispatch(
-          multiYearProjectionProgressRequest({
-            simulation_id: Number(simulation_id),
-          }),
-        );
+        dispatch(refreshProjectSimulationRequest({simulation_id: Number(simulation_id)}));
+        dispatch(getMultiYearSilentRequest({simulation_id: Number(simulation_id)}));
+        dispatch(getMultiYearProgressSilentRequest({simulation_id: Number(simulation_id)}));
       }
     },
     [dispatch, simulation_id],
   );
+
+  const handleProjectionStopped = useCallback(() => {
+    setHasUserEditedAfterProjectionCompletion(false);
+    dispatch(clearMultiYearProjectionProgressData());
+  }, [dispatch]);
 
   const {
     currentYear,
@@ -142,12 +167,17 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
   } = useMultiYearProjectionSimulation({
     simulationId: simulation_id ? Number(simulation_id) : undefined,
     onSimulationCompleted: handleProjectionCompleted,
+    onSimulationStopped: handleProjectionStopped,
   });
 
   const loadConfig = projectionData?.config?.load ?? proSimulData?.config?.load;
   const solarConfig = projectionData?.config?.solar ?? proSimulData?.config?.solar;
   const dgConfig = projectionData?.config?.dg ?? proSimulData?.config?.dg;
   const customResult = simulResData?.results?.[0];
+
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
+
+  const shouldShowExternalSimulationMessage = !isSimulationRunning && (isBlocked || isAnySimulationRunning);
 
   const bessCapacity =
     projectionData?.config?.bess?.bess_capacity ?? customData?.bess_capacity ?? customResult?.bess_mwh ?? proSimulData?.config?.bess_dg_sizing?.bess_max ?? 0;
@@ -196,7 +226,13 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
 
   useEffect(() => {
     if (!simulation_id) return;
+    dispatch(refreshProjectSimulationRequest({simulation_id: Number(simulation_id)}));
     dispatch(multiYearProjectionResultRequest({simulation_id: Number(simulation_id)}));
+  }, [dispatch, simulation_id]);
+
+  useEffect(() => {
+    if (!simulation_id) return;
+    dispatch(simulationProgressRequest({simulation_id: Number(simulation_id)}));
   }, [dispatch, simulation_id]);
 
   useEffect(() => {
@@ -228,10 +264,39 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
     }
   }, [projectionSaveSuccess]);
 
+  useEffect(() => {
+    if (!simulation_id) {
+      stopProjectionRefreshPolling();
+      return;
+    }
+
+    const isStep5Completed = Number(simulProgressData?.status) === 2;
+
+    if (isStep5Completed && projectionData) {
+      stopProjectionRefreshPolling();
+      return;
+    }
+
+    const pollProjectionState = () => {
+      dispatch(refreshProjectSimulationRequest({simulation_id: Number(simulation_id)}));
+      dispatch(simulationProgressRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getMultiYearSilentRequest({simulation_id: Number(simulation_id)}));
+      projectionRefreshPollingRef.current = setTimeout(pollProjectionState, 5000);
+    };
+
+    projectionRefreshPollingRef.current = setTimeout(pollProjectionState, 5000);
+
+    return stopProjectionRefreshPolling;
+  }, [dispatch, projectionData, simulProgressData?.status, simulation_id, stopProjectionRefreshPolling]);
+
   const shouldShowProjectionCompletionSummary = !isSimulationRunning && !showCompletionProgress && showCompletionSummary;
+  const isStep5Completed = Number(simulProgressData?.status) === 2;
+  const isProjectionReady =
+    isStep5Completed &&
+    (Boolean(projectionData) || projectionProgressData?.status === 2 || shouldShowProjectionCompletionSummary || multiYearProjectionRunSuccess === 'S-20043');
 
   const wasProjectionCompleted =
-    !isSimulationRunning && (projectionProgressData?.status === 2 || shouldShowProjectionCompletionSummary || multiYearProjectionRunSuccess === 'S-20043');
+    !isSimulationRunning && isProjectionReady;
 
   const handleProjectionInputChange = (onStay: () => void) => {
     if (!wasProjectionCompleted) {
@@ -438,7 +503,7 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
     dispatch(setShowDetailedMultiYearProjectionAnalysis(true));
   };
 
-  if (progressLoading || !simulProgressData) {
+  if (projectionResultLoading) {
     return <MultiYearProjectionGhostLoader />;
   }
 
@@ -448,14 +513,29 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
     simulationData?.edited_step === 7 ||
     simulationData?.edited_step === 8;
 
-  if (shouldShowEmptyState || simulProgressData?.status !== 2) {
+  if (shouldShowEmptyState || !isProjectionReady) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
-        <img src={Images.websitePreview} alt="No Simulations" className="w-22" />
-        <Text variant="h4" className="text-text-secondary! font-InterMedium!">
-          Run the Simulation Results in Step 5 to generate and yearly projection results.
-        </Text>
-      </div>
+      <>
+        {shouldShowExternalSimulationMessage && (
+          <div className="flex justify-center">
+            <div className="flex items-center gap-3">
+              <Icon name="infoCircle" className="size-4.5! text-warning!" />
+              <Text variant="14M" className="text-warning!">
+                Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
+              </Text>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
+          <img src={Images.websitePreview} alt="No Simulations" className="w-22" />
+          <Text variant="h4" className="text-text-secondary! font-InterMedium!">
+            Run the Simulation Results in Step 5 to generate and yearly projection results.
+          </Text>
+        </div>
+
+        {(isSimulationRunning || isBlocked || shouldBlock) &&
+          createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
+      </>
     );
   }
 
@@ -507,13 +587,14 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
                   labelClassName="text-text-secondary! font-InterMedium!"
                   scaleWrapperClassName="bottom-2!"
                   scaleClassName="text-text-primary!"
+                  readOnly={isAssignedUser}
                 />
               </div>
             </div>
           ))}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="rounded-lg border border-border bg-white px-7 py-6">
           <Text variant="18SB" className="text-primary!">
             Sizing Strategy
@@ -522,24 +603,27 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
             When should BESS meet target?
           </Text>
 
-          <div className="mt-7 flex flex-wrap items-center gap-11">
+          <div className="mt-5 xl:mt-7 flex items-center gap-3 xl:gap-11">
             <Radio
               checked={sizingStrategy === 'year1'}
               onCheckedChange={() => handleSizingStrategyChange('year1')}
               label="Year 1 BOL"
               labelClassName="text-text-primary! font-InterMedium!"
+              disabled={isAssignedUser}
             />
             <Radio
               checked={sizingStrategy === 'year10'}
               onCheckedChange={() => handleSizingStrategyChange('year10')}
               label="Year 10 EOL"
               labelClassName="text-text-primary! font-InterMedium!"
+              disabled={isAssignedUser}
             />
             <Radio
               checked={sizingStrategy === 'year20'}
               onCheckedChange={() => handleSizingStrategyChange('year20')}
               label="Year 20 EOL"
               labelClassName="text-text-primary! font-InterMedium!"
+              disabled={isAssignedUser}
             />
           </div>
         </div>
@@ -578,7 +662,7 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
           <Text variant="h4"> Capacity Degradation Breakdown</Text>
         </div>
 
-        <div className="grid grid-cols-5 gap-10">
+        <div className="grid grid-cols-3 xl:grid-cols-5 gap-10">
           {degradationData.map((item: any) => {
             return (
               <div key={item.title}>
@@ -604,20 +688,23 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
         </div>
       </div>
 
-      {(projectionProgressData?.status !== 2 || hasUserEditedAfterProjectionCompletion) && !isSimulationRunning && (
+      {(!isProjectionReady || hasUserEditedAfterProjectionCompletion) && !isSimulationRunning && (
         <div className="flex justify-center gap-3 mt-3">
-          <Button
-            variant="secondary"
-            size="md"
-            className="self-center w-30 flex justify-center"
-            onClick={() => {
-              if (!simulation_id) return;
-              dispatch(multiYearProjectionRequest(projectionPayload));
-              setIsSaved(true);
-            }}
-            disabled={!simulation_id || isSaved}>
-            Save
-          </Button>
+          {!isReadOnly && (
+            <Button
+              variant="secondary"
+              size="md"
+              className="self-center w-30 flex justify-center"
+              onClick={() => {
+                if (!simulation_id) return;
+                dispatch(multiYearProjectionRequest(projectionPayload));
+                setIsSaved(true);
+              }}
+              disabled={!simulation_id || isSaved}>
+              Save
+            </Button>
+          )}
+
           <Button
             variant="primary"
             size="md"
@@ -626,24 +713,25 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
               if (!simulation_id) return;
               handleRunProjection();
             }}
-            disabled={!isSaved || runSimulationDisabled || isSimulationRunning || isBlocked}>
+            disabled={!isSaved || isReadOnly || runSimulationDisabled || isSimulationRunning || isBlocked}>
             Run Projection
           </Button>
         </div>
       )}
 
-      {isBlocked && (
+      {shouldShowExternalSimulationMessage && (
         <div className="flex justify-center">
           <div className="flex items-center gap-3">
             <Icon name="infoCircle" className="size-4.5! text-warning!" />
             <Text variant="14M" className="text-warning!">
-              Another projection is currently running. You can start a new one once it finishes.
+              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
             </Text>
           </div>
         </div>
       )}
 
-      {(isSimulationRunning || isBlocked) && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
+      {(isSimulationRunning || isBlocked || shouldBlock) &&
+        createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
 
       {(isSimulationRunning || showCompletionProgress || shouldShowProjectionCompletionSummary) && (
         <>
@@ -698,7 +786,7 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
           )}
         </>
       )}
-      {(shouldShowProjectionCompletionSummary || (projectionProgressData?.status === 2 && !isBlocked)) &&
+      {(shouldShowProjectionCompletionSummary || (isProjectionReady && !isBlocked)) &&
         !isSimulationRunning &&
         !hasUserEditedAfterProjectionCompletion && (
           <div className="mt-4 flex justify-center">
@@ -712,11 +800,11 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
             </div>
           </div>
         )}
-      {(shouldShowProjectionCompletionSummary || (projectionProgressData?.status === 2 && !isBlocked)) &&
+      {(shouldShowProjectionCompletionSummary || (isProjectionReady && !isBlocked)) &&
         !isSimulationRunning &&
         !hasUserEditedAfterProjectionCompletion && (
           <div className="mt-1 flex items-center justify-between rounded-lg border border-border bg-[#F9F9FA] px-6 py-3">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 w-[65%]! xl:w-full">
               <Icon name="analysis" className="text-black! size-6.75!" />{' '}
               <Text variant="caption" className="font-normal text-text-secondary!">
                 Explore detailed insights through monthly performance and hourly data summary.
@@ -724,7 +812,7 @@ export const MultiYearProjection = ({setIsStepsHidden}: MultiYearProjectionProps
             </div>
             <Button
               variant="secondary"
-              size="md"
+              size="sm"
               rightIcon="chevron-right"
               iconClassName="size-3!"
               className="flex items-center justify-center gap-2 self-center border bg-white px-6 py-3"
@@ -775,6 +863,37 @@ function formatMwhMwValue(mwh: number, mw: number) {
 }
 
 interface ConfigSummaryCardProps extends ConfigSummaryDataType {}
+
+function TruncatedTextWithTooltip({text}: {text: string}) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    const element = textRef.current;
+    if (!element) return;
+
+    setIsTruncated(element.scrollWidth > element.clientWidth);
+  }, [text]);
+
+  return (
+    <div className="relative flex-1 min-w-0 group">
+      <Text ref={textRef} variant="12SB" className="block w-full overflow-hidden whitespace-nowrap text-ellipsis">
+        {text}
+      </Text>
+
+      {isTruncated && (
+        <Tooltip
+          arrowClassName="hidden"
+          textClassName="font-InterMedium!"
+          portal
+          className="z-999 -translate-x-5! border border-[#9ECBC5]! whitespace-normal!"
+          position="top"
+          message={text}
+        />
+      )}
+    </div>
+  );
+}
 function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
   const {title, icon, points, bgGradientStart = '#FFFFFF', bgGradientEnd = '#FFFFFF'} = props;
 
@@ -791,19 +910,19 @@ function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
         </Text>
       </div>
       <ul className="list-disc! pl-6 pb-2! flex flex-col gap-1 marker:text-text-secondary marker:text-small">
-        {points.map((point, index) => (
-          <li key={`${point.label ?? point.value}-${index}`}>
-            <div className="flex whitespace-nowrap gap-1">
-              {point.label && (
-                <Text variant="small" className="text-text-secondary!">
+        {points.map((point, index) => {
+          const showTooltip = title === 'SOLAR' && point.label === 'Profile';
+          return (
+            <li key={`${point.label ?? point.value}-${index}`}>
+              <div className="flex items-center gap-1 min-w-0">
+                <Text variant="small" className="text-text-secondary! shrink-0">
                   {point.label} :
                 </Text>
-              )}
-
-              <Text variant="12SB">{point.value}</Text>
-            </div>
-          </li>
-        ))}
+                {showTooltip ? <TruncatedTextWithTooltip text={point.value} /> : <Text variant="12SB">{point.value}</Text>}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

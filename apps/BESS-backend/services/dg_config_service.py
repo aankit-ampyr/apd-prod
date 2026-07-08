@@ -1,5 +1,6 @@
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from constants.enums import SimulationLogStep, SimulationSetupProgress
 from dtos.simulation_dto import FuelCoefficients
@@ -10,7 +11,6 @@ from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -26,18 +26,12 @@ class DGConfigService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
         if payload.is_included:
             if not payload.is_binary and payload.min_stable_load is None:
                 return Res.error(
                     status_code="E-20038",
                     message="Minimum stable load is required for variable generator configuration.",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.advanced_fuel_curve:
@@ -45,14 +39,14 @@ class DGConfigService:
                     return Res.error(
                         status_code="E-20039",
                         message="Both no-load and load coefficients are required for advanced fuel curve model.",
-                        http_status_code=400,
+                        http_status_code=status.HTTP_400_BAD_REQUEST,
                     )
             else:
                 if payload.flat_fuel_rate is None:
                     return Res.error(
                         status_code="E-20008",
                         message="Missing required request parameter.",
-                        http_status_code=400,
+                        http_status_code=status.HTTP_400_BAD_REQUEST,
                     )
 
         query = select(DieselGeneratorConfiguration).where(
@@ -120,7 +114,9 @@ class DGConfigService:
             db=bess_db,
         )
 
-        await depreciate_simulation_job(simulation_id=simulation_id, db=bess_db)
+        await depreciate_simulation_job(
+            simulation_id=simulation_id, db=bess_db, include_green_job=True
+        )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -150,7 +146,11 @@ class DGConfigService:
         config = result.scalar_one_or_none()
 
         if not config:
-            return Res.error(status_code="E-20040", message="DG Config not found")
+            return Res.error(
+                status_code="E-20040",
+                message="DG Config not found",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         return Res.success(
             status_code="S-20020",

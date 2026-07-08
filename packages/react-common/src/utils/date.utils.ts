@@ -1,4 +1,4 @@
-import { format, parseISO, parse } from "date-fns";
+import { format, parseISO, parse, isValid } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 
 export const formatDate = (date: string | Date, formatStr: string = 'yyyy-MM-dd', utc: boolean = false) => {
@@ -27,9 +27,10 @@ export const parseDate = (dateString: string | Date, formatStr: string = 'dd-MM-
     if (!dateString) return null;
 
     const parsedDate =
-      typeof dateString === "string" ? parse(dateString, formatStr, new Date()) : dateString;
+    typeof dateString === "string" ? parse(dateString, formatStr, new Date()) : dateString;
+    
+    return isValid(parsedDate) ? parsedDate : null;
 
-    return parsedDate;
   } catch (error) {
     console.error("Error parsing date:", error);
     return null;

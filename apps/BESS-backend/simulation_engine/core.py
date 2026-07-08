@@ -1,12 +1,15 @@
 from typing import Tuple
 from constants.enums import BessState, DGTriggerType, LoadServingPriority
 from simulation_engine.schemas import (
-    CompleteScenarioResult,
     HourlyResult,
     SimulationParams,
     SimulationState,
+    SingleSimulationResult,
 )
-from simulation_engine.utils import get_datetime_from_hour_of_year
+from simulation_engine.utils import (
+    get_datetime_from_hour_of_year,
+    is_within_march_to_october,
+)
 
 
 class SimulationEngine:
@@ -53,11 +56,11 @@ class SimulationEngine:
                 self.state.bess_used = True
 
             self.hourly_result.solar_to_bess = charge
-            self.state.solar_in_bess += charge
+            soc_mwh_increase = charge * self.params.charge_discharge_efficiency
 
             self.hourly_result.solar_curtailed = solar_energy_avl
-            soc_mwh_increase = charge * self.params.charge_discharge_efficiency
             self.state.current_soc += soc_mwh_increase
+            self.state.solar_in_bess += soc_mwh_increase
             self.hourly_result.charging_loss += charge - soc_mwh_increase
 
         if dg_energy_avl > 0:
@@ -83,6 +86,9 @@ class SimulationEngine:
             )
 
             dg_energy_avl -= charge
+
+            if charge > 0:
+                self.state.bess_used = True
 
             self.hourly_result.dg_to_bess = charge
             self.hourly_result.dg_curtailed = dg_energy_avl
@@ -173,10 +179,10 @@ class SimulationEngine:
             self.params.dg_trigger_type == DGTriggerType.SOLAR_BATTERY_DEFICIT
             or self.params.dg_trigger_type == DGTriggerType.PREEMPTIVE_NIGHT
         ):
-            if remaining_load > 1e-9 and not self.state.is_dg_running:
+            if remaining_load > self.TOLERANCE and not self.state.is_dg_running:
                 self.state.is_dg_running = True
                 self.state.dg_start_count += 1
-            elif remaining_load <= 0:
+            elif remaining_load <= self.TOLERANCE:
                 self.state.is_dg_running = False
 
         # Early exit if DG is OFF
@@ -276,7 +282,7 @@ class SimulationEngine:
         if unprocessed_dg > 0:
             self.hourly_result.dg_curtailed += unprocessed_dg
 
-        return exess_solar, unprocessed_dg + exess_solar, remaining_load, fuel
+        return exess_solar, unprocessed_dg + excess_dg, remaining_load, fuel
 
     def __template_2(
         self,
@@ -377,9 +383,9 @@ class SimulationEngine:
         job_id: int,
         total_hours=8760,
         store_hourly: bool = False,
-    ) -> tuple[CompleteScenarioResult, list[dict]]:
+    ) -> tuple[SingleSimulationResult, list[dict]]:
 
-        result: CompleteScenarioResult = CompleteScenarioResult(
+        result: SingleSimulationResult = SingleSimulationResult(
             bess_mwh=self.params.bess_capacity_mwh,
             duration_hr=self.params.duration_hr,
             power_mw=self.params.bess_capacity_mwh / self.params.duration_hr,
@@ -404,14 +410,14 @@ class SimulationEngine:
                 self.state.current_day = day_of_year
                 self.hourly_result.day = day_of_year
                 self.state.bess_dissabled = False
+                result.bess_cycles += self.state.daily_cycles
+
                 self.state.daily_cycles = 0.0
 
                 if self.state.bess_used:
                     self.state.bess_operation_day += 1
 
                 self.state.bess_used = False
-
-                result.bess_cycles += self.state.daily_cycles
 
             load = self.params.load_profile[hour]
             solar = self.params.solar_profile[hour]
@@ -435,12 +441,16 @@ class SimulationEngine:
                 )
             )
 
-            green_bess_to_load = min(
-                self.state.solar_in_bess, self.hourly_result.bess_to_load
+            internal_bess_needed = (
+                self.hourly_result.bess_to_load
+                / self.params.charge_discharge_efficiency
             )
+
+            green_bess_to_load = min(self.state.solar_in_bess, internal_bess_needed)
             self.state.solar_in_bess -= green_bess_to_load
             self.hourly_result.green_energy_to_load_mwh = (
-                solar_to_load + green_bess_to_load
+                self.hourly_result.solar_to_load
+                + (green_bess_to_load * self.params.charge_discharge_efficiency)
             )
 
             self.hourly_result.bess_power_mw = self.hourly_result.bess_to_load - (
@@ -480,11 +490,20 @@ class SimulationEngine:
             if load > 0:
                 result.solar_gen_during_load += solar
                 result.solar_curtailed_during_load += waste_solar_mw
+
+                is_mar_to_oct = is_within_march_to_october(
+                    year=self.year, hour_of_year=hour
+                )
+                if is_mar_to_oct:
+                    result.load_hours_mar_oct += 1
+
                 if unserved_load <= self.TOLERANCE:
                     result.delivery_hours += 1
                     result.delivery_met_mwh += load
                     self.hourly_result.delivery = True
                     if not self.state.is_dg_running:
+                        if is_mar_to_oct:
+                            result.green_hours_mar_oct += 1
                         result.green_hours += 1
 
             result.dg_generation += self.state.dg_generation
@@ -498,7 +517,6 @@ class SimulationEngine:
             result.solar_hrs += int(self.hourly_result.solar_to_load > self.TOLERANCE)
 
             result.dg_to_load += self.hourly_result.dg_to_load
-            result.dg_curtailed += self.hourly_result.dg_curtailed
             result.energy_to_load += (
                 self.hourly_result.solar_to_load
                 + self.hourly_result.bess_to_load
@@ -517,15 +535,23 @@ class SimulationEngine:
                     get_datetime_from_hour_of_year(year=self.year, hour_of_year=hour)
                 )
                 hourly_resutls.append(
-                    self.hourly_result.model_dump()
-                    | {"simulation_id": simulation_id, "custom_job_id": job_id}
+                    {k: v for k, v in self.hourly_result.__dict__.items()}
+                    | {
+                        "simulation_id": simulation_id,
+                        "custom_job_id": job_id,
+                        "job_id": job_id,
+                    },
                 )
 
-        result.bess_cycles = self.state.total_bess_discharge_mwh / (
-            self.params.bess_max_soc_mwh - self.params.bess_min_soc_mwh
-        )
+        # result.bess_cycles = self.state.total_bess_discharge_mwh / (
+        #     self.params.bess_max_soc_mwh - self.params.bess_min_soc_mwh
+        # )
 
-        result.bess_cycles = result.bess_cycles / self.state.bess_operation_day
+        if self.state.bess_operation_day > 0:
+            result.bess_cycles = result.bess_cycles / self.state.bess_operation_day
+        else:
+            result.bess_cycles = 0
+
         result.final_soc_pct = (
             self.state.current_soc / self.params.bess_capacity_mwh
         ) * 100

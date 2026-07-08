@@ -51,6 +51,7 @@ class ProjectController:
                 UserRole.MANAGEMENT,
                 UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
+                UserRole.VIEWER,
             )
         ),
     ):
@@ -66,7 +67,7 @@ class ProjectController:
         payload: ProjectCreate,
         bess_db: AsyncSession = Depends(get_bess_db),
         user_db: AsyncSession = Depends(get_user_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN,UserRole.ANALYST)),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
     ):
         return await self.service.create_project(
             payload=payload, bess_db=bess_db, user_db=user_db, current_user=current_user
@@ -79,7 +80,7 @@ class ProjectController:
         bess_db: AsyncSession = Depends(get_bess_db),
         user_db: AsyncSession = Depends(get_user_db),
         current_user: dict = Depends(
-            allowed_roles(UserRole.ADMIN, UserRole.MANAGEMENT,UserRole.ANALYST)
+            allowed_roles(UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST)
         ),
     ):
         return await self.service.edit_project(
@@ -151,10 +152,14 @@ class ProjectController:
         sort: str = "asc",
         search: Optional[str] = None,
         status: Optional[SimulationStatus] = None,  # Correct annotation
-        start_date: Optional[str] = None,  
-        end_date: Optional[str] = None,   
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         bess_db: AsyncSession = Depends(get_bess_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.MANAGEMENT, UserRole.VIEWER
+            )
+        ),
     ):
         return await self.service.get_simulation_list(
             bess_db=bess_db,
@@ -164,7 +169,7 @@ class ProjectController:
             sort=sort,
             search=search,
             status=status,
-            start_date=start_date, 
+            start_date=start_date,
             end_date=end_date,
             current_user=current_user,
         )

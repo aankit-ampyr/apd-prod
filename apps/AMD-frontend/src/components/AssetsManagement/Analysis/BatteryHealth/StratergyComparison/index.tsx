@@ -114,7 +114,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
     Actual: 'Actual',
     'EPEX Daily': 'Daily',
     'EPEX EFA': 'EFA',
-    'Multi-Market': 'Multi',
+    'Optimized': 'Opt',
   };
 
   /**
@@ -203,7 +203,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
         {name: 'Actual', value: 0},
         {name: 'EPEX Daily', value: 0},
         {name: 'EPEX EFA', value: 0},
-        {name: 'Multi-Market', value: 0},
+        {name: 'Optimized', value: 0},
       ];
     }
     return annualProjectionReportResult?.annual_projection_report?.map(item => ({
@@ -260,7 +260,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       subLabel: 'cycle',
     },
     {
-      title: 'Multi - Market Avg Daily',
+      title: 'Optimized Avg Daily',
       value: dailyCycleData?.multi_market?.avg_cycles?.toString() ?? '0',
       variant: 'blue',
       icon: 'chart-wave',
@@ -285,7 +285,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       ),
     },
     {
-      title: 'Multi - Market Max Day',
+      title: 'Optimized Max Day',
       value: dailyCycleData?.multi_market?.max_cycles?.toString() ?? '0',
       variant: 'green',
       icon: 'trending-up',
@@ -647,7 +647,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
             <Section
               title="Daily Cycles Analysis"
               icon="chart-trend-up"
-              subtitle="Actual Operation vs Multi-Market Optimized">
+              subtitle="Actual Operation vs Optimized">
               <div className="grid grid-cols-2 min-[1136px]:grid-cols-4 gap-3">
                 {cycleAnalaysisKpis.map(item => (
                   <GradientKPI className="pb-1.5! px-4" key={item.title} {...item} isLoading={dailyCycleDataLoading} />
@@ -655,7 +655,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
               </div>
 
               <LineChart
-                title="Actual Operation vs Multi-Market Optimized"
+                title="Actual Operation vs Optimized"
                 data={dailyCycleChartData ?? []}
                 chartMargin={{left: 40}}
                 isLoading={dailyCycleDataLoading || assetLoading}
@@ -673,7 +673,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                         Actual Daily Cycle : <span style={{color: actual?.color}} className='font-InterBold!'>{Number(actual?.value).toFixed(2) ?? 0} cycles/day</span>
                       </Text>
                       <Text variant="14R" className="text-text-secondary!">
-                        Multi-Market Daily Cycle : <span style={{color: multimarket?.color}} className='font-InterBold!'>{Number(multimarket?.value).toFixed(2) ?? 0} cycles/day</span>
+                        Optimized Daily Cycle : <span style={{color: multimarket?.color}} className='font-InterBold!'>{Number(multimarket?.value).toFixed(2) ?? 0} cycles/day</span>
                       </Text>
                       <Text variant="14R" className="text-text-secondary!">
                         Method : <span className='font-InterBold! text-text-primary!'>{getCurrentStratergyLabel(stratergy)}</span>
@@ -724,7 +724,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                     },
                     {
                       key: 'multi_market_daily_cycles',
-                      label: 'Multi-Market',
+                      label: 'Optimized',
                       color: 'var(--color-blue-data)',
                       smooth: true,
                     },

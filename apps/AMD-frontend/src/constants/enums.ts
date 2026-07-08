@@ -79,6 +79,7 @@ export enum APDAuditLogModules {
   ASSET_ANALYSIS = AuditLogModules.ASSET_ANALYSIS,
   BENCHMARK_ANALYSIS = AuditLogModules.BENCHMARK_ANALYSIS,
   FILE_HISTORY = AuditLogModules.FILE_HISTORY,
+  INVOICE=AuditLogModules.INVOICE
 }
 
 export enum APDAuditLogScenario {
@@ -141,10 +142,25 @@ export enum APDAuditLogScenario {
   ASSET_APPROVED = AuditLogScenario.ASSET_APPROVED,
   ASSET_DISABLED = AuditLogScenario.ASSET_DISABLED,
   ASSET_ENABLED = AuditLogScenario.ASSET_ENABLED,
+  INVOICE_UPLOADED=AuditLogScenario.INVOICE_UPLOADED,
+  INVOICE_DELETED=AuditLogScenario.INVOICE_DELETED,
+  SETTELMENT_FILE_UPLOADED=AuditLogScenario.SETTELMENT_FILE_UPLOADED,
+  SETTELMENT_FILE_DELETED=AuditLogScenario.SETTELMENT_FILE_DELETED,
 }
 
 export enum AssetBatteryCycleCalculationMethod {
   DISCHARGE_BASED = 'discharge-only',
   FULL_EQUIVALENT = 'full-equivalent',
   THROUGHPUT_BASED = 'throughput-based',
+}
+
+export enum InvoiceType {
+  HartreePV = 1,
+  HartreeBESS = 2,
+  EMR = 3,
+  GridBeyond = 4,
+  HartreeBESSPower = 5,
+  HartreeAuxiliary = 6,
+  HartreeSolarPower = 7,
+  HartreeOther = 8,
 }

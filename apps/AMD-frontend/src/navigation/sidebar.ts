@@ -14,6 +14,7 @@ function resolveSidebarValue<T>(value: T | ((role: UserRole) => T), role: UserRo
 export function getSidebarSections(role: UserRole): SideNavSection[] {
   const configuration: SideNavOptionType[] = [];
   const system: SideNavOptionType[] = [];
+  const analytics: SideNavOptionType[] = [];
 
   for (const route of Object.values(AppRoutes)) {
     const sidebar = route?.sidebar;
@@ -33,6 +34,8 @@ export function getSidebarSections(role: UserRole): SideNavSection[] {
 
     if (section === 'CONFIGURATION') {
       configuration.push(item);
+    } else if (section === 'ANALYTICS') {
+      analytics.push(item);
     } else {
       system.push(item);
     }
@@ -43,7 +46,10 @@ export function getSidebarSections(role: UserRole): SideNavSection[] {
       title: 'CONFIGURATION',
       options: configuration,
     },
-
+    {
+      title: 'ANALYTICS',
+      options: analytics,
+    },
     {
       title: 'SYSTEM',
       options: system,

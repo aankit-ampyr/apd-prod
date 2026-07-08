@@ -446,7 +446,7 @@ export function AuditLog() {
             {
               key: 'action',
               placeholder: 'Select Action',
-              type: 'searchable-select',
+            type: 'searchable-select',
               options: ACTION_OPTIONS,
               props: {
                 className: 'min-w-38',

@@ -99,8 +99,11 @@ export function AssetSection(props: AssetSectionProps) {
     if (width < 1480) {
       gridCols = 3;
     }
-    if (width < 1160) {
+    if (width < 1024) {
       gridCols = 2;
+    }
+    if (width < 768) {
+      gridCols = 1;
     }
     return gridCols;
   }
@@ -159,7 +162,7 @@ export function AssetSection(props: AssetSectionProps) {
           {assetType === AssetType.BESS && <Icon name="battery" className="text-blue-tint size-5" />}
           {assetType === AssetType['Solar + BESS'] && <Icon name="solar-battery" className="text-violet-tint size-5" />}
         </div>
-        <Text variant="h3" className="text-lg font-bold text-secondary!">
+        <Text variant="h3" className="text-base font-bold text-secondary!">
           {AssetType[assetType]} ({totalAssets})
         </Text>
       </div>
@@ -168,7 +171,7 @@ export function AssetSection(props: AssetSectionProps) {
           display: 'grid',
           gridTemplateColumns: `repeat(${getGridColSize()}, 1fr)`,
         }}
-        className="gap-6">
+        className="gap-2 lg:gap-6">
         {slicedAssets.map(asset => (
           <AssetCard onView={onView} key={asset.id} asset={asset} onReassign={() => onReassign(asset)} />
         ))}

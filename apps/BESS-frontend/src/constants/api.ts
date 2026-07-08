@@ -1,4 +1,4 @@
-import { type ApiConfigInterface } from '@/interface';
+import {type ApiConfigInterface} from '@/interface';
 const {
   VITE_APP_API_URL_LOC,
   VITE_APP_API_URL_DEV,
@@ -35,6 +35,8 @@ export const API: ApiConfigInterface = {
     verifyOtp: 'api/v1/auth/login/verify-otp',
   },
   authUrls: {
+    // auth related APIs
+    logout: 'api/v1/auth/logout',
     users: 'api/v1/users/',
     projects: 'api/v1/projects/',
     loadProfile: 'api/v1/simulation/{simulation_id}/load-profile/compute',
@@ -55,6 +57,8 @@ export const API: ApiConfigInterface = {
     runSimulation: 'api/v1/simulation/{simulation_id}',
     multiYearProjection: 'api/v1/simulation/{simulation_id}/multi-year-projection',
     multiYearProjectionRun: 'api/v1/simulation/{simulation_id}/multi-year',
+    greenAnalysis: 'api/v1/simulation/{simulation_id}/green-energy-analysis',
+    detailedGreenEnergy: 'api/v1/simulation/{simulation_id}/detailed-green-energy',
 
     // websocket
     ws_token: 'api/v1/websocket/auth',

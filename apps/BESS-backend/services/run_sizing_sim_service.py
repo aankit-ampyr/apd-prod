@@ -5,6 +5,7 @@ from fastapi.responses import StreamingResponse
 from redis.asyncio import Redis
 from sqlalchemy import desc, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 
 from constants.enums import SimulationJobStatus, SimulationStatus
 
@@ -25,7 +26,6 @@ from utils.response_utils import Res
 from python_common.utils.common_utils import paginate  # type: ignore
 from python_common.constants.enums import AuditLogModules, AuditLogScenario  # type: ignore
 from simulation_engine import bess_sizing_sim_task
-from .service_support import ensure_simulation_write_access
 
 
 class RunSizingSimulationService:
@@ -48,22 +48,22 @@ class RunSizingSimulationService:
         writer = csv.writer(output)
 
         headers = [
-            "BESS (MWh)",
-            "Duration (hr)",
-            "Power (MW)",
+            "Battery Size (MWh)",
+            "Discharge Duration (hr)",
+            "Battery Power (MW)",
             "Containers",
-            "DG (MW)",
-            "Delivery %",
-            "Green %",
-            "Wastage %",
-            "Delivery Hrs",
-            "Load Hrs",
-            "Green Hrs",
-            "DG Hrs",
-            "DG Starts",
-            "BESS Cycles",
-            "Unserved (MWh)",
-            "Fuel (L)",
+            "Generator Size (MW)",
+            "Load Met (%)",
+            "Green Hours (%)",
+            "Wasted Energy (%)",
+            "Hours Fully Served",
+            "Total Load Hours",
+            "Green Hours",
+            "Generator Hours",
+            "Generator Starts",
+            "Avg. Battery Cycles per day",
+            "Unmet Energy (MWh)",
+            "Fuel Used (L)",
         ]
         writer.writerow(headers)
 
@@ -161,19 +161,18 @@ class RunSizingSimulationService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
 
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
         )
         simulation = result.scalar_one_or_none()
-        
+
         if not simulation:
-            return Res.error(status_code="E-20043", message="Simulation not found")
+            return Res.error(
+                status_code="E-20043",
+                message="Simulation not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         # WARNING: Uncomment it once the progress status update is implemented after step 3.
         # if simulation.step < SimulationSetupProgress.BESS_DG_CONFIG:
@@ -196,9 +195,21 @@ class RunSizingSimulationService:
         if active_job:
             if active_job.status == SimulationJobStatus.COMPLETED:
                 return Res.error(
-                    status_code="E-20047",
+                    status_code="E-20058",
                     message="Results for this configuration are already available.",
+                    http_status_code=status.HTTP_409_CONFLICT,
                 )
+
+            if (
+                active_job.status == SimulationJobStatus.INITIATED
+                or active_job.status == SimulationJobStatus.IN_PROGRESS
+            ):
+                return Res.error(
+                    status_code="E-20058",
+                    message="Simulation is already running.",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
+                )
+
             before_config = (
                 f"Simulation Status : {SimulationJobStatus(active_job.status).name}"
             )
@@ -246,12 +257,6 @@ class RunSizingSimulationService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
 
         result = await bess_db.execute(
             select(SimulationJob)
@@ -264,14 +269,20 @@ class RunSizingSimulationService:
         simulation_job = result.scalars().first()
 
         if not simulation_job:
-            return Res.error(status_code="E-20047", message="Simulation job not found")
+            return Res.error(
+                status_code="E-20047",
+                message="Simulation job not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         if simulation_job.status not in [
             SimulationJobStatus.INITIATED,
             SimulationJobStatus.IN_PROGRESS,
         ]:
             return Res.error(
-                status_code="E-20048", message="Simulation is not in a running state."
+                status_code="E-20048",
+                message="Simulation is not in a running state.",
+                http_status_code=status.HTTP_409_CONFLICT,
             )
 
         await stop_sim_util(job_id=simulation_job.job_id, redis_client=redis)
@@ -305,7 +316,11 @@ class RunSizingSimulationService:
         simulation_job = result.scalars().first()
 
         if not simulation_job:
-            return Res.error(status_code="E-20047", message="Simulation job not found.")
+            return Res.error(
+                status_code="E-20047",
+                message="Simulation job not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         progress_percentage = 0.0
         if simulation_job.max_iterations:
@@ -351,7 +366,9 @@ class RunSizingSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20046", message="Sizing simulation result not found."
+                status_code="E-20046",
+                message="Sizing simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         query = select(SimulationResult).where(
@@ -480,7 +497,9 @@ class RunSizingSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20046", message="Sizing simulation result not found."
+                status_code="E-20046",
+                message="Sizing simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         return StreamingResponse(
@@ -582,7 +601,9 @@ class RunSizingSimulationService:
 
         if not simulation_job:
             return Res.error(
-                status_code="E-20046", message="Sizing simulation result not found."
+                status_code="E-20046",
+                message="Sizing simulation result not found.",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         return StreamingResponse(

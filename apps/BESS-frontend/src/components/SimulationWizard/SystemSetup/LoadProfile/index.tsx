@@ -126,7 +126,7 @@ export const LoadProfile = ({onSaveComplete, setIsStepsHidden, readOnly = false}
           </Text>
         </div>
         <div className="flex flex-col xl:flex-row items-start gap-4 w-full">
-          <div className="w-[60%] xl:w-[35%]">
+          <div className="w-full xl:w-[35%]">
             <LoadConfig onChangeConfig={setCurrentConfig} onFormStateChange={handleFormStateChange} readOnly={isReadOnly} />
           </div>
           <div className="flex flex-col w-full xl:w-[65%] mt-7">

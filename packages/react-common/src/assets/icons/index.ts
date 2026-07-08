@@ -1,5 +1,7 @@
 import FileTick from "./file-tick.svg?react";
 import Info from "./info.svg?react";
+import CapPayment from "./cap_payment.svg?react";
+import ReceiveMoney from "./receive-money.svg?react";
 import Tick from "./tick.svg?react";
 import Cross from "./cross.svg?react";
 import Exclamation from "./exclamation.svg?react";
@@ -27,7 +29,6 @@ import ArrowLeft from "./arrow-left.svg?react";
 import WarningTriangle from "./warning-triangle.svg?react";
 import WarningTriangleSharp from "./warning-triangle-sharp.svg?react";
 import Calendar from "./calendar.svg?react";
-import Sun from "./sun.svg?react";
 import Battery from "./battery.svg?react";
 import SolarBattery from "./solar-battery.svg?react";
 import ChargeCircle from "./charge-circle.svg?react";
@@ -93,7 +94,6 @@ import InfoCircle2 from "./info-circle-2.svg?react";
 import Monitor from "./monitor.svg?react";
 import Table from "./table.svg?react";
 import CheckList from "./checklist.svg?react";
-import Star from "./star.svg?react";
 import BriefCase from "./briefcase.svg?react";
 import Pie from "./pie.svg?react";
 import GisLayerUpload from "./gis-layer-upload.svg?react";
@@ -109,21 +109,48 @@ import PhoneSignal from "./phone-signal.svg?react";
 import Recycle from "./recycle.svg?react";
 import Bulb from "./bulb.svg?react";
 import AlignCenterHorizontal from "./align-center-horizontal.svg?react";
-import CurrentPoundCircle from './currency-pound-circle.svg?react';
-import PieSolid from './pie-solid.svg?react';
-import ScaleImabalance from './scale-imbalance.svg?react';
-import GraphDecline from './graph-decline.svg?react';
-import TearDownNote from './tear-down-note.svg?react';
-import Toxic from './toxic.svg?react';
-import RecycleRounded from './recycle-rounded.svg?react';
-import ZapSolid from './zap-solid.svg?react';
-import Degradation from './degradation.svg?react';
+import CurrentPoundCircle from "./currency-pound-circle.svg?react";
+import PieSolid from "./pie-solid.svg?react";
+import ScaleImabalance from "./scale-imbalance.svg?react";
+import GraphDecline from "./graph-decline.svg?react";
+import TearDownNote from "./tear-down-note.svg?react";
+import Toxic from "./toxic.svg?react";
+import RecycleRounded from "./recycle-rounded.svg?react";
+import ZapSolid from "./zap-solid.svg?react";
+import Degradation from "./degradation.svg?react";
 import Gear1 from "./gear1.svg?react";
 import Document from "./document.svg?react";
 import Rocket1 from "./rocket.svg?react";
 import Sack from "./sack.svg?react";
-
+import Ticket from "./ticket.svg?react";
+import Bar4 from "./bar4.svg?react";
+import FilePound from "./file-pound.svg?react";
+import CalendarZap from "./calendar-zap.svg?react";
+import StoveTrendDown from "./stove-trend-down.svg?react";
+import SignalFull from "./signal-full.svg?react";
+import BiDirectionalCircle from "./bi-directional-circle.svg?react";
+import CalendarCoins from "./calendar-coins.svg?react";
+import Upload2 from "./upload-2.svg?react";
+import Download2 from "./download-2.svg?react";
+import FileBig from "./file-big.svg?react";
+import FileSearch2 from "./file-search-2.svg?react";
+import FileSearch from "./file-search.svg?react";
+import SupportedDocument from "./supported-document.svg?react";
+import SupportedDocumentShield from "./supported-document-shield.svg?react";
+import SupportedDocumentCross from "./supported-document-cross.svg?react";
+import CircleCross from "./circle-cross.svg?react";
+import Files from "./files.svg?react";
+import Tag from "./tag.svg?react";
+import Pdf from "./pdf.svg?react";
+import Difference from "./difference.svg?react";
+import ExpandAdminUsersTableCompress from "./expand_admin_users_table_compress.svg?react";
+import ExpandAdminUsersTableCompressed from "./expand_admin_users_table_compressed.svg?react";
+import TableGbp from "./table-gbp.svg?react";
+import Files2 from "./files-2.svg?react";
+import DottedClock from "./dotted-clock.svg?react";
+import RetryNumber from "./retry-number.svg?react";
 import {
+  Battery as EmptyCell,
   Plus,
   Info as CircleInfo,
   ListFilter,
@@ -159,10 +186,44 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   ArrowUp,
+  Ellipsis,
   ArrowDown,
+  Cpu,
+  Globe,
+  Sun,
+  Star,
+  FoldHorizontal,
+  UnfoldHorizontal,
 } from "lucide-react";
 
 export const Icons = {
+  'cap_payment': CapPayment,
+  'receive-money': ReceiveMoney,
+  "fold-horizontal": FoldHorizontal,
+  "unfold-horizontal": UnfoldHorizontal,
+  globe: Globe,
+  ellipsis: Ellipsis,
+  cpu: Cpu,
+  "supported-document-shield": SupportedDocumentShield,
+  "supported-document-cross": SupportedDocumentCross,
+  "circle-cross": CircleCross,
+  files: Files,
+  "download-2": Download2,
+  "file-big": FileBig,
+  "file-search-2": FileSearch2,
+  "empty-cell": EmptyCell,
+  pdf: Pdf,
+  tag: Tag,
+  "supported-document": SupportedDocument,
+  "file-search": FileSearch,
+  "upload-2": Upload2,
+  "bi-directional-circle": BiDirectionalCircle,
+  "calendar-coins": CalendarCoins,
+  "file-pound": FilePound,
+  "calendar-zap": CalendarZap,
+  "stove-trend-down": StoveTrendDown,
+  bar4: Bar4,
+  ticket: Ticket,
   sack: Sack,
   "arrow-up": ArrowUp,
   "arrow-down": ArrowDown,
@@ -323,6 +384,14 @@ export const Icons = {
   gear1: Gear1,
   document: Document,
   rocket1: Rocket1,
+  "signal-full": SignalFull,
+  difference: Difference,
+  "expand-admin-users-table-compress": ExpandAdminUsersTableCompress,
+  "expand-admin-users-table-compressed": ExpandAdminUsersTableCompressed,
+  "table-gbp": TableGbp,
+  "files-2": Files2,
+  "dotted-clock": DottedClock,
+  "retry-number": RetryNumber,
 } as const;
 
 export type IconName = keyof typeof Icons;

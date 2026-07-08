@@ -80,6 +80,18 @@ FIELD_MAP = {
     "dg_min": "Min DG Capacity MW",
     "dg_max": "Max DG Capacity MW",
     "dg_step_size": "DG Step Size MW",
+    # --- CustomConfiguration ---
+    "bess_capacity": "BESS Capacity MWh",
+    "dg_capacity": "DG Capacity MW",
+    "duration_class": "Duration Class",
+    "factory_degradation": "Factory Degradation %",
+    "annual_degradation": "Annual Degradation % per Year",
+    "sizing_strategy": "Sizing Strategy",
+    "solar_min": "Solar Min MWh",
+    "solar_max": "Solar Max MWh",
+    "solar_step": "Solar Step Size MW",
+    "min_green_energy": "Min Green Energy %",
+    "max_wastage": "Max Wastage %",
 }
 
 

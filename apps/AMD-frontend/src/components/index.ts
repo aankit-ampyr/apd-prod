@@ -5,3 +5,5 @@ export * from './OrganizationManagement';
 export * from './AssetsManagement';
 export * from './Settings';
 export * from './BenchmarkAnalysis';
+export * from './ExecutiveAnalysis';
+export * from './InvoiceAnalysis';

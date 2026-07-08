@@ -1,6 +1,7 @@
 import {API, ACCESS_KEY, SUCCESS_KEY} from '@/constants';
 import {createAxiosInstance} from './axiosConfig';
-import {fetchAndDownloadBlob} from './fetchConfig';
+import {fetchAndDownloadBlob, fetchBlobFromApi} from './fetchConfig';
+
 import {
   ActivateAssetRequest,
   AddMonthlyValuesRequest,
@@ -61,6 +62,24 @@ import {
   AssetAnalysisBatteryHealthAnnualProjectionReportRequest,
   AssetAnalysisBatteryHealthDailyCyclesRequest,
   AssetAnalysisBatteryHealthWarrantyExceedanceRequest,
+  AssetExecutiveAnalysisMonthlyRevenueComparisonRequest,
+  AssetExecutiveAnalysisRevenueByStreamRequest,
+  AssetExecutiveAnalysisSummaryRequest,
+  AssetExecutiveAnalysisMonthlyRevenueComparisonExportRequest,
+  AssetExecutiveAnalysisRevenueByStreamExportRequest,
+  InvoiceListRequest,
+  InvoiceDeleteRequest,
+  InvoiceDownloadRequest,
+  InvoicePreviewRequest,
+  InvoiceSummaryRequest,
+  InvoiceUploadRequest,
+  InvoiceListExportRequest,
+  InvoiceSettlementListRequest,
+  InvoiceSettlementUploadRequest,
+  DeleteInvoiceSettlementRequest,
+  ExportInvoiceSettlementRequest,
+  AssetCapacityMarketRequest,
+  AssetCapacityMarketExportRequest,
 } from '@/interface';
 
 const defaultHeaders = {
@@ -178,6 +197,14 @@ export async function verifyOtp(data: any) {
   })
     .then(setAuthHeaderFromResponse)
     .catch(res => res);
+}
+
+export async function logout() {
+  return await createAxiosInstance({
+    url: API.authUrls.logout,
+    method: 'POST',
+    headers: {...authHeaders},
+  })
 }
 
 export async function assignOrganization(data: any) {
@@ -871,6 +898,179 @@ export async function getAssetBatteryHealthWarrantyExceedance(
     url: API.authUrls.asset_analysis_battery_health_warranty_exceedance(assetId),
     method: 'GET',
     headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetExecutiveAnalysisMonthRevenueComparison(
+  params: AssetExecutiveAnalysisMonthlyRevenueComparisonRequest['params'],
+) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_executive_analysis_monthly_revenue_comparison(assetId),
+    method: 'GET',
+    headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetExecutiveAnalysisRevenueByStream(
+  params: AssetExecutiveAnalysisRevenueByStreamRequest['params'],
+) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_executive_analysis_revenue_by_stream(assetId),
+    method: 'GET',
+    headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetExecutiveAnalysisSummary(params: AssetExecutiveAnalysisSummaryRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_executive_analysis_summary(assetId),
+    method: 'GET',
+    headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetExecutiveAnalysisMonthRevenueComparisonExport(
+  params: AssetExecutiveAnalysisMonthlyRevenueComparisonExportRequest['params'],
+) {
+  const {assetId, fileName, ...rest} = params;
+  await fetchAndDownloadBlob({
+    url: API.authUrls.asset_executive_analysis_monthly_revenue_comparison_export(assetId),
+    filename: fileName,
+    params: rest,
+  });
+}
+
+export async function getAssetExecutiveAnalysisRevenueByStreamExport(
+  params: AssetExecutiveAnalysisRevenueByStreamExportRequest['params'],
+) {
+  const {assetId, fileName, ...rest} = params;
+  await fetchAndDownloadBlob({
+    url: API.authUrls.asset_executive_analysis_revenue_by_stream_export(assetId),
+    filename: fileName,
+    params: rest,
+  });
+}
+
+export async function getInvoicesList(params: InvoiceListRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders, ...authHeaders},
+    params: rest,
+  });
+}
+
+export async function getInvoicesSummary(params: InvoiceSummaryRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_summary(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders, ...authHeaders},
+    params: rest,
+  });
+}
+
+export async function uploadInvoice(data: InvoiceUploadRequest['payload']) {
+  const {assetId, formData} = data;
+  return createAxiosInstance({
+    url: API.authUrls.asset_invoices(assetId),
+    method: 'POST',
+    headers: {...authHeaders},
+    data: formData,
+  });
+}
+
+export async function deleteInvoice(data: InvoiceDeleteRequest['payload']) {
+  const {invoiceId, assetId} = data;
+  return createAxiosInstance({
+    url: API.authUrls.asset_invoices_id(assetId, invoiceId),
+    method: 'DELETE',
+    headers: {...authHeaders},
+  });
+}
+
+export async function downloadInvoice(params: InvoiceDownloadRequest['params']) {
+  const {invoiceId, fileName, assetId} = params;
+  return fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoices_id_export(assetId, invoiceId),
+    filename: fileName || `invoice_${invoiceId}.pdf`,
+  });
+}
+
+export async function downloadInvoiceList(params: InvoiceListExportRequest['params']) {
+  const {assetId, fileName, ...rest} = params;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoices_export(assetId),
+    filename: fileName,
+    params: rest,
+  });
+}
+
+export async function previewInvoice(params: InvoicePreviewRequest['params']) {
+  const {invoiceId, assetId} = params;
+  return await fetchBlobFromApi(API.authUrls.asset_invoices_id_preview(assetId, invoiceId));
+}
+
+export async function getInvoicesSettlementList(params: InvoiceSettlementListRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_settlement(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders, ...authHeaders},
+    params: rest,
+  });
+}
+
+export async function uploadInvoiceSettlement(data: InvoiceSettlementUploadRequest['payload']) {
+  const {assetId, formData} = data;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_settlement(assetId),
+    method: 'POST',
+    headers: {...authHeaders},
+    data: formData,
+  });
+}
+
+export async function deleteInvoiceSettlement(data: DeleteInvoiceSettlementRequest['payload']) {
+  const {assetId, settlementId} = data;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_settlement_id(assetId, settlementId),
+    method: 'DELETE',
+    headers: {...authHeaders},
+  });
+}
+
+export async function exportInvoiceSettlement(data: ExportInvoiceSettlementRequest['payload']) {
+  const {assetId, settlementId, fileName} = data;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoices_settlement_id_export(assetId, settlementId),
+    filename: fileName || `settlement_${settlementId}.pdf`,
+  });
+}
+
+export async function getAssetCapacityMarketAnalytics(params: AssetCapacityMarketRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoice_analysis_capacity_market(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders, ...authHeaders},
+    params: rest,
+  });
+}
+
+export async function downloadAssetCapacityMarketAnalytics(params: AssetCapacityMarketExportRequest['params']) {
+  const {assetId, fileName, ...rest} = params;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoice_analysis_capacity_market_export(assetId),
+    filename: fileName || `capacity_market_${assetId}.csv`,
     params: rest,
   });
 }

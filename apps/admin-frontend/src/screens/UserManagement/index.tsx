@@ -2,12 +2,29 @@ import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {Images} from '@/assets/images';
 import {DataTable, DeleteUserModal, FilterGroup, UserEntryModal} from '@/components';
-import {Button, Text, Badge, IconButton, Sort} from '@/ui-kits';
-import {users, totalPages, userSuccess, userFailure, totalUserResults, currentUserPage} from '@/services/redux/selectors';
+import {Button, Text, Badge, IconButton, Sort, Icon} from '@/ui-kits';
+import {
+  users,
+  totalPages,
+  userSuccess,
+  userFailure,
+  totalUserResults,
+  currentUserPage,
+} from '@/services/redux/selectors';
 import {resetUserMessage, userListRequest} from '@/services/redux/slice';
 import type {User, DataTableColumn, UserListRequest, SelectInputItem, SortType} from '@/interface';
-import {NA, Platform, PLATFORM_LABELS, AMD_USER_ROLES, BESS_USER_ROLES, UserRole, STATUS_OPTIONS} from '@/constants';
-import {useToast} from '@/hooks';
+import {
+  NA,
+  Platform,
+  PLATFORM_LABELS,
+  AMD_USER_ROLES,
+  BESS_USER_ROLES,
+  UserRole,
+  STATUS_OPTIONS,
+  TABLET_SCREEN_BREAKPOINT,
+  USER_ROLE_LABELS,
+} from '@/constants';
+import {useToast, useWindowDimensions} from '@/hooks';
 import {
   cn,
   enumToSelectOptions,
@@ -27,10 +44,7 @@ const PLATFORM_OPTIONS: SelectInputItem[] = [
   {id: BOTH_PLATFORM, label: `APD & PSP`},
 ];
 
-/**
- * Page Size for pagination
- */
-const PAGE_SIZE = 10;
+const ALL_ROLES = enumToSelectOptions(UserRole, USER_ROLE_LABELS);
 
 /**
  * Filter type for user list filtering
@@ -50,11 +64,13 @@ export function UserManagement() {
   // =================
   const dispatch = useDispatch();
   const {showToast} = useToast();
+  const {width} = useWindowDimensions();
+  const pageSize = width < 1025 ? 6 : 10;
 
   // =================
   // selectors
   // =================
-  const usersData = useSelector(users).slice(0, PAGE_SIZE);
+  const baseUsers = useSelector(users);
   const totalPagesData = useSelector(totalPages);
   const currentPage = useSelector(currentUserPage);
   const totalResult = useSelector(totalUserResults);
@@ -65,7 +81,9 @@ export function UserManagement() {
   // states
   // =================
   const [page, setPage] = useState(1);
+  const usersData = baseUsers;
   const [noData, setNoData] = useState(false);
+  const [isTableExpanded, setIsTableExpanded] = useState(false);
   const [filter, setFilter] = useState<FilterType>({});
   const [tableMessage, setTableMessage] = useState<string>('');
   const [currentSelectUser, setCurrentSelectUser] = useState<User | null>(null);
@@ -90,10 +108,17 @@ export function UserManagement() {
   };
 
   const UserRoleOptions = () => {
-    if (filter.platform === BOTH_PLATFORM){
+    if (filter?.platform === Platform.APD) {
       return AMD_USER_ROLES;
     }
-    return filter?.platform === Platform.APD ? AMD_USER_ROLES : BESS_USER_ROLES;
+    if (filter.platform === Platform.PSP) {
+      return BESS_USER_ROLES;
+    }
+    if (filter?.platform === BOTH_PLATFORM) {
+      // since APD user roles are common in both APD itself as well as PSP
+      return AMD_USER_ROLES;
+    }
+    return ALL_ROLES;
   };
 
   function handleSort(sort: SortType) {
@@ -142,11 +167,17 @@ export function UserManagement() {
       title: 'Platform',
       width: {minWidth: '160px'},
       align: 'left',
-      render: row => (
-        <Text variant="caption" className="text-text-secondary!">
-          {row.platform ? row.platform.map(p => PLATFORM_LABELS[p]).join(' & ') : NA}
-        </Text>
-      ),
+      render: row => {
+        let label = '-';
+        if (row.role !== UserRole.SuperAdmin) {
+          label = row.platform ? row.platform.map(p => PLATFORM_LABELS[p]).join(' & ') : NA;
+        }
+        return (
+          <Text variant="caption" className="text-text-secondary!">
+            {label}
+          </Text>
+        );
+      },
     },
     {
       name: 'role',
@@ -162,12 +193,12 @@ export function UserManagement() {
     {
       name: 'last_login',
       title: (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 whitespace-nowrap">
           <Text variant="caption">Last Login</Text>
           <Sort sort={filter.sort ?? null} onSortChange={handleSort} />
         </div>
       ),
-      width: {minWidth: '90px'},
+      width: {minWidth: '120px'},
       align: 'left',
       render: row => {
         return (
@@ -198,20 +229,29 @@ export function UserManagement() {
     },
     {
       name: 'actions',
-      title: 'Actions',
-      width: {minWidth: '90px'},
-      align: 'center',
-      render: row => (
-        <div className="flex items-center justify-center gap-4">
-          <IconButton name="pencil" color="secondary" onClick={() => handleEdit(row)} />
-          <IconButton name="trash" color="error" onClick={() => handleDelete(row)} />
+      title: (
+        <div className="flex items-center justify-center gap-2">
+          <Text variant="caption">Actions</Text>
         </div>
       ),
+      width: {minWidth: '90px'},
+      align: 'center',
+      render: row => {
+        if (row.role === UserRole.SuperAdmin) {
+          return <Text variant='14M'>-</Text>;
+        }
+        return (
+          <div className="flex items-center justify-center gap-4">
+            <IconButton name="pencil" color="secondary" onClick={() => handleEdit(row)} />
+            <IconButton name="trash" color="error" onClick={() => handleDelete(row)} />
+          </div>
+        );
+      },
     },
   ];
 
   function fetchUsers() {
-    const payload: UserListRequest['params'] = {page, limit: PAGE_SIZE};
+    const payload: UserListRequest['params'] = {page, limit: pageSize};
     if (filter.search) {
       payload.search = filter.search;
     }
@@ -245,7 +285,7 @@ export function UserManagement() {
   // =================
   useEffect(() => {
     fetchUsers();
-  }, [filter, page]);
+  }, [filter, page, pageSize]);
 
   useEffect(() => {
     if (success) {
@@ -314,10 +354,10 @@ export function UserManagement() {
   }
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 h-full min-h-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <Text variant="subtitle1" className="text-text-primary">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 overflow-hidden shrink-0">
+        <Text variant="subtitle2" className="text-text-primary truncate">
           Manage user accounts, roles, and access.
         </Text>
         <AddUserCTA />
@@ -350,7 +390,6 @@ export function UserManagement() {
             options: UserRoleOptions(),
             props: {
               className: 'min-w-[130px]',
-              disabled: !filter?.platform,
             },
           },
           {
@@ -367,15 +406,36 @@ export function UserManagement() {
       />
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={usersData}
-        totalPages={totalPagesData}
-        currentPage={currentPage}
-        totalResult={totalResult}
-        errorMessage={tableMessage}
-        onPageChange={setPage}
-      />
+      <div className="relative w-full flex-1 flex flex-col min-h-0">
+        {width <= TABLET_SCREEN_BREAKPOINT && (
+          <div className="absolute top-7 -right-3.5 -translate-y-1/2 z-20">
+            <button
+              onClick={() => setIsTableExpanded(!isTableExpanded)}
+              className="flex items-center justify-center cursor-pointer hover:opacity-80 transition-opacity">
+              <Icon
+                name={isTableExpanded ? 'expand-admin-users-table-compress' : 'expand-admin-users-table-compressed'}
+                size={34}
+                className="text-primary!"
+              />
+            </button>
+          </div>
+        )}
+        <DataTable
+          columns={columns.filter(col => {
+            if (!isTableExpanded && width <= TABLET_SCREEN_BREAKPOINT) {
+              return col.name !== 'email' && col.name !== 'last_login';
+            }
+            return true;
+          })}
+          data={usersData}
+          totalPages={totalPagesData}
+          currentPage={page}
+          pageSize={pageSize}
+          totalResult={totalResult}
+          errorMessage={tableMessage}
+          onPageChange={setPage}
+        />
+      </div>
 
       {(modalOpen == 'add' || modalOpen == 'edit') && (
         <UserEntryModal

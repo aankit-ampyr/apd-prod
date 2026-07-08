@@ -43,7 +43,7 @@ def allowed_roles(*allowed_roles: int):
         if not user:
             raise UserNotAuthorized("User not authenticated")
         
-        # be default allow all
+        # by default allow all
         if len(allowed_roles) == 0:
             return user
 

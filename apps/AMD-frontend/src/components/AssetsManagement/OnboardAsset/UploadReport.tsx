@@ -267,7 +267,7 @@ export function AggregatorFileUpload(props: SpecsFileUploadProps) {
 
   return (
     <div className={cn('bg-white px-8 py-6 rounded-3xl border border-border', className)}>
-      <Text variant="h4">Aggregator Report Upload</Text>
+      <Text variant="16SB">Aggregator Report Upload</Text>
       <div className="mt-4">
         <DragAndDrop
           variant={variant}
@@ -409,7 +409,7 @@ export function ScadaFileUpload(props: SpecsFileUploadProps) {
 
   return (
     <div className={cn('bg-white px-8 py-6 rounded-3xl border border-border', className)}>
-      <Text variant="h4">SCADA Report Upload</Text>
+      <Text variant="16SB">SCADA Report Upload</Text>
       <div className="mt-4">
         <DragAndDrop
           variant={variant}

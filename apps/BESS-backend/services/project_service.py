@@ -5,10 +5,12 @@ Uses BESS DB for projects; fetches user details from User DB when needed.
 
 from datetime import datetime, time
 from math import ceil
+from os import stat
 from typing import Optional, Set
 from sqlalchemy import func, or_, select, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from fastapi import status as http_status
 from constants.enums import (
     Platform,
     ProjectStatus,
@@ -118,7 +120,9 @@ class ProjectService:
 
             if existing_project.scalar_one_or_none():
                 return Res.error(
-                    status_code="E-20028", message="Project name already exists."
+                    status_code="E-20028",
+                    message="Project name already exists.",
+                    http_status_code=http_status.HTTP_409_CONFLICT,
                 )
 
             responsible_user = await user_db.execute(
@@ -133,13 +137,14 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20029",
                     message="Selected responsible user must be a BESS Admin or Analyst.",
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             if payload.responsible_user_id in payload.assigned_users:
                 return Res.error(
                     status_code="E-20033",
                     message="The Responsible User cannot also be included in the Assigned Users list.",
-                    http_status_code=400,
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             created_by_user_id = int(current_user.get("id"))
@@ -157,6 +162,7 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20004",
                     message="Only admin or analysts can assign users.",
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             # validate assigned users
@@ -169,17 +175,20 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20016",
                         message="One or more assigned users do not exist.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
                 for user in assigned_users:
                     if not user.status:
                         return Res.error(
                             status_code="E-20027",
                             message="Assigned users must be active.",
+                            http_status_code=http_status.HTTP_400_BAD_REQUEST,
                         )
                     if user.role == UserRole.ADMIN:
                         return Res.error(
                             status_code="E-20033",
                             message="Admins users should not be assigned to projects.",
+                            http_status_code=http_status.HTTP_400_BAD_REQUEST,
                         )
 
                 # Prevent Creator and Responsible User from being assigned
@@ -190,6 +199,7 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20033",
                         message="Creator or Responsible User cannot be in the Assigned Users list.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
             new_project = Project(
@@ -247,7 +257,9 @@ class ProjectService:
             data = self._map_project_to_response(new_project, user_map)
 
             return Res.success(
-                "S-20013", data=data.model_dump(mode="json"), http_status_code=201
+                "S-20013",
+                data=data.model_dump(mode="json"),
+                http_status_code=http_status.HTTP_201_CREATED,
             )
 
         except Exception:
@@ -256,7 +268,7 @@ class ProjectService:
             return Res.error(
                 "E-20001",
                 message="Unable to create project. Please try again.",
-                http_status_code=500,
+                http_status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     async def edit_project(
@@ -276,7 +288,11 @@ class ProjectService:
             )
             project = result.scalar_one_or_none()
             if not project:
-                return Res.error(status_code="E-20015", message="Project not Found.")
+                return Res.error(
+                    status_code="E-20015",
+                    message="Project not Found.",
+                    http_status_code=http_status.HTTP_405_NOT_FOUND,
+                )
             project_proj_id = project.proj_id
 
             user_id = int(current_user.get("id"))
@@ -288,6 +304,7 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20004",
                     message="You do not have permission to edit this project.",
+                    http_status_code=http_status.HTTP_401_UNAUTHORIZED,
                 )
 
             # Only Admin and analyst  can modify assigned users
@@ -298,6 +315,7 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20004",
                     message="Only admin or analysts can assign users.",
+                    http_status_code=http_status.HTTP_401_UNAUTHORIZED,
                 )
 
             assigned_user_ids = payload.assigned_users or []
@@ -311,18 +329,22 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20016",
                     message="One or more assigned users do not exist.",
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             for user in assigned_users:
                 if not user.status:
                     return Res.error(
-                        status_code="E-20027", message="Assigned user must be active."
+                        status_code="E-20027",
+                        message="Assigned user must be active.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
                 if user.role == UserRole.ADMIN:
                     return Res.error(
                         status_code="E-20033",
                         message="Admin users should not be assigned to projects.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
                 # Prevent Creator and Responsible User from being assigned
@@ -333,6 +355,7 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20033",
                         message="Creator or Responsible User cannot be in the assigned users list.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
             old_name = project.name
@@ -352,6 +375,7 @@ class ProjectService:
                         return Res.error(
                             status_code="E-20028",
                             message="Project name already exists.",
+                            http_status_code=http_status.HTTP_409_CONFLICT,
                         )
                 project.name = payload.name
 
@@ -373,6 +397,7 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20029",
                         message="Selected responsible user not found.",
+                        http_status_code=http_status.HTTP_404_NOT_FOUND,
                     )
                 if responsible_user_data and (
                     responsible_user_data.role != UserRole.ADMIN
@@ -381,6 +406,7 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20029",
                         message="Selected responsible user must be a BESS Admin or Analyst.",
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
                 previous_owner_id = project.owned_by_user_id
@@ -406,7 +432,7 @@ class ProjectService:
                     return Res.error(
                         status_code="E-20033",
                         message="The Responsible User cannot also be included in the Assigned Users list.",
-                        http_status_code=400,
+                        http_status_code=http_status.HTTP_400_BAD_REQUEST,
                     )
 
             # Get user IDs for fetching details (for assignments and response mapping)
@@ -538,7 +564,9 @@ class ProjectService:
             data = self._map_project_to_response(project, user_map)
 
             return Res.success(
-                "S-20014", data=data.model_dump(mode="json"), http_status_code=200
+                "S-20014",
+                data=data.model_dump(mode="json"),
+                http_status_code=http_status.HTTP_200_OK,
             )
 
         except Exception:
@@ -547,7 +575,7 @@ class ProjectService:
             return Res.error(
                 "E-20001",
                 message="Unable to edit project. Please try again.",
-                http_status_code=500,
+                http_status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     async def reassign_project(
@@ -567,7 +595,7 @@ class ProjectService:
                 return Res.error(
                     "E-20004",
                     message="Only Admin can reassign project responsibility.",
-                    http_status_code=403,
+                    http_status_code=http_status.HTTP_403_FORBIDDEN,
                 )
 
             # E-20015: Project does not exist (BESS DB)
@@ -577,7 +605,9 @@ class ProjectService:
             project = result.scalar_one_or_none()
             if not project:
                 return Res.error(
-                    "E-20015", message="Project not found", http_status_code=404
+                    "E-20015",
+                    message="Project not found",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
                 )
 
             project_proj_id = project.proj_id
@@ -593,7 +623,7 @@ class ProjectService:
                 return Res.error(
                     "E-20016",
                     message="New responsible user is not assigned to this project",
-                    http_status_code=400,
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             # Validate user is active (User DB)
@@ -603,13 +633,15 @@ class ProjectService:
             new_user = user_result.scalar_one_or_none()
             if not new_user:
                 return Res.error(
-                    "E-20016", message="User not found", http_status_code=400
+                    "E-20016",
+                    message="User not found",
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
             if new_user.status is False:
                 return Res.error(
                     "E-20016",
                     message="Cannot reassign to inactive user",
-                    http_status_code=400,
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             # Cannot reassign to current owner
@@ -617,7 +649,7 @@ class ProjectService:
                 return Res.error(
                     "E-20016",
                     message="New responsible user is already the current owner",
-                    http_status_code=400,
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             previous_owner_id = project.owned_by_user_id
@@ -668,7 +700,9 @@ class ProjectService:
                 "proj_id": project.proj_id,
                 "owned_by": _user_to_dict(new_user),
             }
-            return Res.success("S-20003", data=data, http_status_code=200)
+            return Res.success(
+                "S-20003", data=data, http_status_code=http_status.HTTP_200_OK
+            )
 
         except Exception:
             await bess_db.rollback()
@@ -676,7 +710,7 @@ class ProjectService:
             return Res.error(
                 "E-20001",
                 message="Unable to reassign the project. Please try again.",
-                http_status_code=500,
+                http_status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     async def list_project(
@@ -692,11 +726,12 @@ class ProjectService:
             return Res.error(
                 status_code="E-20004",
                 message="You are not authorized to perform this action",
+                http_status_code=http_status.HTTP_401_UNAUTHORIZED,
             )
 
         conditions = []
 
-        user_id = int(current_admin.get("id"))
+        user_id = int(current_admin.get("id"))  # type: ignore
         user_role = current_admin.get("role")
         if user_role == UserRole.ANALYST:
             conditions.append(
@@ -778,11 +813,13 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20005",
                     message="No records match the search or filter criteria.",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
                 )
 
             return Res.error(
                 status_code="E-20006",
                 message="No data found.",
+                http_status_code=http_status.HTTP_404_NOT_FOUND,
             )
 
         #  Apply pagination and sorting to the data query
@@ -814,13 +851,13 @@ class ProjectService:
                 return Res.error(
                     status_code="E-20005",
                     message="Invalid filter criteria provided",
-                    http_status_code=400,
+                    http_status_code=http_status.HTTP_400_BAD_REQUEST,
                 )
 
             return Res.error(
                 status_code="E-20006",
                 message="Invalid date range provided",
-                http_status_code=400,
+                http_status_code=http_status.HTTP_400_BAD_REQUEST,
             )
 
         data = {
@@ -848,7 +885,11 @@ class ProjectService:
         project_data = project_request.scalar_one_or_none()
 
         if not project_data:
-            return Res.error(status_code="E-20015", message="Project not found.")
+            return Res.error(
+                status_code="E-20015",
+                message="Project not found.",
+                http_status_code=http_status.HTTP_404_NOT_FOUND,
+            )
 
         user_id = int(current_user.get("id"))
         user_role = current_user.get("role")
@@ -859,12 +900,14 @@ class ProjectService:
             return Res.error(
                 status_code="E-20004",
                 message="You do not have permission to delete this project.",
+                http_status_code=http_status.HTTP_401_UNAUTHORIZED,
             )
 
         if project_data.is_archived:
             return Res.error(
                 status_code="E-20032",
                 message="Delete action is only available for Active and Inactive projects.",
+                http_status_code=http_status.HTTP_409_CONFLICT,
             )
 
         # Perform hard delete (triggers all cascades)
@@ -896,10 +939,14 @@ class ProjectService:
         project_data = project_request.scalar_one_or_none()
 
         if not project_data:
-            return Res.error(status_code="E-20015", message="Project not found.")
+            return Res.error(
+                status_code="E-20015",
+                message="Project not found.",
+                http_status_code=http_status.HTTP_404_NOT_FOUND,
+            )
 
         # Permission check
-        user_id = int(current_user.get("id"))
+        user_id = int(current_user.get("id"))  # type: ignore
         user_role = current_user.get("role")
 
         is_admin = user_role == UserRole.ADMIN
@@ -910,6 +957,7 @@ class ProjectService:
             return Res.error(
                 status_code="E-20030",
                 message="You do not have permission to perform this action.",
+                http_status_code=http_status.HTTP_401_UNAUTHORIZED,
             )
 
         past_project_status = self._get_project_status(
@@ -947,7 +995,11 @@ class ProjectService:
         project_data = project_request.scalar_one_or_none()
 
         if not project_data:
-            return Res.error(status_code="E-20015", message="Project not found.")
+            return Res.error(
+                status_code="E-20015",
+                message="Project not found.",
+                http_status_code=http_status.HTTP_404_NOT_FOUND,
+            )
 
         user_id = int(current_user.get("id"))
         user_role = current_user.get("role")
@@ -959,12 +1011,14 @@ class ProjectService:
             return Res.error(
                 status_code="E-20030",
                 message="You do not have permission to perform this action.",
+                http_status_code=http_status.HTTP_401_UNAUTHORIZED,
             )
 
         if project_data.is_archived:
             return Res.error(
                 status_code="E-20031",
                 message="Archive option will only be available for active/inactive projects.",
+                http_status_code=http_status.HTTP_409_CONFLICT,
             )
         past_project_status = self._get_project_status(
             is_archived=project_data.is_archived,
@@ -1004,11 +1058,15 @@ class ProjectService:
         project_data = project_request.scalar_one_or_none()
 
         if not project_data:
-            return Res.error(status_code="E-20015", message="Project not found.")
+            return Res.error(
+                status_code="E-20015",
+                message="Project not found.",
+                http_status_code=http_status.HTTP_404_NOT_FOUND,
+            )
 
         # Permission check
-        user_id = int(current_user.get("id"))
-        user_role = current_user.get("role")
+        user_id = int(current_user.get("id"))  # type: ignore
+        user_role = current_user.get("role")  # type: int
 
         is_admin = user_role == UserRole.ADMIN
         is_creator = project_data.created_by_user_id == user_id
@@ -1018,6 +1076,7 @@ class ProjectService:
             return Res.error(
                 status_code="E-20030",
                 message="You do not have permission to perform this action.",
+                http_status_code=http_status.HTTP_401_UNAUTHORIZED,
             )
 
         if not project_data.is_archived:
@@ -1038,7 +1097,7 @@ class ProjectService:
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
-            user_role=current_user.get("role"),
+            user_role=user_role,
             module=AuditLogModules.PROJECT_MANAGEMENT_BESS.value,
             action=AuditLogScenario.PROJECT_UNARCHIVED.value,  # Placeholder for Project Created
             resource_id=project_data.proj_id,
@@ -1063,18 +1122,38 @@ class ProjectService:
         current_user: dict,
     ):
         try:
-            project_query = await bess_db.execute(
+            user_id = int(current_user.get("id"))  # type: ignore
+            user_role = current_user.get("role")
+
+            query = (
                 select(Project)
                 .where(Project.id == project_id)
                 .options(selectinload(Project.assignments))
             )
+
+            if user_role != UserRole.ADMIN:
+                print("not admin")
+                query = query.where(
+                    or_(
+                        Project.created_by_user_id == user_id,
+                        Project.owned_by_user_id == user_id,
+                        Project.assignments.any(
+                            ProjectUserAssignment.user_id == user_id
+                        ),
+                    )
+                )
+
+            project_query = await bess_db.execute(query)
             project = project_query.scalar_one_or_none()
 
             if not project or project.is_deleted:
-                return Res.error("E-20015", message="Project not found.")
+                return Res.error(
+                    "E-20015",
+                    message="Project not found.",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
+                )
 
             user_id = int(current_user.get("id"))  # type: ignore
-            user_role = current_user.get("role")
 
             is_authorized = (
                 user_role == UserRole.ADMIN
@@ -1085,7 +1164,9 @@ class ProjectService:
 
             if not is_authorized:
                 return Res.error(
-                    "E-20004", message="Not authorized to perform the action."
+                    "E-20004",
+                    message="Not authorized to perform the action.",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
                 )
 
             query = select(Simulation).where(Simulation.project_id == project_id)
@@ -1139,7 +1220,11 @@ class ProjectService:
 
             # Check if simulations exist
             if not pagination.records and page == 1:
-                return Res.error("E-20043", message="No simulations found.")
+                return Res.error(
+                    "E-20043",
+                    message="No simulations found.",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
+                )
 
             return Res.success(
                 "S-20027",
@@ -1184,7 +1269,11 @@ class ProjectService:
             project, sequence = project_query.first()
 
             if not project or project.is_deleted:
-                return Res.error("E-20015", message="Project not found.")
+                return Res.error(
+                    "E-20015",
+                    message="Project not found.",
+                    http_status_code=http_status.HTTP_404_NOT_FOUND,
+                )
 
             user_id = int(current_user.get("id"))  # type: ignore
             user_role = current_user.get("role")

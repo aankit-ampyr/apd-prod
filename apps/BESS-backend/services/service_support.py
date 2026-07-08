@@ -9,6 +9,8 @@ from constants.enums import UserRole
 from models.project_model import Project
 from models.simulation_model import (
     CustomSimulationJob,
+    DetailGreenSimulationJob,
+    GreenSizingSimulationJob,
     MultiYearSimulationJob,
     Simulation,
     SimulationJob,
@@ -40,6 +42,9 @@ async def depreciate_simulation_job(
     db: AsyncSession,
     include_sizing_job: bool = True,
     include_custom_job: bool = True,
+    include_multi_job: bool = True,
+    include_green_job: bool = False,
+    include_detailed_green_job: bool = False,
 ):
     if include_sizing_job:
         await db.execute(
@@ -55,44 +60,61 @@ async def depreciate_simulation_job(
             .values(status=SimulationJobStatus.OUTDATED)
         )
 
-    await db.execute(
-        update(MultiYearSimulationJob)
-        .where(MultiYearSimulationJob.simulation_id == simulation_id)
-        .values(status=SimulationJobStatus.OUTDATED)
-    )
+    if include_multi_job:
+        await db.execute(
+            update(MultiYearSimulationJob)
+            .where(MultiYearSimulationJob.simulation_id == simulation_id)
+            .values(status=SimulationJobStatus.OUTDATED)
+        )
+
+    if include_green_job:
+        await db.execute(
+            update(GreenSizingSimulationJob)
+            .where(GreenSizingSimulationJob.simulation_id == simulation_id)
+            .values(status=SimulationJobStatus.OUTDATED)
+        )
+
+    if include_detailed_green_job:
+        await db.execute(
+            update(DetailGreenSimulationJob)
+            .where(DetailGreenSimulationJob.simulation_id == simulation_id)
+            .values(status=SimulationJobStatus.OUTDATED)
+        )
+
     await db.commit()
 
 
-async def ensure_simulation_write_access(
-    db: AsyncSession,
-    simulation_id: int,
-    current_user: dict,
-) -> Tuple[Optional[Simulation], Optional[Res]]:
-    query = (
-        select(Simulation)
-        .options(selectinload(Simulation.project))
-        .where(Simulation.id == simulation_id)
-    )
-    result = await db.execute(query)
-    simulation = result.scalar_one_or_none()
-
-    if not simulation or not simulation.project or simulation.project.is_deleted:
-        return None, Res.error(status_code="E-20043", message="Simulation not found")
-
-    user_id = int(current_user.get("id"))
-    user_role = current_user.get("role")
-    project = simulation.project
-
-    is_authorized = (
-        user_role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
-        or project.created_by_user_id == user_id
-        or project.owned_by_user_id == user_id
-    )
-
-    if not is_authorized:
-        return simulation, Res.error(
-            status_code="E-20004",
-            message="Not authorized to perform the action.",
-        )
-
-    return simulation, None
+#
+# async def ensure_simulation_write_access(
+#     db: AsyncSession,
+#     simulation_id: int,
+#     current_user: dict,
+# ) -> Tuple[Optional[Simulation], Optional[Res]]:
+#     query = (
+#         select(Simulation)
+#         .options(selectinload(Simulation.project))
+#         .where(Simulation.id == simulation_id)
+#     )
+#     result = await db.execute(query)
+#     simulation = result.scalar_one_or_none()
+#
+#     if not simulation or not simulation.project or simulation.project.is_deleted:
+#         return None, Res.error(status_code="E-20043", message="Simulation not found")
+#
+#     user_id = int(current_user.get("id"))
+#     user_role = current_user.get("role")
+#     project = simulation.project
+#
+#     is_authorized = (
+#         user_role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
+#         or project.created_by_user_id == user_id
+#         or project.owned_by_user_id == user_id
+#     )
+#
+#     if not is_authorized:
+#         return simulation, Res.error(
+#             status_code="E-20004",
+#             message="Not authorized to perform the action.",
+#         )
+#
+#     return simulation, None

@@ -13,45 +13,6 @@ import {ACCESS_KEY, API} from '@/constants';
 import {downloadBlob} from '@/utils';
 import qs from 'qs';
 
-type SaveFilePickerWindow = Window & {
-  showSaveFilePicker?: (options?: {
-    suggestedName?: string;
-  }) => Promise<FileSystemFileHandle>;
-};
-
-async function getSaveFileHandle(filename: string) {
-  const windowWithPicker = window as SaveFilePickerWindow;
-
-  if (!windowWithPicker.showSaveFilePicker) {
-    return null;
-  }
-
-  try {
-    return await windowWithPicker.showSaveFilePicker({
-      suggestedName: filename,
-    });
-  } catch (error) {
-    if (error instanceof DOMException && error.name === 'AbortError') {
-      return null;
-    }
-    throw error;
-  }
-}
-
-async function writeBlobToFileHandle(fileHandle: FileSystemFileHandle, blob: Blob) {
-  const writable = await fileHandle.createWritable();
-
-  try {
-    await writable.write(blob);
-    await writable.close();
-  } catch (error) {
-    if (typeof writable.abort === 'function') {
-      await writable.abort();
-    }
-    throw error;
-  }
-}
-
 /**
  * Fetch blob/file from API endpoint (for binary responses like PDFs)
  * Uses same authentication headers as regular API calls
@@ -110,18 +71,6 @@ type FetchAndDownloadBlobParams = {
 };
 export async function fetchAndDownloadBlob(args: FetchAndDownloadBlobParams): Promise<void> {
   const {url, filename, params} = args;
-  const fileHandle = await getSaveFileHandle(filename);
-
-  if ((window as SaveFilePickerWindow).showSaveFilePicker && !fileHandle) {
-    return;
-  }
-
   const blob = await fetchBlobFromApi(url, params);
-
-  if (fileHandle) {
-    await writeBlobToFileHandle(fileHandle, blob);
-    return;
-  }
-
   downloadBlob(blob, filename);
 }

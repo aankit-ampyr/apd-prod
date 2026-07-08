@@ -13,5 +13,5 @@ export const SuperAdminSideNavOptions: SideNavOptionType<RouteValues>[] = [
  */
 export const SystemSideBarOption: SideNavOptionType<RouteValues>[] = [
   {icon: 'clock', label: 'Audit Log', route: Routes.AUDIT_LOG},
-  {icon: 'gear', label: 'Settings', route: Routes.SETTINGS},
+  // {icon: 'gear', label: 'Settings', route: Routes.SETTINGS},
 ];

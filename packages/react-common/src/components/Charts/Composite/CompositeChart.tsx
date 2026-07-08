@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from "react";
+import {useMemo, useState, type ReactNode} from 'react';
 import {
   Bar,
   CartesianGrid,
@@ -13,17 +13,17 @@ import {
   type TooltipContentProps,
   XAxis,
   YAxis,
-} from "recharts";
-import { useChartsActionV2 } from "../../../hooks";
-import { cn } from "../../../utils";
-import { IconButton, Skeleton, Text } from "../../../ui-kit";
-import { WithFallback } from "../../SkelatonWrapper";
+} from 'recharts';
+import {useChartsActionV2} from '../../../hooks';
+import {cn} from '../../../utils';
+import {IconButton, Skeleton, Text} from '../../../ui-kit';
+import {WithFallback} from '../../SkelatonWrapper';
 
-type ChartAxisId = "left" | "right";
-type ChartSeriesType = "bar" | "line";
-type ChartDomainStrategy = "auto" | "positive" | "symmetric";
-type ChartReferenceLineAxis = "x" | "y";
-type ChartReferenceLineStyle = "dotted" | "plain";
+type ChartAxisId = 'left' | 'right';
+type ChartSeriesType = 'bar' | 'line';
+type ChartDomainStrategy = 'auto' | 'positive' | 'symmetric';
+type ChartReferenceLineAxis = 'x' | 'y';
+type ChartReferenceLineStyle = 'dotted' | 'plain';
 
 export type CompositeChartReferenceLine = {
   id?: string;
@@ -37,24 +37,24 @@ export type CompositeChartReferenceLine = {
   labelColor?: string;
   labelFontSize?: number;
   labelPosition?:
-    | "top"
-    | "left"
-    | "right"
-    | "bottom"
-    | "inside"
-    | "insideLeft"
-    | "insideRight"
-    | "insideTop"
-    | "insideBottom"
-    | "insideTopLeft"
-    | "insideTopRight"
-    | "insideBottomLeft"
-    | "insideBottomRight"
-    | "insideStart"
-    | "insideEnd"
-    | "middle"
-    | "center";
-  ifOverflow?: "discard" | "hidden" | "visible" | "extendDomain";
+    | 'top'
+    | 'left'
+    | 'right'
+    | 'bottom'
+    | 'inside'
+    | 'insideLeft'
+    | 'insideRight'
+    | 'insideTop'
+    | 'insideBottom'
+    | 'insideTopLeft'
+    | 'insideTopRight'
+    | 'insideBottomLeft'
+    | 'insideBottomRight'
+    | 'insideStart'
+    | 'insideEnd'
+    | 'middle'
+    | 'center';
+  ifOverflow?: 'discard' | 'hidden' | 'visible' | 'extendDomain';
   showInLegend?: boolean;
   legendLabel?: string;
 };
@@ -75,6 +75,9 @@ export type CompositeChartSeries<TData extends Record<string, unknown>> = {
   yAxisId?: ChartAxisId;
   valueFormatter?: (value: number, row: TData) => string;
   barSize?: number;
+  dot?: any;
+  activeDot?: any;
+  activeBar?: any;
 };
 
 export type CompositeChartAxisConfig = {
@@ -98,7 +101,7 @@ export type CompositeChartProps<TData extends Record<string, unknown>> = {
   isFullScreenOverride?: boolean;
   xAxisLabel?: ReactNode;
   tooltipRenderer?: (props: CompositeChartTooltipProps<TData>) => ReactNode;
-  tooltipInteractionMode?: "axis" | "item";
+  tooltipInteractionMode?: 'axis' | 'item';
   legendRenderer?: (
     items: CompositeChartSeries<TData>[],
     referenceLines: CompositeChartReferenceLegendItem[],
@@ -108,27 +111,27 @@ export type CompositeChartProps<TData extends Record<string, unknown>> = {
   showZeroReferenceLine?: boolean;
   showBarPointValues?: boolean;
   showLinePointValues?: boolean;
+  showTooltipCursor?: boolean;
   barGap?: number;
   barCategoryGap?: number | string;
   referenceLines?: CompositeChartReferenceLine[];
 };
 
-export type CompositeChartTooltipProps<TData extends Record<string, unknown>> =
-  TooltipContentProps<any, any> & {
-    series: CompositeChartSeries<TData>[];
-    axes: Partial<Record<ChartAxisId, CompositeChartAxisConfig>>;
-    currentData?: TData;
-    currentPayload?: any;
-  };
+export type CompositeChartTooltipProps<TData extends Record<string, unknown>> = TooltipContentProps<any, any> & {
+  series: CompositeChartSeries<TData>[];
+  axes: Partial<Record<ChartAxisId, CompositeChartAxisConfig>>;
+  currentData?: TData;
+  currentPayload?: any;
+};
 
 const DEFAULT_Y_TICK_COUNT = 5;
 
 function formatCompactNumber(value: number): string {
-  if (!Number.isFinite(value)) return "0";
-  if (value === 0) return "0";
+  if (!Number.isFinite(value)) return '0';
+  if (value === 0) return '0';
 
   const absolute = Math.abs(value);
-  const sign = value < 0 ? "-" : "";
+  const sign = value < 0 ? '-' : '';
 
   if (absolute >= 1000000) {
     return `${sign}${Math.round(absolute / 1000000)}m`;
@@ -142,15 +145,32 @@ function formatCompactNumber(value: number): string {
 }
 
 function getAxisLabelPosition(axisId: ChartAxisId) {
-  return axisId === "left" ? "insideLeft" : "insideRight";
+  return axisId === 'left' ? 'insideLeft' : 'insideRight';
 }
 
 function getAxisLabelAngle(axisId: ChartAxisId) {
-  return axisId === "left" ? -90 : 90;
+  return axisId === 'left' ? -90 : 90;
 }
 
 function getAxisLabelOffset(axisId: ChartAxisId) {
-  return axisId === "left" ? 1 : -8;
+  return axisId === 'left' ? 1 : -8;
+}
+
+function MultilineTick(props: any) {
+  const {x, y, payload} = props;
+  const lines = String(payload?.value ?? '').split('\n');
+
+  return (
+    <g transform={`translate(${x},${y})`}>
+      <text x={0} y={0} textAnchor="middle" fill="var(--color-text-secondary)" fontSize={13} fontFamily="Inter-Regular">
+        {lines.map((line, index) => (
+          <tspan key={`${line}-${index}`} x={0} dy={index === 0 ? 16 : 18}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
 }
 
 function BarValueLabel({
@@ -167,12 +187,7 @@ function BarValueLabel({
   formatter: (value: number) => string;
 }) {
   const numericValue = Number(value);
-  if (
-    !Number.isFinite(numericValue) ||
-    x == null ||
-    y == null ||
-    width == null
-  ) {
+  if (!Number.isFinite(numericValue) || x == null || y == null || width == null) {
     return null;
   }
 
@@ -183,8 +198,7 @@ function BarValueLabel({
       textAnchor="middle"
       fill="var(--color-text-primary)"
       fontFamily="Inter-Medium"
-      fontSize={12}
-    >
+      fontSize={12}>
       {formatter(numericValue)}
     </text>
   );
@@ -195,10 +209,12 @@ function LineValueBadge({
   y,
   value,
   formatter,
+  viewBox,
 }: {
   x?: number;
   y?: number;
   value?: number | string;
+  viewBox?: {x?: number; y?: number; width?: number; height?: number};
   formatter: (value: number) => string;
 }) {
   const numericValue = Number(value);
@@ -210,7 +226,10 @@ function LineValueBadge({
   const width = Math.max(42, label.length * 7 + 12);
   const height = 22;
   const rx = 11;
-  const offsetY = 10;
+  const chartTop = Number(viewBox?.y ?? 0);
+  const chartBottom = chartTop + Number(viewBox?.height ?? 0);
+  const shouldRenderAbove = Number(y) > chartBottom - 48;
+  const offsetY = shouldRenderAbove ? -(height + 10) : 10;
 
   const badgeX = x - width / 2;
   const badgeY = y + offsetY;
@@ -227,7 +246,7 @@ function LineValueBadge({
         fill="rgba(255,255,255,0.85)"
         stroke="rgba(255,255,255,0.7)"
         strokeWidth={1}
-        style={{ filter: "drop-shadow(0 2px 4px rgba(16,19,41,0.08))" }}
+        style={{filter: 'drop-shadow(0 2px 4px rgba(16,19,41,0.08))'}}
       />
       <text
         x={x}
@@ -236,8 +255,7 @@ function LineValueBadge({
         fill="var(--color-text-primary)"
         fontSize={11}
         fontFamily="Inter-Medium"
-        fontWeight={500}
-      >
+        fontWeight={500}>
         {label}
       </text>
     </g>
@@ -254,7 +272,7 @@ function DefaultTooltip<TData extends Record<string, unknown>>({
 }: CompositeChartTooltipProps<TData>) {
   if (!active || !payload?.length) return null;
 
-  const seriesByKey = new Map(series.map((item) => [item.key, item]));
+  const seriesByKey = new Map(series.map(item => [item.key, item]));
 
   return (
     <div className="min-w-52 rounded-xl border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)]">
@@ -264,34 +282,21 @@ function DefaultTooltip<TData extends Record<string, unknown>>({
 
       <div className="flex flex-col gap-1.5">
         {payload.map((entry: any) => {
-          const dataKey = String(entry.dataKey ?? "");
+          const dataKey = String(entry.dataKey ?? '');
           const seriesItem = seriesByKey.get(dataKey as any);
-          const rawValue = Number(
-            Array.isArray(entry.value) ? entry.value[1] : (entry.value ?? 0),
-          );
-          const axisId = (entry.yAxisId ??
-            seriesItem?.yAxisId ??
-            "left") as ChartAxisId;
-          const axisFormatter =
-            axes[axisId]?.tickFormatter ?? formatCompactNumber;
-          const valueFormatter =
-            seriesItem?.valueFormatter ??
-            ((value: number) => axisFormatter(value));
+          const rawValue = Number(Array.isArray(entry.value) ? entry.value[1] : (entry.value ?? 0));
+          const axisId = (entry.yAxisId ?? seriesItem?.yAxisId ?? 'left') as ChartAxisId;
+          const axisFormatter = axes[axisId]?.tickFormatter ?? formatCompactNumber;
+          const valueFormatter = seriesItem?.valueFormatter ?? ((value: number) => axisFormatter(value));
           const row = (currentData ?? entry.payload ?? {}) as TData;
 
           return (
-            <div
-              key={dataKey}
-              className="flex items-center justify-between gap-3"
-            >
+            <div key={dataKey} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <span
-                  className={cn(
-                    "h-2.5 w-2.5 rounded-full",
-                    seriesItem?.type === "line" && "h-3 w-3 rounded-sm",
-                  )}
+                  className={cn('h-2.5 w-2.5 rounded-full', seriesItem?.type === 'line' && 'h-3 w-3 rounded-sm')}
                   style={{
-                    backgroundColor: entry.color || seriesItem?.color || "#999",
+                    backgroundColor: entry.color || seriesItem?.color || '#999',
                   }}
                 />
                 <Text variant="12M" className="text-text-secondary!">
@@ -309,27 +314,13 @@ function DefaultTooltip<TData extends Record<string, unknown>>({
   );
 }
 
-function LegendItem({
-  color,
-  label,
-  type,
-}: {
-  color: string;
-  label: string;
-  type: ChartSeriesType;
-}) {
-  if (type === "line") {
+function LegendItem({color, label, type}: {color: string; label: string; type: ChartSeriesType}) {
+  if (type === 'line') {
     return (
       <div className="flex items-center gap-2">
         <span className="relative flex items-center justify-center">
-          <span
-            className="h-0.5 w-8 rounded-full"
-            style={{ backgroundColor: color }}
-          />
-          <span
-            className="absolute h-2.5 w-2.5 rounded-full border-2 bg-white"
-            style={{ borderColor: color }}
-          />
+          <span className="h-0.5 w-8 rounded-full" style={{backgroundColor: color}} />
+          <span className="absolute h-2.5 w-2.5 rounded-full border-2 bg-white" style={{borderColor: color}} />
         </span>
         <Text variant="14SB" className="text-text-primary!">
           {label}
@@ -340,7 +331,7 @@ function LegendItem({
 
   return (
     <div className="flex items-center gap-2">
-      <span className="h-4 w-5 rounded" style={{ backgroundColor: color }} />
+      <span className="h-4 w-5 rounded" style={{backgroundColor: color}} />
       <Text variant="14SB" className="text-text-primary!">
         {label}
       </Text>
@@ -348,15 +339,7 @@ function LegendItem({
   );
 }
 
-function ReferenceLegendItem({
-  color,
-  label,
-  style,
-}: {
-  color: string;
-  label: string;
-  style: ChartReferenceLineStyle;
-}) {
+function ReferenceLegendItem({color, label, style}: {color: string; label: string; style: ChartReferenceLineStyle}) {
   return (
     <div className="flex items-center gap-2">
       <span className="flex w-8 items-center">
@@ -364,7 +347,7 @@ function ReferenceLegendItem({
           className="w-full border-t-2"
           style={{
             borderTopColor: color,
-            borderTopStyle: style === "dotted" ? "dashed" : "solid",
+            borderTopStyle: style === 'dotted' ? 'dashed' : 'solid',
           }}
         />
       </span>
@@ -381,8 +364,8 @@ function getChartDensity(count: number) {
       barCategoryGap: 96,
       barGap: 18,
       barSize: 34,
-      xAxisPadding: { left: 84, right: 84 },
-      margin: { top: 28, right: 32, bottom: 54, left: 12 },
+      xAxisPadding: {left: 84, right: 84},
+      margin: {top: 28, right: 32, bottom: 54, left: 12},
     };
   }
 
@@ -391,8 +374,8 @@ function getChartDensity(count: number) {
       barCategoryGap: 72,
       barGap: 18,
       barSize: 34,
-      xAxisPadding: { left: 36, right: 36 },
-      margin: { top: 28, right: 32, bottom: 54, left: 12 },
+      xAxisPadding: {left: 36, right: 36},
+      margin: {top: 28, right: 32, bottom: 54, left: 12},
     };
   }
 
@@ -400,14 +383,12 @@ function getChartDensity(count: number) {
     barCategoryGap: 24,
     barGap: 18,
     barSize: 28,
-    xAxisPadding: { left: 12, right: 12 },
-    margin: { top: 24, right: 28, bottom: 52, left: 8 },
+    xAxisPadding: {left: 12, right: 12},
+    margin: {top: 24, right: 28, bottom: 52, left: 8},
   };
 }
 
-export function CompositeChart<TData extends Record<string, unknown>>(
-  props: CompositeChartProps<TData>,
-) {
+export function CompositeChart<TData extends Record<string, unknown>>(props: CompositeChartProps<TData>) {
   const {
     header,
     downloadFileName,
@@ -423,37 +404,32 @@ export function CompositeChart<TData extends Record<string, unknown>>(
     xAxisLabel,
     formulaRenderer,
     tooltipRenderer: customTooltipRenderer,
-    tooltipInteractionMode = "axis",
+    tooltipInteractionMode = 'axis',
     legendRenderer,
     legend,
     showZeroReferenceLine = true,
     showBarPointValues = true,
     showLinePointValues = true,
+    showTooltipCursor,
     barGap,
     barCategoryGap,
     referenceLines = [],
   } = props;
 
-  const { chartRef, handleDownLoad, onMaximize, onMinimize } =
-    useChartsActionV2({
-      downloadFileName,
-      renderFullScreen: () => (
-        <CompositeChart<TData> {...props} isFullScreenOverride />
-      ),
-    });
+  const {chartRef, handleDownLoad, onMaximize, onMinimize} = useChartsActionV2({
+    downloadFileName,
+    renderFullScreen: () => <CompositeChart<TData> {...props} isFullScreenOverride />,
+  });
 
   const chartData = useMemo(() => data, [data]);
-  const chartDensity = useMemo(
-    () => getChartDensity(chartData.length),
-    [chartData.length],
-  );
+  const chartDensity = useMemo(() => getChartDensity(chartData.length), [chartData.length]);
   const [hoverTooltip, setHoverTooltip] = useState<any>(null);
 
   const resolvedSeries = useMemo(
     () =>
-      series.map((item) => ({
+      series.map(item => ({
         ...item,
-        yAxisId: item.yAxisId ?? "left",
+        yAxisId: item.yAxisId ?? 'left',
         barSize: item.barSize ?? chartDensity.barSize,
       })),
     [chartDensity.barSize, series],
@@ -462,7 +438,7 @@ export function CompositeChart<TData extends Record<string, unknown>>(
   const axisIdsInUse = useMemo(() => {
     const ids = new Set<ChartAxisId>();
     for (const item of resolvedSeries) {
-      ids.add(item.yAxisId ?? "left");
+      ids.add(item.yAxisId ?? 'left');
     }
     return ids;
   }, [resolvedSeries]);
@@ -504,7 +480,7 @@ export function CompositeChart<TData extends Record<string, unknown>>(
       for (const item of resolvedSeries) {
         const rawValue = Number(row[item.key]);
         if (Number.isFinite(rawValue)) {
-          valuesByAxis[item.yAxisId ?? "left"].push(rawValue);
+          valuesByAxis[item.yAxisId ?? 'left'].push(rawValue);
         }
       }
     }
@@ -512,35 +488,33 @@ export function CompositeChart<TData extends Record<string, unknown>>(
     const leftValues = valuesByAxis.left;
     const rightValues = valuesByAxis.right;
 
-    const leftYDomain: [number, number] = leftValues.length
-      ? [
-          Math.min(...leftValues),
-          Math.max(...leftValues) === Math.min(...leftValues)
-            ? Math.min(...leftValues) + 1
-            : Math.max(...leftValues),
-        ]
-      : [0, 1];
+    function calculateDomain(values: number[], strategy?: ChartDomainStrategy): [number, number] {
+      if (!values.length) return [0, 1];
+      let min = Math.min(...values);
+      let max = Math.max(...values);
 
-    const rightYDomain: [number, number] = rightValues.length
-      ? [
-          Math.min(...rightValues),
-          Math.max(...rightValues) === Math.min(...rightValues)
-            ? Math.min(...rightValues) + 1
-            : Math.max(...rightValues),
-        ]
-      : [0, 1];
+      // Only force 0 minimum if explicitly requested or if we are fixing the single data point bug
+      if (strategy === 'positive' || (max === min && min > 0)) {
+        min = Math.min(0, min);
+      }
+
+      // Fix single data point bug by padding max, preserving old exact min-max for normal charts
+      if (max === min) {
+        max = min > 0 ? min * 1.2 : min + 10;
+        if (min === 0) max = 10;
+      }
+
+      return [min, max];
+    }
+
+    const leftYDomain = calculateDomain(leftValues, axes.left?.domainStrategy);
+    const rightYDomain = calculateDomain(rightValues, axes.right?.domainStrategy);
 
     const leftTicks = getNiceTickValues(leftYDomain, DEFAULT_Y_TICK_COUNT);
     const rightTicks = getNiceTickValues(rightYDomain, DEFAULT_Y_TICK_COUNT);
 
-    const normalizedLeftDomain: [number, number] = [
-      leftTicks[0],
-      leftTicks[leftTicks.length - 1],
-    ];
-    const normalizedRightDomain: [number, number] = [
-      rightTicks[0],
-      rightTicks[rightTicks.length - 1],
-    ];
+    const normalizedLeftDomain: [number, number] = [leftTicks[0], leftTicks[leftTicks.length - 1]];
+    const normalizedRightDomain: [number, number] = [rightTicks[0], rightTicks[rightTicks.length - 1]];
 
     return {
       left: {
@@ -570,19 +544,19 @@ export function CompositeChart<TData extends Record<string, unknown>>(
   }, [axes.left, axes.right]);
 
   const rightAxisSeriesColor = useMemo(
-    () => resolvedSeries.find((item) => item.yAxisId === "right")?.color,
+    () => resolvedSeries.find(item => item.yAxisId === 'right')?.color,
     [resolvedSeries],
   );
-  const rightAxisColor = rightAxisSeriesColor ?? "var(--color-text-secondary)";
+  const rightAxisColor = rightAxisSeriesColor ?? 'var(--color-text-secondary)';
 
   const resolvedReferenceLineItems = useMemo(
     () =>
       referenceLines.map((line, index) => ({
         ...line,
         id: line.id ?? `reference-line-${index}`,
-        color: line.color ?? "var(--color-text-secondary)",
-        style: line.style ?? "dotted",
-        yAxisId: line.yAxisId ?? "left",
+        color: line.color ?? 'var(--color-text-secondary)',
+        style: line.style ?? 'dotted',
+        yAxisId: line.yAxisId ?? 'left',
       })),
     [referenceLines],
   );
@@ -590,27 +564,25 @@ export function CompositeChart<TData extends Record<string, unknown>>(
   const legendReferenceLines = useMemo(
     () =>
       resolvedReferenceLineItems
-        .filter((line) => line.showInLegend !== false)
-        .map((line) => ({
+        .filter(line => line.showInLegend !== false)
+        .map(line => ({
           id: line.id,
           color: line.color,
           style: line.style,
-          label:
-            line.legendLabel ??
-            line.label ??
-            `${line.axis.toUpperCase()} = ${line.value}`,
+          label: line.legendLabel ?? line.label ?? `${line.axis.toUpperCase()} = ${line.value}`,
         })),
     [resolvedReferenceLineItems],
   );
 
   function buildTooltipPayload(row: TData | undefined) {
-    return resolvedSeries.map((item) => {
+    return resolvedSeries.map(item => {
       const value = Number(row?.[item.key] ?? 0);
       return {
         dataKey: item.key,
+        name: item.tooltipLabel ?? item.label ?? item.key,
         value,
         color: item.color,
-        yAxisId: item.yAxisId ?? "left",
+        yAxisId: item.yAxisId ?? 'left',
         payload: row,
       };
     });
@@ -634,7 +606,7 @@ export function CompositeChart<TData extends Record<string, unknown>>(
   function showItemTooltip(row: TData | undefined, x: number, y: number) {
     setHoverTooltip({
       ...createTooltipProps(row),
-      coordinate: { x, y },
+      coordinate: {x, y},
     });
   }
 
@@ -642,15 +614,20 @@ export function CompositeChart<TData extends Record<string, unknown>>(
     setHoverTooltip(null);
   }
 
+  function handleChartMouseLeave() {
+    if (tooltipInteractionMode === 'item') {
+      hideItemTooltip();
+    }
+  }
+
   return (
     <div
       ref={chartRef}
       className={cn(
-        "relative flex flex-col gap-8 rounded-xl border border-border bg-white p-5 sm:p-6",
-        isFullScreen && "grow",
+        'relative flex flex-col gap-8 rounded-xl border border-border bg-white p-5 sm:p-6',
+        isFullScreen && 'grow',
         className,
-      )}
-    >
+      )}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         {header}
 
@@ -686,7 +663,7 @@ export function CompositeChart<TData extends Record<string, unknown>>(
         </div>
       </div>
 
-      <div className={cn("flex w-full flex-col gap-5", chartClassName)}>
+      <div className={cn('flex w-full flex-col gap-5', chartClassName)}>
         {!isLoading && (
           <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl px-4 py-3">
             {formulaRenderer}
@@ -696,121 +673,90 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                 legendRenderer(resolvedSeries, legendReferenceLines)
               ) : (
                 <div className="flex flex-wrap items-center justify-end gap-6">
-                  {resolvedSeries.map((item) => (
-                    <LegendItem
-                      key={item.key}
-                      color={item.color}
-                      label={item.label}
-                      type={item.type}
-                    />
+                  {resolvedSeries.map(item => (
+                    <LegendItem key={item.key} color={item.color} label={item.label} type={item.type} />
                   ))}
-                  {legendReferenceLines.map((line) => (
-                    <ReferenceLegendItem
-                      key={line.id}
-                      color={line.color}
-                      label={line.label}
-                      style={line.style}
-                    />
+                  {legendReferenceLines.map(line => (
+                    <ReferenceLegendItem key={line.id} color={line.color} label={line.label} style={line.style} />
                   ))}
                 </div>
               ))}
           </div>
         )}
 
-        <WithFallback
-          isLoading={isLoading}
-          fallback={<CompositeChartSkeleton />}
-        >
+        <WithFallback isLoading={isLoading} fallback={<CompositeChartSkeleton />}>
           <div
-            className={cn(
-              "relative h-105 w-full sm:h-115",
-              isFullScreen && "min-h-115 grow",
-            )}
-            onMouseLeave={
-              tooltipInteractionMode === "item" ? hideItemTooltip : undefined
-            }
-          >
+            className={cn('relative h-105 w-full sm:h-115', isFullScreen && 'min-h-115 grow')}
+            onMouseLeave={handleChartMouseLeave}>
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
                 data={chartData}
                 margin={chartDensity.margin}
                 barCategoryGap={barCategoryGap ?? chartDensity.barCategoryGap}
-                barGap={barGap ?? chartDensity.barGap}
-              >
-                <CartesianGrid
-                  vertical={false}
-                  stroke="var(--color-border)"
-                  strokeDasharray="4 4"
-                  yAxisId={"left"}
-                />
+                barGap={barGap ?? chartDensity.barGap}>
+                <CartesianGrid vertical={false} stroke="var(--color-border)" strokeDasharray="4 4" yAxisId={'left'} />
                 <XAxis
                   dataKey={xAxisKey}
                   tickFormatter={xTickFormatter}
-                  axisLine={{ stroke: "var(--color-border)" }}
+                  axisLine={{stroke: 'var(--color-border)'}}
                   tickLine={false}
                   interval={0}
                   padding={chartDensity.xAxisPadding}
-                  tick={{
-                    fill: "var(--color-text-secondary)",
-                    fontSize: 13,
-                    fontFamily: "Inter-Regular",
-                  }}
-                >
+                  tick={<MultilineTick />}>
                   {xAxisLabel ? (
                     <Label
                       value={xAxisLabel as any}
                       position="insideBottom"
                       offset={-30}
                       style={{
-                        fill: "var(--color-text-primary)",
+                        fill: 'var(--color-text-primary)',
                         fontSize: 14,
                         fontWeight: 500,
-                        textAnchor: "middle",
-                        fontFamily: "Inter-Medium",
+                        textAnchor: 'middle',
+                        fontFamily: 'Inter-Medium',
                       }}
                     />
                   ) : null}
                 </XAxis>
 
-                {axisIdsInUse.has("left") ? (
+                {axisIdsInUse.has('left') ? (
                   <YAxis
                     yAxisId="left"
                     orientation="left"
-                    axisLine={{ stroke: "var(--color-border)" }}
+                    axisLine={{stroke: 'var(--color-border)'}}
                     tickLine={false}
                     ticks={axisScale.left.ticks}
                     domain={axisScale.left.domain}
                     tickFormatter={axisConfig.left.tickFormatter}
                     tick={{
-                      fill: "var(--color-text-secondary)",
+                      fill: 'var(--color-text-secondary)',
                       fontSize: 13,
-                      fontFamily: "Inter-Regular",
+                      fontFamily: 'Inter-Regular',
                     }}
-                    width={axisConfig.left.width}
-                  >
+                    width={axisConfig.left.width}>
                     {axisConfig.left.label ? (
                       <Label
                         value={axisConfig.left.label as any}
-                        angle={getAxisLabelAngle("left")}
-                        position={getAxisLabelPosition("left")}
-                        offset={getAxisLabelOffset("left")}
+                        angle={getAxisLabelAngle('left')}
+                        position={getAxisLabelPosition('left')}
+                        offset={getAxisLabelOffset('left')}
                         style={{
-                          fill: "var(--color-text-primary)",
+                          fill: 'var(--color-text-primary)',
                           fontSize: 14,
                           fontWeight: 500,
-                          textAnchor: "middle",
-                          fontFamily: "Inter-Medium",
+                          textAnchor: 'middle',
+                          fontFamily: 'Inter-Medium',
                         }}
                       />
                     ) : null}
                   </YAxis>
                 ) : null}
 
-                {axisIdsInUse.has("right") ? (
+                {axisIdsInUse.has('right') ? (
                   <YAxis
                     yAxisId="right"
                     orientation="right"
-                    axisLine={{ stroke: "var(--color-border)" }}
+                    axisLine={{stroke: 'var(--color-border)'}}
                     tickLine={false}
                     ticks={axisScale.right.ticks}
                     domain={axisScale.right.domain}
@@ -818,22 +764,21 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                     tick={{
                       fill: rightAxisColor,
                       fontSize: 13,
-                      fontFamily: "Inter-Regular",
+                      fontFamily: 'Inter-Regular',
                     }}
-                    width={axisConfig.right.width}
-                  >
+                    width={axisConfig.right.width}>
                     {axisConfig.right.label ? (
                       <Label
                         value={axisConfig.right.label as any}
-                        angle={getAxisLabelAngle("right")}
-                        position={getAxisLabelPosition("right")}
-                        offset={getAxisLabelOffset("right")}
+                        angle={getAxisLabelAngle('right')}
+                        position={getAxisLabelPosition('right')}
+                        offset={getAxisLabelOffset('right')}
                         style={{
                           fill: rightAxisColor,
                           fontSize: 14,
                           fontWeight: 500,
-                          textAnchor: "middle",
-                          fontFamily: "Inter-Medium",
+                          textAnchor: 'middle',
+                          fontFamily: 'Inter-Medium',
                         }}
                       />
                     ) : null}
@@ -841,31 +786,24 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                 ) : null}
 
                 {showZeroReferenceLine ? (
-                  <ReferenceLine
-                    y={0}
-                    yAxisId="left"
-                    stroke="var(--color-border)"
-                    strokeDasharray="0"
-                  />
+                  <ReferenceLine y={0} yAxisId="left" stroke="var(--color-border)" strokeDasharray="0" />
                 ) : null}
 
-                {resolvedReferenceLineItems.map((line) => (
+                {resolvedReferenceLineItems.map(line => (
                   <ReferenceLine
                     key={line.id}
-                    x={line.axis === "x" ? line.value : undefined}
-                    y={line.axis === "y" ? line.value : undefined}
-                    yAxisId={line.axis === "y" ? line.yAxisId : undefined}
+                    x={line.axis === 'x' ? line.value : undefined}
+                    y={line.axis === 'y' ? line.value : undefined}
+                    yAxisId={line.axis === 'y' ? line.yAxisId : undefined}
                     stroke={line.color}
                     strokeWidth={line.strokeWidth ?? 2}
-                    strokeDasharray={line.style === "dotted" ? "6 6" : "0"}
-                    ifOverflow={line.ifOverflow ?? "extendDomain"}
+                    strokeDasharray={line.style === 'dotted' ? '6 6' : '0'}
+                    ifOverflow={line.ifOverflow ?? 'extendDomain'}
                     label={
                       line.label
                         ? {
                             value: line.label,
-                            position:
-                              line.labelPosition ??
-                              (line.axis === "y" ? "right" : "top"),
+                            position: line.labelPosition ?? (line.axis === 'y' ? 'right' : 'top'),
                             fill: line.labelColor ?? line.color,
                             fontSize: line.labelFontSize ?? 12,
                           }
@@ -874,15 +812,13 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                   />
                 ))}
 
-                {tooltipInteractionMode === "axis" ? (
+                {tooltipInteractionMode === 'axis' ? (
                   <Tooltip
                     animationDuration={0}
-                    content={(tooltipProps) =>
+                    content={tooltipProps =>
                       (() => {
                         const currentPayload = tooltipProps?.payload?.[0];
-                        const currentData = currentPayload?.payload as
-                          | TData
-                          | undefined;
+                        const currentData = currentPayload?.payload as TData | undefined;
 
                         const resolvedTooltipProps = {
                           ...tooltipProps,
@@ -899,13 +835,13 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                         );
                       })()
                     }
-                    cursor={{ fill: "transparent" }}
-                    wrapperStyle={{ outline: "none", pointerEvents: "none" }}
+                    cursor={showTooltipCursor === false ? false : {fill: 'transparent'}}
+                    wrapperStyle={{outline: 'none', pointerEvents: 'none'}}
                   />
                 ) : null}
 
-                {resolvedSeries.map((item) => {
-                  if (item.type === "line") {
+                {resolvedSeries.map(item => {
+                  if (item.type === 'line') {
                     return (
                       <Line
                         key={item.key}
@@ -915,33 +851,36 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                         type="monotone"
                         stroke={item.color}
                         strokeWidth={2}
-                        dot={{
-                          r: 4,
-                          fill: "#fff",
-                          stroke: item.color,
-                          strokeWidth: 2,
-                        }}
-                        activeDot={{
-                          r: 7,
-                          fill: item.color,
-                          stroke: "#fff",
-                          strokeWidth: 2,
-                        }}
+                        dot={
+                          item.dot !== undefined
+                            ? item.dot
+                            : {
+                                r: 4,
+                                fill: '#fff',
+                                stroke: item.color,
+                                strokeWidth: 2,
+                              }
+                        }
+                        activeDot={
+                          item.activeDot !== undefined
+                            ? item.activeDot
+                            : {
+                                r: 7,
+                                fill: item.color,
+                                stroke: '#fff',
+                                strokeWidth: 2,
+                              }
+                        }
                         isAnimationActive={false}
                         label={
                           showLinePointValues
                             ? (labelProps: any) => (
                                 <LineValueBadge
                                   {...labelProps}
-                                  formatter={(value) =>
+                                  formatter={value =>
                                     item.valueFormatter
-                                      ? item.valueFormatter(
-                                          value,
-                                          (labelProps?.payload ?? {}) as TData,
-                                        )
-                                      : axisConfig[
-                                          item.yAxisId ?? "left"
-                                        ].tickFormatter(value)
+                                      ? item.valueFormatter(value, (labelProps?.payload ?? {}) as TData)
+                                      : axisConfig[item.yAxisId ?? 'left'].tickFormatter(value)
                                   }
                                 />
                               )
@@ -960,18 +899,13 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                       fill={item.color}
                       radius={[4, 4, 0, 0]}
                       barSize={barSize}
+                      activeBar={item.activeBar !== undefined ? item.activeBar : undefined}
                       isAnimationActive={false}
                       shape={
-                        tooltipInteractionMode === "item"
+                        tooltipInteractionMode === 'item'
                           ? (shapeProps: any) => {
-                              const { x, y, width, height, payload } =
-                                shapeProps;
-                              if (
-                                x == null ||
-                                y == null ||
-                                width == null ||
-                                height == null
-                              ) {
+                              const {x, y, width, height, payload} = shapeProps;
+                              if (x == null || y == null || width == null || height == null) {
                                 return null;
                               }
 
@@ -986,24 +920,12 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                                   {...shapeProps}
                                   radius={[4, 4, 0, 0]}
                                   fill={item.color}
-                                  onMouseEnter={() =>
-                                    showItemTooltip(
-                                      row,
-                                      numericX + numericWidth / 2,
-                                      numericY,
-                                    )
-                                  }
+                                  onMouseEnter={() => showItemTooltip(row, numericX + numericWidth / 2, numericY)}
                                   onMouseLeave={hideItemTooltip}
-                                  onClick={() =>
-                                    showItemTooltip(
-                                      row,
-                                      numericX + numericWidth / 2,
-                                      numericY,
-                                    )
-                                  }
+                                  onClick={() => showItemTooltip(row, numericX + numericWidth / 2, numericY)}
                                   style={{
-                                    cursor: "pointer",
-                                    transition: "fill 0.15s ease",
+                                    cursor: 'pointer',
+                                    transition: 'fill 0.15s ease',
                                   }}
                                 />
                               );
@@ -1015,15 +937,10 @@ export function CompositeChart<TData extends Record<string, unknown>>(
                           ? (labelProps: any) => (
                               <BarValueLabel
                                 {...labelProps}
-                                formatter={(value) =>
+                                formatter={value =>
                                   item.valueFormatter
-                                    ? item.valueFormatter(
-                                        value,
-                                        (labelProps?.payload ?? {}) as TData,
-                                      )
-                                    : axisConfig[
-                                        item.yAxisId ?? "left"
-                                      ].tickFormatter(value)
+                                    ? item.valueFormatter(value, (labelProps?.payload ?? {}) as TData)
+                                    : axisConfig[item.yAxisId ?? 'left'].tickFormatter(value)
                                 }
                               />
                             )
@@ -1035,20 +952,15 @@ export function CompositeChart<TData extends Record<string, unknown>>(
               </ComposedChart>
             </ResponsiveContainer>
 
-            {tooltipInteractionMode === "item" && hoverTooltip ? (
+            {tooltipInteractionMode === 'item' && hoverTooltip ? (
               <div
                 className="pointer-events-none absolute z-10"
                 style={{
                   left: (hoverTooltip.coordinate as any)?.x ?? 0,
                   top: (hoverTooltip.coordinate as any)?.y ?? 0,
-                  transform: "translate(-50%, calc(-100% - 10px))",
-                }}
-              >
-                {customTooltipRenderer ? (
-                  customTooltipRenderer(hoverTooltip)
-                ) : (
-                  <DefaultTooltip {...hoverTooltip} />
-                )}
+                  transform: 'translate(-50%, calc(-100% - 10px))',
+                }}>
+                {customTooltipRenderer ? customTooltipRenderer(hoverTooltip) : <DefaultTooltip {...hoverTooltip} />}
               </div>
             ) : null}
           </div>
@@ -1059,7 +971,7 @@ export function CompositeChart<TData extends Record<string, unknown>>(
 }
 
 function CompositeChartSkeleton() {
-  function BarGroup({ data }: { data: [number, number] }) {
+  function BarGroup({data}: {data: [number, number]}) {
     return (
       <div className="flex gap-2 items-end">
         <Skeleton height={data[0]} className="w-10 rounded-t-sm" />
@@ -1078,11 +990,7 @@ function CompositeChartSkeleton() {
           <div className="border border-dashed translate-y-4 border-border w-full absolute top-3/4" />
 
           {/* Curved Line */}
-          <svg
-            className="absolute inset-0 w-full h-full z-0"
-            viewBox="0 0 1000 320"
-            preserveAspectRatio="none"
-          >
+          <svg className="absolute inset-0 w-full h-full z-0" viewBox="0 0 1000 320" preserveAspectRatio="none">
             <path
               d="
                 M 40 210
@@ -1107,15 +1015,7 @@ function CompositeChartSkeleton() {
               [760, 170],
               [960, 140],
             ].map(([cx, cy], index) => (
-              <circle
-                key={index}
-                cx={cx}
-                cy={cy}
-                r="8"
-                fill="white"
-                stroke="var(--color-border)"
-                strokeWidth="4"
-              />
+              <circle key={index} cx={cx} cy={cy} r="8" fill="white" stroke="var(--color-border)" strokeWidth="4" />
             ))}
           </svg>
 
@@ -1128,8 +1028,8 @@ function CompositeChartSkeleton() {
             [275, 220],
             [190, 250],
             [300, 170],
-          ].map((item) => (
-            <BarGroup data={item as any} />
+          ].map((item, index) => (
+            <BarGroup key={index} data={item as any} />
           ))}
         </div>
         <Skeleton className="h-3! min-h-3! w-40! rounded-lg! self-center! mt-4" />

@@ -1,6 +1,7 @@
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from constants.enums import SimulationLogStep, SimulationSetupProgress
 from models import BessDgSizingConfiguration, Simulation
@@ -32,7 +33,7 @@ class BessDGService:
             return Res.error(
                 status_code="E-20043",
                 message="Simulation not found.",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         dg = simulation.dg_config
@@ -40,7 +41,7 @@ class BessDGService:
             return Res.error(
                 status_code="E-20040",
                 message="DG Config not found.",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if dg.is_included:
@@ -52,7 +53,7 @@ class BessDGService:
                 return Res.error(
                     status_code="E-20044",
                     message="Missing required parameters",
-                    http_status_code=400,
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
         query = select(BessDgSizingConfiguration).where(
@@ -114,7 +115,7 @@ class BessDGService:
             return Res.error(
                 status_code="E-20042",
                 message="BESS & DG Sizing configuration not found",
-                http_status_code=404,
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         data = BessDgSizingResponse.model_validate(config)

@@ -6,6 +6,7 @@ from models.simulation_model import (
     DispatchRuleConfiguration,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from fastapi.encoders import jsonable_encoder
 from dtos.simulation_dto import (
     BessConfigPayload,
@@ -20,7 +21,6 @@ from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -87,12 +87,6 @@ class ContainerConfigService:
         """
         Creates or updates a BESSContainerConfiguration for a given simulation_id.
         """
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
         # Check if configuration already exists for the simulation
         query = select(BESSContainerConfiguration).where(
             BESSContainerConfiguration.simulation_id == simulation_id
@@ -143,7 +137,9 @@ class ContainerConfigService:
             to=SimulationSetupProgress.BESS_CONTAINER_CONFIG,
             db=bess_db,
         )
-        await depreciate_simulation_job(simulation_id=simulation_id, db=bess_db)
+        await depreciate_simulation_job(
+            simulation_id=simulation_id, db=bess_db, include_green_job=True
+        )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -163,6 +159,7 @@ class ContainerConfigService:
         return Res.success(
             status_code="S-20011",
             data=ContainerConfigResponse.model_validate(config).model_dump(mode="json"),
+            http_status_code=status.HTTP_200_OK,
         )
 
     async def get_container_config(self, bess_db: AsyncSession, simulation_id: int):
@@ -173,9 +170,14 @@ class ContainerConfigService:
         config = result.scalar_one_or_none()
 
         if not config:
-            return Res.error(status_code="E-20026", message="Simulation not found")
+            return Res.error(
+                status_code="E-20026",
+                message="Simulation not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         return Res.success(
             status_code="S-20012",
             data=ContainerConfigResponse.model_validate(config).model_dump(mode="json"),
+            http_status_code=status.HTTP_200_OK,
         )

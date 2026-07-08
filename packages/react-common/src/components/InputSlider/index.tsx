@@ -109,7 +109,7 @@ export const IOSSingleSlider = ({
     typeof mark === "number" ? mark : mark.value;
 
   const getMarkLabel = (mark: SliderMark) =>
-    typeof mark === "number" ? mark : mark.label ?? mark.value;
+    typeof mark === "number" ? mark : (mark.label ?? mark.value);
 
   const markValues = marks.map(getMarkValue);
   const shouldUseEvenSnap =
@@ -117,14 +117,15 @@ export const IOSSingleSlider = ({
   const sliderValue = shouldUseEvenSnap
     ? markValues.reduce(
         (nearestIndex, markValue, index) =>
-          Math.abs(markValue - value) < Math.abs(markValues[nearestIndex] - value)
+          Math.abs(markValue - value) <
+          Math.abs(markValues[nearestIndex] - value)
             ? index
             : nearestIndex,
         0,
       )
     : value;
   const formatSliderValue = (sliderVal: number) =>
-    shouldUseEvenSnap ? markValues[sliderVal] ?? value : sliderVal;
+    shouldUseEvenSnap ? (markValues[sliderVal] ?? value) : sliderVal;
   const displayValue = formatSliderValue(sliderValue);
 
   return (
@@ -171,11 +172,15 @@ export const IOSSingleSlider = ({
           valueLabelDisplay={
             valueLabelOnThumb as "on" | "auto" | "off" | undefined
           }
-          valueLabelFormat={(v: any) => `${formatSliderValue(v as number)}${unit}`}
+          valueLabelFormat={(v: any) =>
+            `${formatSliderValue(v as number)}${unit}`
+          }
           disabled={disabled}
         />
         {!disabled && (
-          <div className={cn("absolute bottom-2! w-full", scaleWrapperClassName)}>
+          <div
+            className={cn("absolute bottom-2! w-full", scaleWrapperClassName)}
+          >
             {marks.map((mark, index) => {
               const value = getMarkValue(mark);
               const left =
@@ -183,13 +188,21 @@ export const IOSSingleSlider = ({
                   ? (index / (marks.length - 1)) * 100
                   : ((value - min) / (max - min)) * 100;
               const offsetClass =
-                left <= 0 ? "translate-x-0" : left >= 100 ? "-translate-x-full" : "-translate-x-1/2";
+                left <= 0
+                  ? "translate-x-0"
+                  : left >= 100
+                    ? "-translate-x-full"
+                    : "-translate-x-1/2";
 
               return (
                 <Text
                   key={value}
-                  variant="caption"
-                  className={cn("absolute text-text-primary!", offsetClass, scaleClassName)}
+                  variant="small"
+                  className={cn(
+                    "absolute text-text-primary!",
+                    offsetClass,
+                    scaleClassName,
+                  )}
                   style={{ left: `${left}%` }}
                 >
                   {getMarkLabel(mark)}

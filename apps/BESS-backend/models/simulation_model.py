@@ -110,6 +110,24 @@ class Simulation(BessBase):
         back_populates="simulation", uselist=False, cascade="all, delete-orphan"
     )
 
+    green_sizing_job: Mapped["GreenSizingSimulationJob"] = relationship(
+        back_populates="simulation", uselist=False, cascade="all, delete-orphan"
+    )
+
+    detailed_green_config: Mapped[Optional["DetailGreenSimulationConfiguration"]] = (
+        relationship(
+            back_populates="simulation", uselist=False, cascade="all, delete-orphan"
+        )
+    )
+
+    detailed_green_job: Mapped["DetailGreenSimulationJob"] = relationship(
+        back_populates="simulation", uselist=False, cascade="all, delete-orphan"
+    )
+
+    detailed_green_result: Mapped["DetailedGreenSimulationResult"] = relationship(
+        back_populates="simulation", uselist=False, cascade="all, delete-orphan"
+    )
+
 
 class ProjectSimulationSequence(BessBase):
     __tablename__ = "project_simulation_sqeunce"
@@ -567,20 +585,8 @@ class SingularConfSimulationResult(AbstractSimulationResult):
     job: Mapped["CustomSimulationJob"] = relationship(back_populates="results")
 
 
-class SimulationHourlyResult(BessBase):
-    __tablename__ = "simulation_hourly_results"
-
-    id: Mapped[int] = mapped_column(primary_key=True, index=True)
-    simulation_id: Mapped[int] = mapped_column(
-        ForeignKey("simulations.id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
-    custom_job_id: Mapped[int] = mapped_column(
-        ForeignKey("custom_simulation_job.job_id", ondelete="CASCADE"),
-        index=True,
-        nullable=False,
-    )
+class AbstractSimulationHourlyResult(BessBase):
+    __abstract__ = True
 
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     hour: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -602,6 +608,12 @@ class SimulationHourlyResult(BessBase):
     dg_to_load: Mapped[float] = mapped_column(Float, nullable=False)
     dg_to_bess: Mapped[float] = mapped_column(Float, nullable=False)
     dg_curtailed: Mapped[float] = mapped_column(Float, nullable=False)
+    charging_loss: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0")
+    )
+    discharging_loss: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0")
+    )
     soc_mwh: Mapped[float] = mapped_column(Float, nullable=False)
     soc_percent: Mapped[float] = mapped_column(Float, nullable=False)
     unmet_mw: Mapped[float] = mapped_column(Float, nullable=False)
@@ -611,6 +623,22 @@ class SimulationHourlyResult(BessBase):
     solar_curtailed: Mapped[float] = mapped_column(Float, nullable=False)
     daily_cycles: Mapped[float] = mapped_column(Float, nullable=False)
     green_energy_to_load_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+
+
+class SimulationHourlyResult(AbstractSimulationHourlyResult):
+    __tablename__ = "simulation_hourly_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    custom_job_id: Mapped[int] = mapped_column(
+        ForeignKey("custom_simulation_job.job_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
 
     # Relationships
     custom_job: Mapped["CustomSimulationJob"] = relationship(
@@ -737,6 +765,9 @@ class MultiYearSimulationResult(BessBase):
         Float,
         nullable=False,
     )
+    unserved_mwh: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0.0")
+    )
     solar_gen_during_load: Mapped[float] = mapped_column(Float, nullable=False)
     solar_curtailed_during_load: Mapped[float] = mapped_column(Float, nullable=False)
     solar_curtailed: Mapped[float] = mapped_column(Float, nullable=False)
@@ -769,10 +800,12 @@ class GreenEnergyAnalysisConfiguration(BessBase):
 
     dg_min: Mapped[int] = mapped_column(Integer, nullable=False)
     dg_max: Mapped[int] = mapped_column(Integer, nullable=False)
-    dg_step: Mapped[int] = mapped_column(Integer, nullable=False)
+    dg_step_size: Mapped[int] = mapped_column(
+        Integer, nullable=False, server_default=text("10")
+    )
 
     min_green_energy: Mapped[int] = mapped_column(Integer, nullable=False)
-    max_wastage: Mapped[int] = mapped_column(Integer, nullable=False)
+    max_wastage: Mapped[int] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=func.now()
@@ -785,4 +818,208 @@ class GreenEnergyAnalysisConfiguration(BessBase):
     )
 
     # Back-reference
-    simulation: Mapped["Simulation"] = relationship(back_populates="green_energy_config")
+    simulation: Mapped["Simulation"] = relationship(
+        back_populates="green_energy_config"
+    )
+
+
+class GreenSizingSimulationJob(BessBase):
+    __tablename__ = "green_sizing_simulation_job"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+        unique=True,
+    )
+    job_id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(always=True, start=1000),  # Start at 1000 for cleaner IDs
+        unique=True,
+        index=True,
+    )
+    status: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    max_iterations: Mapped[int] = mapped_column(Integer, default=100, nullable=False)
+    completed_iterations: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+    # Relationships
+    simulation: Mapped["Simulation"] = relationship(back_populates="green_sizing_job")
+    results: Mapped[list["GreenEnergySizingSimulationResult"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+
+class AbstractGreenSimulationResult(BessBase):
+    __abstract__ = True
+
+    # Simulation Metrics (Floats & Ints)
+    solar_mwp: Mapped[float] = mapped_column(Float, nullable=False)
+    bess_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    duration_hr: Mapped[float] = mapped_column(Float, nullable=False)
+    power_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    containers: Mapped[int] = mapped_column(Integer, nullable=False)
+    dg_mw: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    green_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    green_energy_pct: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0")
+    )
+    green_hours_mar_oct_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    wastage_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    delivery_hours: Mapped[float] = mapped_column(Float, nullable=False)
+    load_hours: Mapped[float] = mapped_column(Float, nullable=False)
+    green_hours: Mapped[float] = mapped_column(Float, nullable=False)
+    dg_hours: Mapped[float] = mapped_column(Float, nullable=False)
+    dg_starts: Mapped[int] = mapped_column(Integer, nullable=False)
+    bess_cycles: Mapped[float] = mapped_column(Float, nullable=False)
+    unserved_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    fuel_consumption_l: Mapped[float] = mapped_column(Float, nullable=False)
+
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class GreenEnergySizingSimulationResult(AbstractGreenSimulationResult):
+    __tablename__ = "green_energy_sizing_simulation_results"
+
+    # Primary Key & Indexes
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, index=True, nullable=False
+    )
+
+    simulation_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("green_sizing_simulation_job.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    # Relationships
+    simulation: Mapped["Simulation"] = relationship()
+    job: Mapped["GreenSizingSimulationJob"] = relationship(back_populates="results")
+
+
+class DetailGreenSimulationConfiguration(BessBase):
+    __tablename__ = "detail_green_simulation_configuration"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    duration_class: Mapped[int] = mapped_column(Integer, nullable=False)
+    solar_peak: Mapped[int] = mapped_column(Integer, nullable=False)
+    bess_capacity: Mapped[int] = mapped_column(Integer, nullable=False)
+    dg_capacity: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        nullable=False,
+        default=func.now(),
+        onupdate=func.now(),
+    )
+
+    simulation: Mapped["Simulation"] = relationship(
+        back_populates="detailed_green_config"
+    )
+
+
+class DetailGreenSimulationJob(BessBase):
+    __tablename__ = "detail_green_simulation_job"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    job_id: Mapped[int] = mapped_column(
+        BigInteger,
+        Identity(always=True, start=1000),
+        index=True,
+        nullable=False,
+        unique=True,
+    )
+
+    status: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=func.now()
+    )
+
+    hourly_results: Mapped[list["GreenSimulationHourlyResult"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+    results: Mapped[list["DetailedGreenSimulationResult"]] = relationship(
+        back_populates="job", cascade="all, delete-orphan"
+    )
+
+    simulation: Mapped["Simulation"] = relationship(back_populates="detailed_green_job")
+
+
+class DetailedGreenSimulationResult(AbstractGreenSimulationResult):
+    __tablename__ = "detailed_green_simulation_results"
+
+    # Primary Key & Indexes
+    id: Mapped[int] = mapped_column(
+        Integer, primary_key=True, index=True, nullable=False
+    )
+
+    simulation_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("detail_green_simulation_job.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    # Relationships
+    simulation: Mapped["Simulation"] = relationship(
+        back_populates="detailed_green_result"
+    )
+    job: Mapped["DetailGreenSimulationJob"] = relationship(back_populates="results")
+
+
+class GreenSimulationHourlyResult(AbstractSimulationHourlyResult):
+    __tablename__ = "green_simulation_hourly_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("detail_green_simulation_job.job_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    # Relationships
+    job: Mapped["DetailGreenSimulationJob"] = relationship(
+        back_populates="hourly_results"
+    )

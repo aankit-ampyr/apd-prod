@@ -1,11 +1,12 @@
-import { runSimulationData } from '@/services/redux/selectors/simulationWizardSelector';
-import { runSimulationRequest, stopSimulationRequest } from '@/services/redux/slice/simulationWizardSlice';
-import { SIMULATION_JOB_STORAGE_KEY } from '@/services/socket/SocketManager';
-import { useCallback, useEffect, useRef, useState, useContext } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useChangeConfigurationConfirmation } from '../../ChangeConfigurationContext';
-import { ActionType, ResourceType } from '@/constants';
-import { WebSocketContext } from '@/context/WebsocketContext';
+import {runSimulationData} from '@/services/redux/selectors/simulationWizardSelector';
+import {runSimulationRequest, stopSimulationRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {SIMULATION_JOB_STORAGE_KEY} from '@/services/socket/SocketManager';
+import {useCallback, useEffect, useRef, useState, useContext} from 'react';
+import {useDispatch, useSelector} from 'react-redux';
+import {useChangeConfigurationConfirmation} from '../../ChangeConfigurationContext';
+import {ActionType, ResourceType} from '@/constants';
+import {WebSocketContext} from '@/context/WebsocketContext';
+import {useSimulationStatus} from '../../SimulationStatusContext';
 
 interface UseDGSizingSimulationParams {
   simulationId?: number;
@@ -27,8 +28,10 @@ export const useDGSizingSimulation = ({
 }: UseDGSizingSimulationParams) => {
   const dispatch = useDispatch();
   const simulationJobData = useSelector(runSimulationData);
-  const { setIsSimulationRunning } = useChangeConfigurationConfirmation();
-  const { subscribe } = useContext(WebSocketContext);
+  const {setIsSimulationRunning} = useChangeConfigurationConfirmation();
+  const {isAnySimulationRunning, setIsSizingRunning, runningSimulationId} = useSimulationStatus();
+
+  const {subscribe} = useContext(WebSocketContext);
 
   const [isSimulationLocked, setIsSimulationLocked] = useState(false);
   const [activeResourceId, setActiveResourceId] = useState<number | null>(null);
@@ -50,10 +53,9 @@ export const useDGSizingSimulation = ({
   const savedSimulationJobId = Number(localStorage.getItem(SIMULATION_JOB_STORAGE_KEY));
   const currentResourceId = Number.isFinite(savedSimulationJobId) && savedSimulationJobId > 0 ? savedSimulationJobId : null;
 
-  const isCurrentUserOwner =
-    !!currentResourceId &&
-    currentResourceId === activeResourceId;
-  const isBlocked = isSimulationLocked && !isCurrentUserOwner;
+  const isCurrentUserOwner = !!currentResourceId && currentResourceId === activeResourceId;
+  const isBlocked = isSimulationLocked && !isCurrentUserOwner && !isSimulationRunning;
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === simulationId;
 
   // Keep global context and local state in sync
   useEffect(() => {
@@ -70,7 +72,7 @@ export const useDGSizingSimulation = ({
 
   useEffect(() => {
     const unsubscribe = subscribe(event => {
-      console.log("event:", event)
+      console.log('event:', event);
       // Only handle SimulationJob events
       if (event.resource_type !== ResourceType.SizingSimulationJob) return;
 
@@ -98,7 +100,7 @@ export const useDGSizingSimulation = ({
       // Handle progress specific to the active resourceId (the job running on this screen)
       if (resourceId && event.resource_id === resourceId) {
         console.log('ACTION TYPE', action, event.action_id);
-        console.log("event", event)
+        console.log('event', event);
 
         if (action === 'Started' || action === ActionType.Started) {
           setIsSimulationRunningLocal(true);
@@ -117,6 +119,7 @@ export const useDGSizingSimulation = ({
           setCurrentDuration(Number(event.data?.current_config_details?.duration_hr ?? 0));
 
           setIsSimulationRunningLocal(false);
+          setIsSizingRunning(false);
           pendingRunRequestRef.current = false;
           setShowCompletionProgress(true);
           setShowCompletionSummary(false);
@@ -128,6 +131,7 @@ export const useDGSizingSimulation = ({
           }, 5000);
         } else if (isTerminalAction) {
           setIsSimulationRunning(false);
+          setIsSizingRunning(false);
           pendingRunRequestRef.current = false;
           setIsSimulationRunningLocal(false);
           resetSimulationProgressDetails();
@@ -145,7 +149,6 @@ export const useDGSizingSimulation = ({
     return () => unsubscribe();
   }, [subscribe, simulationId, resourceId, onSimulationCompleted, resetSimulationProgressDetails, setIsSimulationRunning]);
 
-
   const handleRunSizingSimulation = () => {
     if (!simulationId) return;
 
@@ -155,16 +158,17 @@ export const useDGSizingSimulation = ({
     setIsSimulationRunningLocal(true);
     pendingRunRequestRef.current = true;
 
-    dispatch(runSimulationRequest({ simulation_id: simulationId }));
+    dispatch(runSimulationRequest({simulation_id: simulationId}));
   };
 
   const handleStopSimulation = () => {
     console.log('[Simulation WS] Stop confirmed by user');
     if (simulationId) {
-      dispatch(stopSimulationRequest({ simulation_id: simulationId }));
+      dispatch(stopSimulationRequest({simulation_id: simulationId}));
     }
 
     setIsSimulationRunningLocal(false);
+    setIsSizingRunning(false);
     pendingRunRequestRef.current = false;
     resetSimulationProgressDetails();
     setIsStopSimulationOpen(false);
@@ -196,12 +200,15 @@ export const useDGSizingSimulation = ({
       return;
     }
 
-    if ((simulationStatus === 0 || simulationStatus === 1) &&
-      normalizedSavedJobId) {
+    if (simulationStatus === 0 || simulationStatus === 1) {
       activeResourceIdRef.current = simulationJobId ?? null;
       setActiveResourceId(simulationJobId ?? null);
       setIsSimulationLocked(true);
       setRunSimulationDisabled(true);
+      if (!simulationJobId) {
+        // Wait until backend sends the job id.
+        return;
+      }
 
       if (normalizedSavedJobId === simulationJobId) {
         setIsSimulationRunningLocal(true);
@@ -252,7 +259,7 @@ export const useDGSizingSimulation = ({
   }, [onSimulationCompleted, setResourceId, simulationJobId, simulationStatus]);
 
   useEffect(() => {
-    if (!isSimulationRunning && !isBlocked) return;
+    if (!isSimulationRunning && !isBlocked && !shouldBlock) return;
 
     const handleClick = (e: MouseEvent) => {
       if (progressContainerRef.current?.contains(e.target as Node)) {
@@ -269,7 +276,7 @@ export const useDGSizingSimulation = ({
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('mousedown', handleClick, true);
     };
-  }, [isSimulationRunning, isBlocked]);
+  }, [isSimulationRunning, isBlocked, shouldBlock]);
 
   return {
     currentBess,
@@ -281,6 +288,7 @@ export const useDGSizingSimulation = ({
     handleStopSimulation,
     isBlocked,
     isSimulationRunning,
+    shouldBlock,
     isStopSimulationOpen,
     progressContainerRef,
     runSimulationDisabled,

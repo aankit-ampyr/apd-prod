@@ -1,7 +1,7 @@
 import {matchesRoute} from '@/utils';
 
 export const Routes = {
-  HOME: '/home',
+  INDEX: '/',
   USER_MANAGEMENT: '/user-management',
   ORGANIZATIONS: '/organizations',
   ASSET_MANAGEMENT: '/asset-management',
@@ -14,8 +14,7 @@ export const Routes = {
 } as const;
 
 export const DashboardRouteHeaderTitles = {
-  [Routes.HOME]: 'Home',
-  [Routes.USER_MANAGEMENT]: 'User Management',
+  [Routes.USER_MANAGEMENT]: 'Users',
   [Routes.ORGANIZATIONS]: 'Organizations',
   [Routes.ASSET_MANAGEMENT]: 'Asset Management',
   [Routes.DIGEST_MANAGEMENT]: 'Digest Management',

@@ -101,7 +101,7 @@ async def paginate(
         page = total_pages
     offset = (page - 1) * limit
 
-    # Apply pagination
+    # Apply pagination, (ignore limit if limit = -1)
     if limit < 0:
         data_query = base_query
     else:

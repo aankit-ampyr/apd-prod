@@ -1,5 +1,5 @@
-import { DGDriggerType, DGRunScheduleMode, LoadServingPriority } from '@/constants';
-import { RootState } from '@/services/redux/rootReducer';
+import {DGDriggerType, DGRunScheduleMode, LoadServingPriority} from '@/constants';
+import {RootState} from '@/services/redux/rootReducer';
 import {
   bessContainerConfigData,
   dispatchRuleData,
@@ -14,23 +14,26 @@ import {
   initiateSimulationData,
   projectSimulationData,
 } from '@/services/redux/selectors/simulationWizardSelector';
-import { authDataSelector, allProjectsData, projectLoading } from '@/services/redux/selectors';
-import { getAllProjectListRequest } from '@/services/redux/slice/projectsSlice';
-import { dispatchRuleRequest, getDispatchRuleRequest } from '@/services/redux/slice/simulationWizardSlice';
-import { Alert, Button, Icon, Text } from '@/ui-kits';
-import { IOSSingleSlider, RadioCard } from '@lazarus/react-common/components';
-import { useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { useChangeConfigurationConfirmation } from '../ChangeConfigurationContext';
-import { createPortal } from 'react-dom';
+import {authDataSelector, allProjectsData, projectLoading} from '@/services/redux/selectors';
+import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
+import {dispatchRuleRequest, getDispatchRuleRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {Alert, Button, Icon, Text} from '@/ui-kits';
+import {IOSSingleSlider, RadioCard} from '@lazarus/react-common/components';
+import {useEffect, useRef, useState} from 'react';
+import {useDispatch, useSelector} from 'react-redux';
+import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
+import {createPortal} from 'react-dom';
+import {useSimulationStatus} from '../SimulationStatusContext';
 
 interface DispatchRulesProps {
   onNextToSizing?: () => void;
 }
 
-export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
+export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
   const dispatch = useDispatch();
-  const { requestChangeConfigurationConfirmation, isSimulationRunning } = useChangeConfigurationConfirmation();
+  const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
+  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+
   const dgData = useSelector(generatorData);
   const success = useSelector(dispatchRuleDataSuccess);
   const failure = useSelector(dispatchRuleDataFailure);
@@ -46,10 +49,10 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
 
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
-  console.log('proSimulData: ', proSimulData);
 
   const simulation_id = simulData?.id ?? proSimulData?.id;
-  console.log('simulation_id: ', simulation_id);
+
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
 
   // Check if user is an assigned user (view-only access)
   const authData = useSelector(authDataSelector);
@@ -190,9 +193,26 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
   };
 
   useEffect(() => {
+    if (!shouldBlock) return;
+
+    const handleClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mousedown', handleClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('mousedown', handleClick, true);
+    };
+  }, [shouldBlock]);
+
+  useEffect(() => {
     // On mount, fetch existing dispatch rule data if it exists to pre-populate form
     if (simulation_id) {
-      dispatch(getDispatchRuleRequest({ simulation_id }));
+      dispatch(getDispatchRuleRequest({simulation_id}));
     }
   }, [simulation_id]);
 
@@ -482,10 +502,10 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
       }
     }
 
-    return { heading, metrics, message };
+    return {heading, metrics, message};
   };
 
-  const { heading, metrics, message } = getTopCardData();
+  const {heading, metrics, message} = getTopCardData();
 
   const handleSave = () => {
     if (typeof simulation_id !== 'number') {
@@ -526,7 +546,7 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
     setDirty(false);
   };
 
-  const ErrorMessage = ({ message }: { message: string }) => (
+  const ErrorMessage = ({message}: {message: string}) => (
     <div className="flex items-center gap-2 mt-3 text-error-text!">
       <Icon name="infoCircle" className="text-error-text! size-4" />
       <Text variant="caption" className="text-error-text! font-InterMedium!">
@@ -607,7 +627,17 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
 
   return (
     <div>
-      <div className="flex items-center gap-3 mt-6">
+      {shouldBlock && (
+        <div className="mt-4 flex justify-center">
+          <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
+            <Icon name="infoCircle" className="size-4.5! text-warning!" />
+            <Text variant="14M" className="text-warning!">
+              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
+            </Text>
+          </div>
+        </div>
+      )}
+      <div className="flex items-center gap-3 mt-1">
         <Icon name="monitor-settings" className="text-black! size-6.75!" />
         <Text variant="h3" className="font-SpaceGroteskBold">
           System Configuration
@@ -775,14 +805,14 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
                 q1 === DGRunScheduleMode.DayOnly ||
                 q1 === DGRunScheduleMode.NightOnly ||
                 q1 === DGRunScheduleMode.CustomBlackout) && (
-                  <RadioCard
-                    label="When battery charge drops below threshold"
-                    checked={q2 === DGDriggerType['Battery SOC threshold']}
-                    onChange={() => updateDispatchField(setQ2, DGDriggerType['Battery SOC threshold'])}
-                    className="w-full"
-                    disabled={isAssignedUser}
-                  />
-                )}
+                <RadioCard
+                  label="When battery charge drops below threshold"
+                  checked={q2 === DGDriggerType['Battery SOC threshold']}
+                  onChange={() => updateDispatchField(setQ2, DGDriggerType['Battery SOC threshold'])}
+                  className="w-full"
+                  disabled={isAssignedUser}
+                />
+              )}
 
               {q1 === DGRunScheduleMode.NightOnly && (
                 <RadioCard
@@ -918,9 +948,21 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
               className="border-none px-0! mb-2"
             />
             <div className="grid grid-cols-2 gap-4">
-              <RadioCard label="No — DG fills only deficit" checked={q5 === false} onChange={() => updateDispatchField(setQ5, false)} className="w-full" disabled={isAssignedUser} />
+              <RadioCard
+                label="No — DG fills only deficit"
+                checked={q5 === false}
+                onChange={() => updateDispatchField(setQ5, false)}
+                className="w-full"
+                disabled={isAssignedUser}
+              />
 
-              <RadioCard label="Yes — DG serves full load" checked={q5 === true} onChange={() => updateDispatchField(setQ5, true)} className="w-full" disabled={isAssignedUser} />
+              <RadioCard
+                label="Yes — DG serves full load"
+                checked={q5 === true}
+                onChange={() => updateDispatchField(setQ5, true)}
+                className="w-full"
+                disabled={isAssignedUser}
+              />
             </div>
             {q5 === true && (
               <div className="bg-[#ECF7F6] p-3 border border-border rounded-md mt-4">
@@ -950,8 +992,20 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-4 mt-3">
-                  <RadioCard label="No — DG follows load" checked={q6 === false} onChange={() => updateDispatchField(setQ6, false)} className="w-full" disabled={isAssignedUser} />
-                  <RadioCard label="Yes — DG at min load %" checked={q6 === true} onChange={() => updateDispatchField(setQ6, true)} className="w-full" disabled={isAssignedUser} />
+                  <RadioCard
+                    label="No — DG follows load"
+                    checked={q6 === false}
+                    onChange={() => updateDispatchField(setQ6, false)}
+                    className="w-full"
+                    disabled={isAssignedUser}
+                  />
+                  <RadioCard
+                    label="Yes — DG at min load %"
+                    checked={q6 === true}
+                    onChange={() => updateDispatchField(setQ6, true)}
+                    className="w-full"
+                    disabled={isAssignedUser}
+                  />
                 </div>
                 {!dgData?.is_binary && q6 === true && (
                   <div className="grid grid-cols-2 gap-4 mt-4">
@@ -1004,13 +1058,12 @@ export const DispatchRules = ({ onNextToSizing }: DispatchRulesProps) => {
         <Button
           size="md"
           className="w-50 my-6 flex justify-center"
-          disabled={isAssignedUser || (!dispatchData && success !== 'S-20023') || isChanged() || hasValidationErrors}
+          disabled={(!dispatchData && success !== 'S-20023') || isChanged() || hasValidationErrors}
           onClick={onNextToSizing}>
           Next → Sizing
         </Button>
       </div>
-      {(isSimulationRunning) && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
-
+      {shouldBlock && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
     </div>
   );
 };

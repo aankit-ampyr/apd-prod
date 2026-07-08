@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Computed, text
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey, Computed
 from db.db_config import AMDBase as Base
 from datetime import datetime, timezone
 from constants.enums import AssetStatus, AssetSteps,AssetFileType
@@ -24,6 +24,8 @@ class Asset(Base):
 
     active_month = Column(Integer, index=True, nullable=True) # adding server default for backward compatiblity
     active_year = Column(Integer, index=True, nullable=True) # adding server default for backward compatiblity
+    active_invoice_month = Column(Integer, nullable=True, index=True)
+    active_invoice_year = Column(Integer, nullable=True, index=True)
     
     created_by = Column(Integer, nullable=True)
     submitted_by = Column(Integer, nullable=True)
@@ -44,6 +46,11 @@ class Asset(Base):
 
     files = relationship(
         "AssetFile",
+        back_populates="asset",
+        cascade="all, delete-orphan"
+    )
+    invoices = relationship(
+        'PdfInvoice',
         back_populates="asset",
         cascade="all, delete-orphan"
     )

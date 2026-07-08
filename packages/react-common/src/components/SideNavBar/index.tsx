@@ -5,6 +5,8 @@ import type { SideNavOptionType } from "../../interface";
 import { Icon, Text, Tooltip } from "../../ui-kit";
 import { cn } from "../../utils";
 import { useWindowDimensions } from "../../hooks";
+import { Divider } from "../Divider";
+import { TABLET_SCREEN_BREAKPOINT } from "../../constants";
 
 export interface SideNavSection<T extends string = string> {
   title: string;
@@ -23,11 +25,6 @@ export interface SideNavBarProps<T extends string = string> {
   onNavigate?: (route: T) => void;
 }
 
-/**
- * Constanst for viewport break point to lock the side in shrink mode only
- */
-const TABLET_VIEWPORT_BREAKPOINT = 1280;
-
 export function SideNavBar<T extends string = string>({
   sections,
   platformLabel,
@@ -45,15 +42,18 @@ export function SideNavBar<T extends string = string>({
   const isExpanded = alwaysShrink ? false : expanded;
 
   useEffect(() => {
-    setAlwaysShrink(width < TABLET_VIEWPORT_BREAKPOINT);
+    setAlwaysShrink(width <= TABLET_SCREEN_BREAKPOINT);
   }, [width]);
+
+  const resolvedSections = sections.filter((item) => item.options.length > 0);
 
   return (
     <div className="relative h-full shrink-0">
       <div
         className={cn(
-          "bg-white flex flex-col overflow-y-scroll scroll-none w-fit h-full border-r border-bg-card shadow-sm shrink-0 transition-all duration-300",
+          "bg-white flex flex-col overflow-y-scroll scroll-none h-full border-r border-bg-card shadow-sm shrink-0 transition-all duration-300",
           className,
+          isExpanded ? "w-fit" : 'w-25'
         )}
       >
         <SideNavHeader
@@ -66,20 +66,22 @@ export function SideNavBar<T extends string = string>({
           brandSubtitle={brandSubtitle}
         />
 
-        <div className="h-px mx-4 bg-bg-card mb-6" />
+        <Divider className="shrink-0 -mt-1 mb-6 w-[80%] h-0.5! translate-x-[10%]" />
 
-        {sections.map((section, index) => {
+        {resolvedSections.map((section, index) => {
           if (!section.options.length) return null;
 
           return (
             <React.Fragment key={section.title}>
-              {(isExpanded || index > 0) && (
+              {(isExpanded || !alwaysShrink) && (
                 <Text
                   variant="small"
                   className={cn(
-                    index > 0 && "mt-8",
+                    // index > 0 && "mt-2",
                     "text-text-placeholder!",
                     isExpanded ? "ml-6" : "self-center",
+                    isExpanded ? "text-sm" : "text-[10px]!",
+
                   )}
                 >
                   {section.title}
@@ -89,7 +91,7 @@ export function SideNavBar<T extends string = string>({
               <div
                 className={cn(
                   "flex flex-col gap-2 px-3",
-                  index === sections.length - 1 && "mb-6",
+                  index === resolvedSections.length - 1 && "mb-6",
                 )}
               >
                 {section.options.map((option) => (
@@ -103,6 +105,9 @@ export function SideNavBar<T extends string = string>({
                   />
                 ))}
               </div>
+              {(isExpanded || !alwaysShrink) && index !== resolvedSections.length - 1 && (
+                <Divider className="shrink-0 mt-4 mb-6 w-[80%] h-0.75! translate-x-[10%]" />
+              )}
             </React.Fragment>
           );
         })}
@@ -176,7 +181,7 @@ function SideNavOption<T extends string = string>({
             ? "gap-3 px-4 py-3"
             : cn(
                 "self-center justify-center px-2 py-3",
-                showLabelBelowIcon ? "min-w-[72px] flex-col" : "w-fit p-3",
+                showLabelBelowIcon ? "min-w-18 flex-col" : "w-fit p-3",
               ),
           depth > 0 && expanded && "ml-5",
           hasChildren
@@ -187,7 +192,7 @@ function SideNavOption<T extends string = string>({
           isActive || hasActiveChild
             ? alwaysShrink
               ? "text-black"
-              : "bg-primary-tint-2 text-black bg-primary-tint-2!"
+              : "text-black bg-primary-tint-2!"
             : "text-text-secondary",
           depth > 0 &&
             (isActive || hasActiveChild) &&
@@ -198,7 +203,7 @@ function SideNavOption<T extends string = string>({
         {icon && (
           <div
             className={cn(
-              "flex items-center justify-center rounded-md transition-colors",
+              "flex items-center  justify-center rounded-md transition-colors",
               alwaysShrink && "p-3",
               alwaysShrink &&
                 (isActive || hasActiveChild) &&
@@ -217,8 +222,8 @@ function SideNavOption<T extends string = string>({
         ) : (
           showLabelBelowIcon && (
             <Text
-              variant="caption"
-              className="mt-1 text-center text-text-secondary! leading-tight max-w-18 flex items-center justify-center"
+              variant="small"
+              className={cn("mt-1 text-center leading-tight max-w-18 flex items-center justify-center", isActive ? "text-black!" : "text-text-secondary!")}
             >
               {label}
             </Text>
@@ -233,7 +238,9 @@ function SideNavOption<T extends string = string>({
           </span>
         )}
 
-        {(!expanded && !alwaysShrink) && <Tooltip message={label} position="right" portal />}
+        {!expanded && !alwaysShrink && (
+          <Tooltip message={label} position="right" portal />
+        )}
       </button>
 
       {expanded && hasChildren && open && (
@@ -282,8 +289,6 @@ interface SideNavHeaderProps {
 
 function SideNavHeader({
   expanded,
-  alwaysShrink,
-  toggleExpanded,
   platformLabel,
   platformLabelClassName,
   brandTitle,
@@ -291,7 +296,10 @@ function SideNavHeader({
 }: SideNavHeaderProps) {
   return (
     <>
-      <div className="relative overflow-visible flex flex-col items-center pt-8 pb-6 px-6">
+      <div className={cn(
+        "relative overflow-visible flex flex-col items-center pt-8 pb-6",
+        expanded ? 'px-6' : 'px-4'
+      )}>
         {expanded ? (
           <>
             <div className="flex items-center gap-2">
@@ -315,8 +323,12 @@ function SideNavHeader({
 
       <Text
         className={cn(
-          "text-text-secondary! p-3 px-6 text-center xl:self-start font-semibold",
+          "text-text-secondary! p-3 text-center font-semibold",
+
           platformLabelClassName,
+          expanded ? "text-base!" : "text-sm!",
+          expanded ? 'px-6' : 'px-1',
+          expanded ? 'self-start' : 'self-center'
         )}
       >
         {platformLabel}

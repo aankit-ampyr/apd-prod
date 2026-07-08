@@ -11,6 +11,7 @@ import {
   BarShapeProps,
   Rectangle,
   Tooltip,
+  getNiceTickValues,
 } from "recharts";
 import { useChartsActionV2 } from "../../../../hooks";
 import { IconButton, Skeleton, Text } from "../../../../ui-kit";
@@ -44,7 +45,6 @@ interface DivergantBarChartsV2Props {
   barRadius?: number;
   barRoomWidth?: number;
   enableHorizontalScroll?: boolean;
-
   positiveBarColor?: string;
   positiveBarHoverColor?: string;
   negativeBarColor?: string;
@@ -67,6 +67,10 @@ interface DivergantBarChartsV2Props {
   showValues?: boolean;
   barValueLabelFomatter?: (value: number) => string;
   barValueLabelProps?: React.SVGAttributes<SVGTextElement>;
+  yBottomDomainPadding?: number;
+  yDomainPadding?: number;
+  headerClassName?: string;
+  yAxisTickFormtter?: (tick: string) => string;
 
   customTooltipRenderer?: (
     props: DivergentBarChartTooltipProps,
@@ -102,6 +106,9 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     barValueLabelProps,
     barValueLabelFomatter = (v) => v.toString(),
     customTooltipRenderer,
+    yDomainPadding = 0,
+    headerClassName,
+    yAxisTickFormtter = (v) => v.toString(),
   } = props;
 
   /**
@@ -132,6 +139,23 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
    * =================================
    */
   const scrollWidth = data.length * barRoomWidth;
+  const niceTickDomain: [number, number] = (() => {
+    const values = data.map((item) => item.value);
+    let max = Math.max(...values);
+    let min = Math.min(...values);
+
+    if (max > 0) {
+      max += yDomainPadding;
+    }
+    if (min < 0) {
+      min -= yDomainPadding;
+    }
+
+    return [min, max];
+  })();
+
+  const ticks: Array<number> = getNiceTickValues(niceTickDomain, 5);
+  const yDomain = [ticks[0], ticks[ticks.length - 1]];
 
   const renderedChartWidth = enableHorizontalScroll
     ? Math.max(chartWidth, scrollWidth)
@@ -144,9 +168,14 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
    */
   const barShape = (props: BarShapeProps) => {
     const { x, y, width, height, payload } = props;
+    const rawValue = Number(payload?.value ?? 0);
+
+    if (rawValue === 0) {
+      return null;
+    }
 
     // derived states
-    const isNegative = payload.value < 0;
+    const isNegative = rawValue < 0;
     const isHovered = hoveredLabel === payload.label;
     const normalizedHeight = Math.max(1, Math.abs(height));
     const normalizedY = height < 0 ? y + height : y;
@@ -202,8 +231,13 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
   const YAxisComponent = (
     <YAxis
       dataKey={"value"}
+      type="number"
       tickLine={false}
       interval={0}
+      yAxisId={"yaxis"}
+      ticks={ticks}
+      domain={yDomain}
+      tickFormatter={yAxisTickFormtter}
       axisLine={{ stroke: "var(--color-border)", strokeWidth: 2 }}
       tick={{
         fill: "var(--color-text-secondary)",
@@ -274,6 +308,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
         margin={{ top: 20, right: 0, bottom: 20, left: 0, ...chartMargins }}
       >
         <CartesianGrid
+          yAxisId={'yaxis'}
           vertical={false}
           stroke="var(--color-border)"
           strokeDasharray="4 4"
@@ -320,6 +355,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
         )}
 
         <Bar
+          yAxisId={'yaxis'}
           barSize={barWidth}
           dataKey="value"
           radius={[4, 4, 0, 0]}
@@ -360,8 +396,19 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
       {/* header */}
       <div className="flex items-start flex-nowrap justify-between gap-4">
         {!isLoading && (
-          <div className="flex shrink-0 w-full flex-wrap items-center justify-between gap-4">
-            <Text variant="h4" className="my-1">{title}</Text>
+          <div
+            className={cn(
+              "flex shrink-0 w-full items-center justify-between gap-4",
+              headerClassName,
+            )}
+          >
+            {typeof title === "string" ? (
+              <Text variant="h4" className="my-1">
+                {title}
+              </Text>
+            ) : (
+              title
+            )}
             <div className="flex items-center gap-3 chart-actions">
               <IconButton
                 name="download"

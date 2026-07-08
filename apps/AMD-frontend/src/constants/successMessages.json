@@ -271,7 +271,7 @@
   },
   "S-10055": {
     "key": "multi_market_summary_fetched",
-    "message": "Multi market summary fetched successfully.",
+    "message": "Optimized summary fetched successfully.",
     "type": "success"
   },
   "S-10056": {
@@ -312,6 +312,151 @@
   "S-10063": {
     "key": "asset_submitted_for_approval",
     "message": "Asset submitted for approval successfully.",
+    "type": "success"
+  },
+  "S-10064": {
+    "key": "actual_strategy_market_selection_and_revenue_distribution_fetched",
+    "message": "Actual Strategy market selection and revenue distribution fetched successfully.",
+    "type": "success"
+  },
+  "S-10065": {
+    "key": "price_correlation_matrix_fetched",
+    "message": "Price correlation matrix fetched successfully.",
+    "type": "success"
+  },
+  "S-10066": {
+    "key": "revenue_iar_vs_actual_comparison_fetched",
+    "message": "Revenue IAR vs actual comparison fetched successfully.",
+    "type": "success"
+  },
+  "S-10067": {
+    "key": "multi_market_optimized_revenue_vs_actual_revenue_comparison_fetched",
+    "message": "Optimized Revenue vs Actual Revenue comparison fetched successfully.",
+    "type": "success"
+  },
+  "S-10068": {
+    "key": "ancillary_revenue_analysis_fetched",
+    "message": "Ancillary revenue analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10069": {
+    "key": "ancillary_service_utilization_patterns_and_opportunity_cost_analysis_fetched",
+    "message": "Ancillary service utilization patterns and opportunity cost analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10070": {
+    "key": "imbalance_summary_metrics_fetched",
+    "message": "Imbalance summary metrics fetched successfully.",
+    "type": "success"
+  },
+  "S-10071": {
+    "key": "daily_imbalance_breakdown_fetched",
+    "message": "Daily imbalance breakdown fetched successfully.",
+    "type": "success"
+  },
+  "S-10072": {
+    "key": "top_5_worst_imbalance_days_fetched",
+    "message": "Top 5 worst imbalance days fetched successfully.",
+    "type": "success"
+  },
+  "S-10073": {
+    "key": "imbalance_by_hour_of_day_analysis_fetched",
+    "message": "Imbalance by hour of day analysis fetched successfully.",
+    "type": "success"
+  },
+  "S-10074": {
+    "key": "top_5_worst_imbalance_days_exported",
+    "message": "Top 5 worst imbalance days exported successfully.",
+    "type": "success"
+  },
+  "S-10075": {
+    "key": "battery_health_analysis_data_fetched",
+    "message": "Battery health analysis data fetched successfully.",
+    "type": "success"
+  },
+  "S-10076": {
+    "key": "cycle_comparison_data_fetched",
+    "message": "Cycle comparison data fetched successfully.",
+    "type": "success"
+  },
+  "S-10077": {
+    "key": "strategy_cycling_comparison_fetched",
+    "message": "Strategy cycling comparison fetched successfully.",
+    "type": "success"
+  },
+  "S-10078": {
+    "key": "annual_projection_report_fetched",
+    "message": "Annual projection report fetched successfully.",
+    "type": "success"
+  },
+  "S-10079": {
+    "key": "tb_spread_summary_fetched",
+    "message": "TB spread summary fetched successfully.",
+    "type": "success"
+  },
+  "S-10080": {
+    "key": "tb_spread_visualization_data_fetched",
+    "message": "TB spread visualization data fetched successfully.",
+    "type": "success"
+  },
+  "S-10081": {
+    "key": "daily_tb_spread_details_fetched",
+    "message": "Daily TB spread details fetched successfully.",
+    "type": "success"
+  },
+  "S-10082": {
+    "key": "daily_tb_spread_details_export_generated",
+    "message": "Daily TB spread details export generated successfully.",
+    "type": "success"
+  },
+  "S-10083": {
+    "key": "daily_cycles_data_retrieved",
+    "message": "Daily cycles data retrieved successfully.",
+    "type": "success"
+  },
+  "S-10084": {
+    "key": "warranty_limit_exceedance_analysis_retrieved",
+    "message": "Warranty limit exceedance analysis retrieved successfully.",
+    "type": "success"
+  },
+  "S-10085": {
+    "key": "executive_comparison_dashboard_data_retrieved",
+    "message": "Executive comparison dashboard data retrieved successfully.",
+    "type": "success"
+  },
+  "S-10086": {
+    "key": "revenue_by_stream_analysis_retrieved",
+    "message": "Revenue by stream analysis retrieved successfully.",
+    "type": "success"
+  },
+  "S-10087": {
+    "key": "pdf_invoices_extracted",
+    "message": "PDF invoices extracted successfully.",
+    "type": "success"
+  },
+  "S-10088": {
+    "key": "pdf_invoice_deleted",
+    "message": "PDF invoice deleted successfully.",
+    "type": "success"
+  },
+  "S-10089": {
+    "key": "settlement_csv_uploaded",
+    "message": "Settlement CSV uploaded successfully. Invoice payment date has been extracted.",
+    "type": "success"
+  },
+  "S-10090": {
+    "key": "settlement_invoice_deleted",
+    "message": "Settlement invoice deleted successfully.",
+    "type": "success"
+  },
+  "S-10091": {
+    "key": "settlement_files_list_retrieved",
+    "message": "Settlement files list fetched successfully.",
+    "type": "success"
+  },
+  "S-10092": {
+    "key": "settlement_files_list_retrieved",
+    "message": "User logged out successfully.",
     "type": "success"
   }
 }

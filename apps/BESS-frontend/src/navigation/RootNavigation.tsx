@@ -1,5 +1,5 @@
-import {BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate} from 'react-router-dom';
-import {Settings, AuditLog, Home, UserManagement, ProjectManagement, LoginScreen, SimulationListing} from '@/screens';
+import {BrowserRouter, Navigate, Route, Routes, useNavigate} from 'react-router-dom';
+import {Settings, AuditLog, UserManagement, ProjectManagement, LoginScreen, SimulationListing, NotFound} from '@/screens';
 import {Routes as WebRoutes} from './Routes';
 import {DashboardLayout, ScreenWrapper} from '@/components';
 import {useDispatch, useSelector} from 'react-redux';
@@ -8,12 +8,9 @@ import {useEffect} from 'react';
 import {OTPVerificationScreen} from '@/screens/Auth';
 import {resetAuthMessage} from '@/services/redux/slice';
 import SimulationWizard from '@/screens/SimulationWizard';
+import {useRole} from '@/hooks/useRole';
 
-const ProtectedRoute = () => {
-  const isAuthenticated = useSelector(authStatus);
-  const fallback = WebRoutes.LOGIN;
-  return isAuthenticated ? <Outlet /> : <Navigate to={fallback} />;
-};
+const getLandingRoute = (isBESSAdmin: boolean, isAnalyst: boolean) => (isBESSAdmin || isAnalyst ? WebRoutes.USER_MANAGEMENT : WebRoutes.SIMULATION_WIZARD);
 
 export function RootNavigator() {
   return (
@@ -25,8 +22,11 @@ export function RootNavigator() {
 
 export function RoutesWrapper() {
   const authSuccessState = useSelector(authSuccessStatus);
+  const isAuthenticated = useSelector(authStatus);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const {isBESSAdmin, isAnalyst} = useRole();
+  const isAdminUser = Boolean(isBESSAdmin);
 
   useEffect(() => {
     if (authSuccessState) {
@@ -35,63 +35,80 @@ export function RoutesWrapper() {
         dispatch(resetAuthMessage());
         navigate(WebRoutes.OTP_VERIFICATION);
       }
-      // S-10018: OTP verified successfully - navigate to dashboard
+      // S-10018: OTP verified successfully - navigate to the appropriate landing page
       if (authSuccessState === 'S-10018') {
         dispatch(resetAuthMessage());
-        navigate(WebRoutes.USER_MANAGEMENT);
+        navigate(getLandingRoute(isAdminUser, isAnalyst));
       }
     }
-  }, [authSuccessState, navigate, dispatch]);
+
+    // user logged out successfully
+    if (authSuccessState === 'S-10092') {
+      navigate(WebRoutes.LOGIN);
+    }
+  }, [authSuccessState, navigate, dispatch, isAdminUser, isAnalyst]);
+
+  if (!isAuthenticated) {
+    return (
+      <Routes>
+        <Route path={WebRoutes.LOGIN} element={<LoginScreen />} />
+        <Route path={WebRoutes.OTP_VERIFICATION} element={<OTPVerificationScreen />} />
+        {/* any arbitiary route, falback to login */}
+        <Route path="*" element={<Navigate to={WebRoutes.LOGIN} />} />
+      </Routes>
+    );
+  }
   return (
     <Routes>
-      {/* Default Route */}
-      <Route path={WebRoutes.INDEX} element={<Root />} />
-      <Route path={WebRoutes.LOGIN} element={<LoginScreen />} />
-      <Route path={WebRoutes.OTP_VERIFICATION} element={<OTPVerificationScreen />} />
-      <Route element={<ProtectedRoute />}>
-        <Route element={<DashboardLayout />}>
-          <Route
-            path={WebRoutes.USER_MANAGEMENT}
-            element={
-              <ScreenWrapper>
-                <UserManagement />
-              </ScreenWrapper>
-            }
-          />
-          <Route
-            path={WebRoutes.PROJECT_MANAGEMENT}
-            element={
-              <ScreenWrapper>
-                <ProjectManagement />
-              </ScreenWrapper>
-            }
-          />
-          <Route path={WebRoutes.SIMULATION_WIZARD} element={<SimulationListing />} />
-          <Route path={`${WebRoutes.SIMULATION_WIZARD}/:id`} element={<SimulationWizard />} />
+      <Route element={<DashboardLayout />}>
+        {/* Redirect public routes when logged in */}
+        <Route path={WebRoutes.LOGIN} element={<Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} replace />} />
 
-          <Route
-            path={WebRoutes.AUDIT_LOG}
-            element={
-              <ScreenWrapper>
-                <AuditLog />
-              </ScreenWrapper>
-            }
-          />
-          <Route
-            path={WebRoutes.SETTINGS}
-            element={
-              <ScreenWrapper>
-                <Settings />
-              </ScreenWrapper>
-            }
-          />
-        </Route>
+        <Route path={WebRoutes.OTP_VERIFICATION} element={<Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} replace />} />
+        <Route
+          path={WebRoutes.USER_MANAGEMENT}
+          element={
+            <ScreenWrapper>
+              <UserManagement />
+            </ScreenWrapper>
+          }
+        />
+        <Route
+          path={WebRoutes.PROJECT_MANAGEMENT}
+          element={
+            <ScreenWrapper>
+              <ProjectManagement />
+            </ScreenWrapper>
+          }
+        />
+        <Route path={WebRoutes.SIMULATION_WIZARD} element={<SimulationListing />} />
+        <Route path={`${WebRoutes.SIMULATION_WIZARD}/:id`} element={<SimulationWizard />} />
+
+        <Route
+          path={WebRoutes.AUDIT_LOG}
+          element={
+            <ScreenWrapper>
+              <AuditLog />
+            </ScreenWrapper>
+          }
+        />
+        <Route
+          path={WebRoutes.SETTINGS}
+          element={
+            <ScreenWrapper>
+              <Settings />
+            </ScreenWrapper>
+          }
+        />
       </Route>
+
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
 
 export function Root() {
   const isAuthenticated = useSelector(authStatus);
-  return isAuthenticated ? <Navigate to={WebRoutes.USER_MANAGEMENT} /> : <Navigate to={WebRoutes.LOGIN} />;
+  const {isBESSAdmin, isAnalyst} = useRole();
+  return isAuthenticated ? <Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} /> : <Navigate to={WebRoutes.LOGIN} />;
 }

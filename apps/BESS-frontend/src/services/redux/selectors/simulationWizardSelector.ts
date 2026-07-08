@@ -1,142 +1,113 @@
-import { createSelector } from '@reduxjs/toolkit';
-import { type RootState } from '../rootReducer';
-import { SelectInputItem } from '@/interface';
+import {createSelector} from '@reduxjs/toolkit';
+import {type RootState} from '../rootReducer';
+import {SelectInputItem} from '@/interface';
 
 /** ======================================
  * load profile - status selectors
  * ====================================== */
-export const loadProfileSuccess = (state: RootState) =>
-  state.simulationWizard.loadProfileSuccess;
+export const loadProfileSuccess = (state: RootState) => state.simulationWizard.loadProfileSuccess;
 
-export const loadProfileError = (state: RootState) =>
-  state.simulationWizard.loadProfileError;
+export const loadProfileError = (state: RootState) => state.simulationWizard.loadProfileError;
 
-export const loadProfileLoading = (state: RootState) =>
-  state.simulationWizard.loadProfileLoading;
+export const loadProfileLoading = (state: RootState) => state.simulationWizard.loadProfileLoading;
 
-export const loadProfileSaved = (state: RootState) =>
-  state.simulationWizard.loadProfileSaved;
+export const loadProfileSaved = (state: RootState) => state.simulationWizard.loadProfileSaved;
 
 /** ======================================
  * load profile - data selectors
  * ====================================== */
-export const loadProfileData = (state: RootState) =>
-  state.simulationWizard.loadProfileData;
+export const loadProfileData = (state: RootState) => state.simulationWizard.loadProfileData;
 
-export const savedLoadProfileData = (state: RootState) =>
-  state.simulationWizard.savedLoadProfileData;
+export const savedLoadProfileData = (state: RootState) => state.simulationWizard.savedLoadProfileData;
 
 /** output (useful for UI directly) */
-export const loadProfileOutput = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output;
+export const loadProfileOutput = (state: RootState) => state.simulationWizard.loadProfileData?.output;
 
 /** graph data (for LoadChart) */
-export const loadProfileDataPoints = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output?.data_points;
+export const loadProfileDataPoints = (state: RootState) => state.simulationWizard.loadProfileData?.output?.data_points;
 
 /** summary metrics */
-export const loadProfilePeakLoad = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output?.peak_load;
+export const loadProfilePeakLoad = (state: RootState) => state.simulationWizard.loadProfileData?.output?.peak_load;
 
-export const loadProfileTotalEnergy = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output?.total_energy;
+export const loadProfileTotalEnergy = (state: RootState) => state.simulationWizard.loadProfileData?.output?.total_energy;
 
-export const loadProfileTotalHours = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output?.total_hours;
+export const loadProfileTotalHours = (state: RootState) => state.simulationWizard.loadProfileData?.output?.total_hours;
 
-export const loadProfileHourPercentage = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.output?.hour_percentage;
+export const loadProfileHourPercentage = (state: RootState) => state.simulationWizard.loadProfileData?.output?.hour_percentage;
 
 /** pattern + config (if needed in UI) */
-export const loadProfilePattern = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.pattern;
+export const loadProfilePattern = (state: RootState) => state.simulationWizard.loadProfileData?.pattern;
 
-export const loadProfileConfig = (state: RootState) =>
-  state.simulationWizard.loadProfileData?.config;
+export const loadProfileConfig = (state: RootState) => state.simulationWizard.loadProfileData?.config;
 
 export const simulationProject = (state: RootState) => state.simulationWizard.currentSelectedProject;
 
 /** ======================================
  * solar profile - status selectors
  * ====================================== */
-export const solarProfileSuccess = (state: RootState) =>
-  state.simulationWizard.solarProfileSuccess;
+export const solarProfileSuccess = (state: RootState) => state.simulationWizard.solarProfileSuccess;
 
-export const solarProfileError = (state: RootState) =>
-  state.simulationWizard.solarProfileError;
+export const solarProfileError = (state: RootState) => state.simulationWizard.solarProfileError;
 
-export const solarProfileLoading = (state: RootState) =>
-  state.simulationWizard.solarProfileLoading;
+export const solarProfileLoading = (state: RootState) => state.simulationWizard.solarProfileLoading;
 
-export const solarProfileSourceListSelector = createSelector(
-  [(state: RootState) => state.simulationWizard.solarProfileSourceList],
-  (solarProfileSourceList) => solarProfileSourceList?.map((item: any): SelectInputItem => ({
-    id: Number.isNaN(Number(item.id)) ? item.id : Number(item.id),
-    label: item.name.replace('.csv', '').replace(/_/g, ' '),
-  }))
+export const solarProfileFetchLoading = (state: RootState) => state.simulationWizard.solarProfileFetchLoading;
+
+export const solarProfileSourceListSelector = createSelector([(state: RootState) => state.simulationWizard.solarProfileSourceList], solarProfileSourceList =>
+  solarProfileSourceList?.map(
+    (item: any): SelectInputItem => ({
+      id: Number.isNaN(Number(item.id)) ? item.id : Number(item.id),
+      label: item.name.replace('.csv', '').replace(/_/g, ' '),
+    }),
+  ),
 );
 
 /** ======================================
  * solar profile - data selectors
  * ====================================== */
-export const solarProfileData = (state: RootState) =>
-  state.simulationWizard.solarProfileData;
+export const solarProfileData = (state: RootState) => state.simulationWizard.solarProfileData;
 
 /** ======================================
  * upload solar CSV - status selectors
  * ====================================== */
-export const uploadSolarCSVSuccess = (state: RootState) =>
-  state.simulationWizard.uploadSolarCSVSuccess;
+export const uploadSolarCSVSuccess = (state: RootState) => state.simulationWizard.uploadSolarCSVSuccess;
 
-export const uploadSolarCSVError = (state: RootState) =>
-  state.simulationWizard.uploadSolarCSVError;
+export const uploadSolarCSVError = (state: RootState) => state.simulationWizard.uploadSolarCSVError;
 
-export const uploadSolarCSVLoading = (state: RootState) =>
-  state.simulationWizard.uploadSolarCSVLoading;
+export const uploadSolarCSVLoading = (state: RootState) => state.simulationWizard.uploadSolarCSVLoading;
 
 /** ======================================
  * upload solar CSV - data selectors
  * ====================================== */
-export const uploadSolarCSVData = (state: RootState) =>
-  state.simulationWizard.uploadSolarCSVData;
+export const uploadSolarCSVData = (state: RootState) => state.simulationWizard.uploadSolarCSVData;
 
 /** ======================================
  * save solar profile - status selectors
  * ====================================== */
-export const saveSolarProfileSuccess = (state: RootState) =>
-  state.simulationWizard.saveSolarProfileSuccess;
+export const saveSolarProfileSuccess = (state: RootState) => state.simulationWizard.saveSolarProfileSuccess;
 
-export const saveSolarProfileError = (state: RootState) =>
-  state.simulationWizard.saveSolarProfileError;
+export const saveSolarProfileError = (state: RootState) => state.simulationWizard.saveSolarProfileError;
 
-export const saveSolarProfileLoading = (state: RootState) =>
-  state.simulationWizard.saveSolarProfileLoading;
+export const saveSolarProfileLoading = (state: RootState) => state.simulationWizard.saveSolarProfileLoading;
 
 /** ======================================
  * get solar profile - status selectors
  * ====================================== */
-export const getSolarProfileSuccess = (state: RootState) =>
-  state.simulationWizard.getSolarProfileSuccess;
+export const getSolarProfileSuccess = (state: RootState) => state.simulationWizard.getSolarProfileSuccess;
 
-export const getSolarProfileError = (state: RootState) =>
-  state.simulationWizard.getSolarProfileError;
+export const getSolarProfileError = (state: RootState) => state.simulationWizard.getSolarProfileError;
 
-export const getSolarProfileLoading = (state: RootState) =>
-  state.simulationWizard.getSolarProfileLoading;
+export const getSolarProfileLoading = (state: RootState) => state.simulationWizard.getSolarProfileLoading;
 
 /** ======================================
  * get solar profile - data selectors
  * ====================================== */
-export const savedSolarProfileData = (state: RootState) =>
-  state.simulationWizard.savedSolarProfileData;
+export const savedSolarProfileData = (state: RootState) => state.simulationWizard.savedSolarProfileData;
 
-export const bessConfigSuccess = (state: RootState) =>
-  state.simulationWizard.bessContainerConfigSuccess;
-export const bessContainerConfigData = (state: RootState) =>
-  state.simulationWizard.bessContainerConfigData;
+export const bessConfigSuccess = (state: RootState) => state.simulationWizard.bessContainerConfigSuccess;
+export const bessContainerConfigData = (state: RootState) => state.simulationWizard.bessContainerConfigData;
 
-export const initiateSimulationError = (state: RootState) =>
-  state.simulationWizard.simulationError;
+export const initiateSimulationError = (state: RootState) => state.simulationWizard.simulationError;
 
 /** ======================================
  * common selectors
@@ -200,7 +171,7 @@ export const customConfigSuccess = (state: RootState) => state.simulationWizard.
 export const customConfigError = (state: RootState) => state.simulationWizard.customConfigError;
 export const customConfigData = (state: RootState) => state.simulationWizard.customConfigData;
 
-export const customConfigLoading = (state: RootState) => state.simulationWizard.customConfigLoading;
+export const customConfigLoading = (state: RootState) => state.simulationWizard.getCustomConfigLoading;
 
 export const customSimulationSuccess = (state: RootState) => state.simulationWizard.customSimulationResultSuccess;
 
@@ -224,9 +195,24 @@ export const multiYearProjectionComputeData = (state: RootState) => state.simula
 export const multiYearProjectionResultLoading = (state: RootState) => state.simulationWizard.multiYearProjectionResultLoading;
 
 export const multiYearProjectionResultData = (state: RootState) => state.simulationWizard.multiYearProjectionResultData;
+export const multiYearProjectionProgressLoading = (state: RootState) => state.simulationWizard.multiYearProjectionProgressLoading;
 export const customRunSuccess = (state: RootState) => state.simulationWizard.runCustomSimulationSuccess;
 export const multiYearResults = (state: RootState) => state.simulationWizard.multiYearProjectionResultsData;
 export const multiYearResultsLoading = (state: RootState) => state.simulationWizard.multiYearProjectionResultsLoading;
 export const multiYearProgressData = (state: RootState) => state.simulationWizard.multiYearProjectionProgressData;
 export const multiYearRunSuccess = (state: RootState) => state.simulationWizard.runMultiYearProjectionSuccess;
 export const simulationProgressLoading = (state: RootState) => state.simulationWizard.projectSimulationLoading;
+export const greenAnalysisSuccess = (state: RootState) => state.simulationWizard.greenAnalysisSuccess;
+export const greenAnalysisData = (state: RootState) => state.simulationWizard.greenAnalysisData;
+export const showGreenAnalysisResults = (state: RootState) => state.simulationWizard.showGreenAnalysisResults;
+export const greenaAnalysisResultsData = (state: RootState) => state.simulationWizard.greenAnalysisResultsData;
+export const greenAnalysisProgressData = (state: RootState) => state.simulationWizard.greenAnalysisProgressData;
+export const greenAnalysisRunSuccess = (state: RootState) => state.simulationWizard.runGreenAnalysisSuccess;
+export const detailedGreenAnalysis = (state: RootState) => state.simulationWizard.showDetailedGreenAnalysis;
+export const detailedGreenAnalysisSuccess = (state: RootState) => state.simulationWizard.detailedGreenAnalysisSuccess;
+export const detailedGreenAnalysisData = (state: RootState) => state.simulationWizard.detailedGreenAnalysisData;
+export const detailedGreenAnalysisProgressData = (state: RootState) => state.simulationWizard.detailedGreenAnalysisProgressData;
+export const detailedGreenAnalysisResultData = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultData;
+export const detailedGreenRunSuccess = (state: RootState) => state.simulationWizard.runDetailedGreenAnalysisSuccess;
+export const detailedResultSuccess = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultSuccess;
+export const detailedResultLoading = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultLoading;

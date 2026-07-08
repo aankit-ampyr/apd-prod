@@ -10,6 +10,10 @@ class ConfigDetails(BaseModel):
     dg_size_mw: int
 
 
+class GreenConfigDetails(ConfigDetails):
+    solar_mwp: int
+
+
 class SimulationDataBase(BaseModel):
     simulation_id: int
 
@@ -24,7 +28,7 @@ class ProgressData(SimulationDataBase):
     current_config: int
     total_config: int
     progress_percentage: float
-    current_config_details: ConfigDetails
+    current_config_details: ConfigDetails | GreenConfigDetails
 
 
 class CompletedData(SimulationDataBase):
@@ -56,6 +60,12 @@ class MultiYearProgressData(SimulationDataBase):
     year: int
 
 
+class UpdateData(SimulationDataBase):
+    status_code: str
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    message: str
+
+
 # Union type for easy parsing of any simulation data format
 SimulationData = Union[
     StartedData,
@@ -64,6 +74,7 @@ SimulationData = Union[
     FailedData,
     StoppedData,
     MultiYearProgressData,
+    UpdateData,
     dict,
 ]
 

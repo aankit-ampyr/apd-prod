@@ -31,7 +31,7 @@ const batteryMarketTab: {name: BatteryMarketTab; icon: IconTypes; label: string}
   {
     name: BatteryMarketTab.MultiMarket,
     icon: 'analysis1',
-    label: 'Multi-Market Optimized',
+    label: 'Optimized',
   },
 ];
 

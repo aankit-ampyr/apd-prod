@@ -128,26 +128,29 @@ export function AuditLog() {
 
   const formatAuditData = (data?: string) => {
     if (!data) return NA;
-    
+
     let formatted = data;
-    
+
     // Convert boolean status to Active/Inactive
     formatted = formatted.replace(/\bstatus:\s*false\b/gi, 'Status: Inactive');
     formatted = formatted.replace(/\bstatus:\s*true\b/gi, 'Status: Active');
-    
+
     // Convert lowercase keys to proper casing based on mockups
     formatted = formatted.replace(/(^|,\s*)name:/gi, '$1Project Name:');
     formatted = formatted.replace(/(^|,\s*)description:/gi, '$1Description:');
     formatted = formatted.replace(/(^|,\s*)status:/gi, '$1Status:');
-    
+
     // Replace commas with newlines for key properties to match the multiline mockup layout
     // Use a negative lookahead to prevent matching commas inside the "Assigned users -" list
-    formatted = formatted.replace(/,\s*(Project Name:|Description:|Status:|Responsible User:|Assigned users -)/gi, '\n$1');
+    formatted = formatted.replace(
+      /,\s*(Project Name:|Description:|Status:|Responsible User:|Assigned users -)/gi,
+      '\n$1',
+    );
 
     // Show assigned-user audit values one role per line for easier reading
     formatted = formatted.replace(/Assigned users -\s*/gi, 'Assigned users -\n');
     formatted = formatted.replace(/,\s*(Admin:|Analyst:|Viewer:|Management:)/g, '\n$1');
-    
+
     return formatted;
   };
 
@@ -314,11 +317,11 @@ export function AuditLog() {
   }, [success, failure]);
 
   return (
-    <div className="flex flex-col gap-6 p-4">
+    <div className="flex flex-col gap-6 h-full overflow-hidden">
       {/* Header */}
-      <div className="flex flex-col gap-1">
+      <div className="flex flex-col gap-1 shrink-0">
         <Text variant="subtitle1" className="text-text-primary">
-          Track detailed audit logs with before/after changes for all actions performed across APD and PSP environments.
+          Monitor user actions, investigate issues, and support compliance
         </Text>
       </div>
 
@@ -331,37 +334,27 @@ export function AuditLog() {
             type: 'search',
             props: {className: 'min-w-40'},
           },
-          {
-            key: 'role',
-            placeholder: 'Select Role',
-            type: 'select',
-            options: ROLE_OPTIONS,
-            props: {className: 'min-w-38'},
-          },
+          // {
+          //   key: 'role',
+          //   placeholder: 'Select Role',
+          //   type: 'select',
+          //   options: ROLE_OPTIONS,
+          //   props: {className: 'min-w-38'},
+          // },
           {
             key: 'module',
             placeholder: 'Select Module',
-            type: 'select',
+            type: 'searchable-select',
             options: MODULE_OPTIONS,
             props: {className: 'min-w-50'},
           },
           {
             key: 'action',
             placeholder: 'Select Action',
-            type: 'select',
+            type: 'searchable-select',
             options: ACTION_OPTIONS,
             props: {className: 'min-w-60'},
           },
-          // {
-          //   key: 'start_date',
-          //   placeholder: 'From Date',
-          //   type: 'date',
-          // },
-          // {
-          //   key: 'end_date',
-          //   placeholder: 'To Date',
-          //   type: 'date',
-          // },
           {
             key: 'date_range',
             placeholder: 'Select Date Range',
@@ -382,6 +375,7 @@ export function AuditLog() {
         data={auditLogsData}
         totalPages={totalPagesData}
         currentPage={page}
+        pageSize={PAGE_SIZE}
         totalResult={totalResult}
         errorMessage={tableMessage}
         onPageChange={setPage}

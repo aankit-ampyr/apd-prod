@@ -60,7 +60,11 @@ class SolarProfileController:
         self,
         simulation_id: int,
         bess_db=Depends(get_bess_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.MANAGEMENT, UserRole.VIEWER
+            )
+        ),
     ):
         return await self.service.get_solar_profile(
             bess_db=bess_db, simulation_id=simulation_id
@@ -70,7 +74,11 @@ class SolarProfileController:
         self,
         simulation_id: int,
         bess_db=Depends(get_bess_db),
-        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.MANAGEMENT, UserRole.VIEWER
+            )
+        ),
     ):
         return await self.service.get_solar_profile_files(
             bess_db=bess_db, simulation_id=simulation_id

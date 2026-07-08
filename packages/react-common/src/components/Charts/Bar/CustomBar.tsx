@@ -41,10 +41,13 @@ export function CustomBarChart({
   enableCellHover = false,
 }: Props) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const chartMargin = showValues
+    ? { top: 28, right: 20, left: 20, bottom: 28 }
+    : { top: 10, right: 20, left: 20, bottom: 20 };
   return (
     <div className="w-full h-[300px]">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={{ top: 10, right: 20, left: 20, bottom: 20 }}>
+        <BarChart data={data} margin={chartMargin}>
           {/* X Axis */}
           <XAxis
             dataKey={xKey}
@@ -108,6 +111,7 @@ export function CustomBarChart({
               showValues
                 ? {
                     position: "top",
+                    offset: 8,
                     fontSize: 12,
                     fill: "#475467",
                     formatter: (value: any) => Math.round(Number(value)),

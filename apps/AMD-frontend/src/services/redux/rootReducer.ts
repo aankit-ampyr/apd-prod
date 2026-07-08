@@ -1,11 +1,12 @@
 import {combineReducers} from '@reduxjs/toolkit';
-import authReducer, {resetAuth, resetAuthWithReason} from './slice/authSlice';
+import authReducer, {logoutSuccess, resetAuthWithReason} from './slice/authSlice';
 import userReducer from './slice/userSlice';
 import organizationReducer from './slice/organizationSlice';
 import assetReducer from './slice/assetSlice';
 import digestReducer from './slice/digestSlice';
 import settingsReducer from './slice/settingsSlice';
 import auditLogReducer from './slice/auditLogSlice';
+import invoiceReducer from './slice/invoiceSlice';
 
 const appReducer = combineReducers({
   auth: authReducer,
@@ -15,6 +16,7 @@ const appReducer = combineReducers({
   digest: digestReducer,
   settings: settingsReducer,
   auditLog: auditLogReducer,
+  invoice: invoiceReducer,
 });
 
 /**
@@ -22,7 +24,7 @@ const appReducer = combineReducers({
  * Preserves pre-signup files (email-tagged for security) for user convenience
  */
 const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
-  if (action.type === resetAuth.type || action.type === resetAuthWithReason.type) {
+  if (action.type === logoutSuccess.type || action.type === resetAuthWithReason.type) {
     const sessionEndReason = action.payload?.reason || null;
     state = undefined;
 
@@ -30,13 +32,13 @@ const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: a
 
     // If there is a reason, we need to return the initial state of the app with the reason
     if (sessionEndReason) {
-      const initialState = appReducer(undefined, { type: '@@INIT' });
+      const initialState = appReducer(undefined, {type: '@@INIT'});
       return {
         ...initialState,
         auth: {
           ...initialState.auth,
           sessionEndReason,
-        }
+        },
       };
     }
   }

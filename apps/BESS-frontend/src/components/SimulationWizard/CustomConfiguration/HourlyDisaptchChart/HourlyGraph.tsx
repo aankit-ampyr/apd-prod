@@ -164,7 +164,7 @@ const LegendGroup = ({
       {title} :
     </Text>
 
-    <div className="flex flex-wrap items-center gap-8">{children}</div>
+    <div className="flex flex-wrap items-center gap-5 xl:gap-8">{children}</div>
   </div>
 );
 
@@ -184,7 +184,7 @@ const CustomLegend = ({
   const visibleSeries = generationSeries.filter(series => visibleKeys.includes(series.id));
 
   return (
-    <div className="mb-6 flex flex-col gap-6 pl-3">
+    <div className="mb-6 flex flex-col gap-6 pl-3 whitespace-nowrap">
       <LegendGroup title="Generation">
         {visibleSeries.map(series => (
           <LegendLine key={series.id} color={series.color} label={series.label} />
@@ -193,7 +193,7 @@ const CustomLegend = ({
 
       <LegendGroup title="Thresholds">
         {loadMw !== null && <LegendLine color={colors.load} label={`Load ${loadMw} MW`} dashed />}
-        {visibleKeys.includes('bessPower') && <LegendLine color={colors.zero} label="Zero MW" dashed />}
+        {/* {visibleKeys.includes('bessPower') && <LegendLine color={colors.zero} label="Zero MW" dashed />} */}
         {showThresholdLines && dgOffThreshold !== null && <LegendLine color={colors.dgOff} label={`DG OFF ${dgOffThreshold}%`} dashed />}
         {showThresholdLines && dgOnThreshold !== null && <LegendLine color={colors.dgOn} label={`DG ON ${dgOnThreshold}%`} dashed />}
       </LegendGroup>

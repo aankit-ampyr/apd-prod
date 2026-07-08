@@ -13,6 +13,8 @@ export const otpTimer = 45;
 export const otpLifeSpan = 5 * 60; // 5 mins
 export const sessionIdleTimeout = 2 * 60 * 60 * 1000; // 2 hours
 
+export const TABLET_SCREEN_BREAKPOINT = 1024;
+
 /**
  * calendar related constants
  */
@@ -75,16 +77,17 @@ export const ModuleBadgeColors: Record<AuditLogModules, string> = {
   [AuditLogModules.ASSET_MANAGEMENT_AMD]: "orange",
   [AuditLogModules.DIGEST_MANAGEMENT_AMD]: "magenta",
   [AuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: "green",
-  [AuditLogModules.PROJECT_MANAGEMENT_BESS]: "orange",
+  [AuditLogModules.PROJECT_MANAGEMENT_BESS]: "sun",
   [AuditLogModules.USER_MANAGEMENT_BESS]: "blue",
   [AuditLogModules.USER_MANAGEMENT_AMD]: "blue",
   [AuditLogModules.BENCHMARK_CONFIGURATION]: "cyan",
   [AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]: "green",
   [AuditLogModules.SIMULATION]: "voilet",
-  [AuditLogModules.ASSET_ONBOARDING]: "orange",
+  [AuditLogModules.ASSET_ONBOARDING]: "pink",
   [AuditLogModules.ASSET_ANALYSIS]: "cyan",
   [AuditLogModules.BENCHMARK_ANALYSIS]: "cyan",
   [AuditLogModules.FILE_HISTORY]: "magenta",
+  [AuditLogModules.INVOICE]: "gray",
 };
 export const AuditModuleLabel: Record<AuditLogModules, string> = {
   [AuditLogModules.AUTHENTICATION]: "Authentication",
@@ -95,12 +98,14 @@ export const AuditModuleLabel: Record<AuditLogModules, string> = {
   [AuditLogModules.USER_MANAGEMENT_AMD]: "User Management (APD)",
   [AuditLogModules.USER_MANAGEMENT_BESS]: "User Management (PSP)",
   [AuditLogModules.BENCHMARK_CONFIGURATION]: "Benchmark Configuration",
-  [AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]: "Monthly Value Management (APD)",
+  [AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]:
+    "Monthly Value Management (APD)",
   [AuditLogModules.SIMULATION]: "Simulation",
   [AuditLogModules.ASSET_ONBOARDING]: "Asset Onboarding",
   [AuditLogModules.ASSET_ANALYSIS]: "Asset Analysis",
   [AuditLogModules.BENCHMARK_ANALYSIS]: "Benchmark Analysis",
   [AuditLogModules.FILE_HISTORY]: "File History",
+  [AuditLogModules.INVOICE]: "Invoice (APD)",
 };
 
 export const AuditActionLabel: Record<AuditLogScenario, string> = {
@@ -143,45 +148,99 @@ export const AuditActionLabel: Record<AuditLogScenario, string> = {
   [AuditLogScenario.DATASET_MERGED]: "Dataset Merged",
   [AuditLogScenario.AGGREGATOR_REPORT_REMOVED]: "Aggregator Report Removed",
   [AuditLogScenario.USER_DEACTIVATED]: "User Deactivated",
-  [AuditLogScenario.BENCHMARK_CONFIGURATION_UPDATED]: "Benchmark Configuration Updated",
-  [AuditLogScenario.INTERNAL_APPRAISAL_REPORT_REMOVED]: "Internal Appraisal Report Removed",
+  [AuditLogScenario.BENCHMARK_CONFIGURATION_UPDATED]:
+    "Benchmark Configuration Updated",
+  [AuditLogScenario.INTERNAL_APPRAISAL_REPORT_REMOVED]:
+    "Internal Appraisal Report Removed",
   [AuditLogScenario.MONTHLY_METRIC_CREATED]: "Monthly Metric Created",
   [AuditLogScenario.MONTHLY_METRIC_UPDATED]: "Monthly Metric Updated",
   [AuditLogScenario.MONTHLY_METRIC_CLEARED]: "Monthly Metric Cleared",
   [AuditLogScenario.SIMULATION_CREATED]: "Simulation Created",
   [AuditLogScenario.SIMULATION_DELETED]: "Simulation Deleted",
   [AuditLogScenario.SIMULATION_EDITED]: "Simulation Updated",
-  [AuditLogScenario.SIZING_SIMULATION_RAN]: "Sizing Simulation Ran",
-  [AuditLogScenario.SIZING_SIMULATION_RERAN]: "Sizing Simulation Reran",
+  [AuditLogScenario.SIZING_SIMULATION_RAN]: "Sizing Simulation Run",
+  [AuditLogScenario.SIZING_SIMULATION_RERAN]: "Sizing Simulation Re-Run",
   [AuditLogScenario.SIZING_SIMULATION_STOPED]: "Sizing Simulation Stopped",
-  [AuditLogScenario.SIZING_SIMULATION_RESULT_VIEWED]: "Sizing Simulation Result Viewed",
-  [AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION]: "Viewed Asset Basic Information",
-  [AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED]: "Optimization Parameters Confirmed",
+  [AuditLogScenario.SIZING_SIMULATION_RESULT_VIEWED]:
+    "Sizing Simulation Result Viewed",
+  [AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION]:
+    "Viewed Asset Basic Information",
+  [AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED]:
+    "Optimization Parameters Confirmed",
   [AuditLogScenario.AGGREGATOR_FILE_UPLOADED]: "Aggregator File Uploaded",
   [AuditLogScenario.AGGREGATOR_FILE_REPLACED]: "Aggregator File Replaced",
   [AuditLogScenario.SCADA_FILE_REPLACED]: "SCADA File Replaced",
   [AuditLogScenario.OPTIMIZED_DATASET_GENERATED]: "Optimized Dataset Generated",
   [AuditLogScenario.MERGED_DATASET_DOWNLOADED]: "Merged Dataset Downloaded",
-  [AuditLogScenario.OPTIMIZED_DATASET_DOWNLOADED]: "Optimized Dataset Downloaded",
+  [AuditLogScenario.OPTIMIZED_DATASET_DOWNLOADED]:
+    "Optimized Dataset Downloaded",
   [AuditLogScenario.VIEWED_ASSET_ANALYSIS]: "Viewed Asset Analysis",
   [AuditLogScenario.IAR_FILE_UPLOADED]: "IAR File Uploaded",
   [AuditLogScenario.IAR_FILE_REPLACED]: "IAR File Replaced",
   [AuditLogScenario.VIEWED_BENCHMARK_ANALYSIS]: "Viewed Benchmark Analysis",
-  [AuditLogScenario.ASSET_SUBMITTED_FOR_APPROVAL]: "Asset Submitted For Approval",
-  [AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET]: "Viewed Pending Approval Asset",
+  [AuditLogScenario.ASSET_SUBMITTED_FOR_APPROVAL]:
+    "Asset Submitted For Approval",
+  [AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET]:
+    "Viewed Pending Approval Asset",
   [AuditLogScenario.VIEWED_ACTIVE_ASSET]: "Viewed Active Asset",
-  [AuditLogScenario.MONTHLY_AGGREGATOR_FILE_UPLOADED]: "Monthly Aggregator File Uploaded",
+  [AuditLogScenario.MONTHLY_AGGREGATOR_FILE_UPLOADED]:
+    "Monthly Aggregator File Uploaded",
   [AuditLogScenario.MONTHLY_SCADA_FILE_UPLOADED]: "Monthly SCADA File Uploaded",
-  [AuditLogScenario.MONTHLY_AGGREGATOR_FILE_REPLACED]: "Monthly Aggregator File Replaced",
+  [AuditLogScenario.MONTHLY_AGGREGATOR_FILE_REPLACED]:
+    "Monthly Aggregator File Replaced",
   [AuditLogScenario.MONTHLY_SCADA_FILE_REPLACED]: "Monthly SCADA File Replaced",
   [AuditLogScenario.UPDATED_IAR_FILE]: "Updated IAR File",
   [AuditLogScenario.DOWNLOADED_AGGREGATOR_FILE]: "Downloaded Aggregator File",
   [AuditLogScenario.DOWNLOADED_SCADA_FILE]: "Downloaded SCADA File",
   [AuditLogScenario.DOWNLOADED_IAR_FILE]: "Downloaded IAR File",
-  [AuditLogScenario.VIEWED_ASSET_APPROVAL_DETAILS]: "Viewed Asset Approval Details",
+  [AuditLogScenario.VIEWED_ASSET_APPROVAL_DETAILS]:
+    "Viewed Asset Approval Details",
   [AuditLogScenario.ASSET_APPROVED]: "Asset Approved",
   [AuditLogScenario.ASSET_DISABLED]: "Asset Disabled",
   [AuditLogScenario.ASSET_ENABLED]: "Asset Enabled",
+  [AuditLogScenario.INVOICE_UPLOADED]: "Invoice Uploaded",
+  [AuditLogScenario.INVOICE_DELETED]: "Invoice Deleted",
+  [AuditLogScenario.SETTELMENT_FILE_UPLOADED]: "Settlement File Uploaded",
+  [AuditLogScenario.SETTELMENT_FILE_DELETED]: "Settlement File Deleted",
+  [AuditLogScenario.CUSTOM_CONF_EDITED]: "Custom Configuration Updated",
+  [AuditLogScenario.CUSTOM_CONF_SIMULATION_RUN]: "Custom Configuration Run",
+  [AuditLogScenario.CUSTOM_CONF_SIMULATION_RERUN]:
+    "Custom Configuration Re-Run",
+  [AuditLogScenario.CUSTOM_CONF_RESULT_VIEWED]:
+    "Custom Configuration Result Viewed",
+  [AuditLogScenario.CUSTOM_CONF_HOURLY_EXPORTED]:
+    "Custom Configuration Hourly Data Exported",
+  [AuditLogScenario.CUSTOM_CONF_MONTHLY_EXPORTED]:
+    "Custom Configuration Monthly Data Exported",
+  [AuditLogScenario.MULTI_YEAR_CONF_EDITED]: "Multi Year Configuration Updated",
+  [AuditLogScenario.MULTI_YEAR_SIMULATION_RUN]: "Multi Year Configuration Run",
+  [AuditLogScenario.MULTI_YEAR_SIMULATION_RERUN]:
+    "Multi Year Configuration Re-Run",
+  [AuditLogScenario.MULTI_YEAR_SIMULATION_STOP]:
+    "Multi Year Configuration Stopped",
+  [AuditLogScenario.MULTI_YEAR_RESULT_VIEWED]:
+    "Multi Year Configuration Result Viewed",
+  [AuditLogScenario.MULTI_YEAR_RESULT_EXPORTED]:
+    "Multi Year Configuration Result Exported",
+  [AuditLogScenario.GREEN_ENERGY_CONF_EDITED]:
+    "Green Energy Configuration Updated",
+  [AuditLogScenario.GREEN_ENERGY_SIMULATION_RUN]:
+    "Green Energy Configuration Run",
+  [AuditLogScenario.GREEN_ENERGY_SIMULATION_RERUN]:
+    "Green Energy Configuration Re-Run",
+  [AuditLogScenario.GREEN_ENERGY_SIMULATION_STOP]:
+    "Green Energy Configuration Stopped",
+  [AuditLogScenario.GREEN_ENERGY_RESULT_VIEWED]:
+    "Green Energy Configuration Result Viewed",
+  [AuditLogScenario.GREEN_ENERGY_RESULT_EXPORTED]:
+    "Green Energy Configuration Result Exported",
+  [AuditLogScenario.CUSTOM_CONF_CREATED]: "Custom Configuration Created",
+  [AuditLogScenario.MULTI_YEAR_CONF_CREATED]:
+    "Multi Year Configuration Created",
+  [AuditLogScenario.GREEN_ENERGY_CONF_CREATED]:
+    "Green Energy Configuration Created",
+  [AuditLogScenario.SOLAR_PROFILE_CREATED]: "Solar Profile Created",
+  [AuditLogScenario.SOLAR_PROFILE_UPDATED]: "Solar Profile Updated",
 };
 
 export const DigestScopeBadgeColors: Record<DigestScope, string> = {
@@ -393,9 +452,30 @@ export const PLATFORM_LABELS: Record<number, string> = {
   [Platform.PSP]: "PSP",
 };
 
+export const USER_ROLE_LABELS: Record<UserRole, string> = {
+  [UserRole.Admin]: "Admin",
+  [UserRole.Analyst]: "Analyst",
+  [UserRole.Management]: "Management",
+  [UserRole.Viewer]: "Viewer",
+  [UserRole.SuperAdmin]: "Super Admin",
+};
+// Admin, Analyst, Management & Viewer roles only
 export const BESS_USER_ROLES: SelectInputItem[] = [
-  {id: UserRole.Analyst, label: 'Analyst'},
-  {id: UserRole.Admin, label: 'Admin'},
-  {id: UserRole.Management, label: 'Management'},
-  {id: UserRole.Viewer, label: 'Viewer'},
-];
+  UserRole.Admin,
+  UserRole.Analyst,
+  UserRole.Management,
+  UserRole.Viewer,
+].map((role) => ({
+  id: role,
+  label: USER_ROLE_LABELS[role],
+}));
+
+// Admin, Analyst, Management roles only
+export const AMD_USER_ROLES: SelectInputItem[] = [
+  UserRole.Admin,
+  UserRole.Analyst,
+  UserRole.Management,
+].map((role) => ({
+  id: role,
+  label: USER_ROLE_LABELS[role],
+}));

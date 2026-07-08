@@ -52,6 +52,15 @@ import type {
   AssetAnalysisBatteryHealthDailyCyclesRequest,
   AssetAnalysisBatteryHealthWarrantyExceedanceRequest,
   UpdateAssetReportingPeriodRequest,
+  AssetExecutiveAnalysisMonthlyRevenueComparisonRequest,
+  AssetExecutiveAnalysisRevenueByStreamRequest,
+  AssetExecutiveAnalysisSummaryRequest,
+  InvoiceUploadRequest,
+  InvoiceDeleteRequest,
+  InvoiceListRequest,
+  InvoiceSettlementUploadRequest,
+  DeleteInvoiceSettlementRequest,
+  InvoiceSettlementListRequest,
 } from '@/interface/api-interface';
 import {mergeDeepRight} from 'ramda';
 import {AssetFileType, AssetStatus, AssetSteps, AssetType} from '@/constants';
@@ -110,6 +119,8 @@ const initialState: AssetSliceInitialState = {
   aggregatorReportUploadError: null,
   scadaReportUploadError: null,
   iarReportUploadError: null,
+  invoiceSettlementUploadError: null,
+  invoiceUploadError: null,
 
   analytics: {
     operations: {
@@ -266,6 +277,45 @@ const initialState: AssetSliceInitialState = {
     industryComparison: false,
     revenueIARvsActual: false,
     multiMarketOptmization: false,
+  },
+
+  executiveAnalysis: {
+    monthly_revenue_comparison: null,
+    revenue_by_stream: null,
+    summary: null,
+  },
+  executiveAnalysisError: {
+    summary: false,
+    monthly_revenue_comparison: false,
+    revenue_by_stream: false,
+  },
+  executiveAnalysisLoading: {
+    summary: false,
+    monthly_revenue_comparison: false,
+    revenue_by_stream: false,
+  },
+
+  uploadInvoice: {
+    loading: false,
+    error: false,
+    success: false,
+  },
+
+  deleteInvoice: {
+    loading: false,
+    error: false,
+    success: false,
+  },
+
+  deleteInvoiceSettlement: {
+    loading: false,
+    error: false,
+    success: false,
+  },
+  uploadInvoiceSettlement: {
+    loading: false,
+    error: false,
+    success: false,
   },
 };
 
@@ -1693,6 +1743,93 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // Executive Analysis monthly revenue Comparison
+    // =======================================
+    getExecutiveAnalysisMonthlyRevenueComparisonRequest: (
+      state,
+      _action: PayloadAction<AssetExecutiveAnalysisMonthlyRevenueComparisonRequest['params']>,
+    ) => {
+      state.executiveAnalysisLoading.monthly_revenue_comparison = true;
+      state.executiveAnalysisError.monthly_revenue_comparison = false;
+      state.executiveAnalysis.monthly_revenue_comparison = null;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getExecutiveAnalysisMonthlyRevenueComparisonSuccess: (
+      state,
+      action: PayloadAction<AssetExecutiveAnalysisMonthlyRevenueComparisonRequest['response']>,
+    ) => {
+      state.executiveAnalysisLoading.monthly_revenue_comparison = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.executiveAnalysis.monthly_revenue_comparison = action.payload.data;
+      }
+    },
+    getExecutiveAnalysisMonthlyRevenueComparisonFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.executiveAnalysisLoading.monthly_revenue_comparison = false;
+      state.executiveAnalysisError.monthly_revenue_comparison = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Executive Analysis revenue by stream
+    // =======================================
+    getExecutiveAnalysisRevenueByStreamRequest: (
+      state,
+      _action: PayloadAction<AssetExecutiveAnalysisRevenueByStreamRequest['params']>,
+    ) => {
+      state.executiveAnalysisLoading.revenue_by_stream = true;
+      state.executiveAnalysisError.revenue_by_stream = false;
+      state.executiveAnalysis.revenue_by_stream = null;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getExecutiveAnalysisRevenueByStreamSuccess: (
+      state,
+      action: PayloadAction<AssetExecutiveAnalysisRevenueByStreamRequest['response']>,
+    ) => {
+      state.executiveAnalysisLoading.revenue_by_stream = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.executiveAnalysis.revenue_by_stream = action.payload.data;
+      }
+    },
+    getExecutiveAnalysisRevenueByStreamFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.executiveAnalysisLoading.revenue_by_stream = false;
+      state.executiveAnalysisError.revenue_by_stream = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Executive Analysis summary
+    // =======================================
+    getExecutiveAnalysisSummaryRequest: (
+      state,
+      _action: PayloadAction<AssetExecutiveAnalysisSummaryRequest['params']>,
+    ) => {
+      state.executiveAnalysisLoading.summary = true;
+      state.executiveAnalysisError.summary = false;
+      state.executiveAnalysis.summary = null;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getExecutiveAnalysisSummarySuccess: (
+      state,
+      action: PayloadAction<AssetExecutiveAnalysisSummaryRequest['response']>,
+    ) => {
+      state.executiveAnalysisLoading.summary = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.executiveAnalysis.summary = action.payload.data;
+      }
+    },
+    getExecutiveAnalysisSummaryFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.executiveAnalysisLoading.summary = false;
+      state.executiveAnalysisError.summary = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
     // Create Asset
     // =======================================
     createAssetRequest: (state, _action: PayloadAction<ActivateAssetRequest['payload']>) => {
@@ -1953,6 +2090,52 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // filter invoices files
+    // =======================================
+    filterInvoiceFilesRequest: (state, _action: PayloadAction<InvoiceListRequest['params']>) => {
+      state.isLoading = true;
+    },
+    filterInvoiceFilesSuccess: (state, action: PayloadAction<InvoiceListRequest['response']>) => {
+      state.isLoading = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data && state.currentSelectedAsset) {
+        const invoiceFile = action.payload.data.invoices.at(0);
+        if (invoiceFile) {
+          state.currentSelectedAsset.invoice_file = invoiceFile;
+        } else {
+          state.currentSelectedAsset.invoice_file = null;
+        }
+      }
+    },
+    filterInvoiceFilesFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.isLoading = false;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // filter invoices settlement files
+    // =======================================
+    filterInvoiceSettlementFilesRequest: (state, _action: PayloadAction<InvoiceSettlementListRequest['params']>) => {
+      state.isLoading = true;
+    },
+    filterInvoiceSettlementFilesSuccess: (state, action: PayloadAction<InvoiceSettlementListRequest['response']>) => {
+      state.isLoading = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data && state.currentSelectedAsset) {
+        const invoiceSettlementFile = action.payload.data.settlement.at(0);
+        if (invoiceSettlementFile) {
+          state.currentSelectedAsset.invoice_settlement_file = invoiceSettlementFile;
+        } else {
+          state.currentSelectedAsset.invoice_settlement_file = null;
+        }
+      }
+    },
+    filterInvoiceSettlementFilesFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.isLoading = false;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
     // update reporting period of the asset
     // =======================================
     updateAssetReportingPeriodRequest: (state, _action: PayloadAction<UpdateAssetReportingPeriodRequest['params']>) => {
@@ -1978,6 +2161,31 @@ const assetSlice = createSlice({
     },
 
     updateAssetReportingPeriodFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.isLoading = false;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // update invoice repoting period of the asset
+    // =======================================
+    updateAssetInvoiceReportingPeriodRequest: (state, _action: PayloadAction<UpdateAssetReportingPeriodRequest['params']>) => {
+      state.isLoading = true;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    updateAssetInvoiceReportingPeriodSuccess: (state, action: PayloadAction<UpdateAssetReportingPeriodRequest['response']>) => {
+      state.isLoading = false;
+      if (action.payload.data && state.currentSelectedAsset) {
+        const {id, invoice_active_period} = action.payload.data;
+        if (id === state.currentSelectedAsset.id) {
+          if (state.currentSelectedAsset?.invoice_active_period && invoice_active_period) {
+            state.currentSelectedAsset.invoice_active_period.month = invoice_active_period.month;
+            state.currentSelectedAsset.invoice_active_period.year = invoice_active_period.year;
+          }
+        }
+      }
+    },
+    updateAssetInvoiceReportingPeriodFailure: (state, action: PayloadAction<APIResponse>) => {
       state.isLoading = false;
       state.assetError = action.payload.status_code;
     },
@@ -2060,6 +2268,127 @@ const assetSlice = createSlice({
     removeAssetFileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.isLoading = false;
       state.assetError = action.payload.status_code;
+    },
+
+    // ====================================
+    // Upload Invoices
+    // ====================================
+    uploadInvoicesRequest(state, _action: PayloadAction<InvoiceUploadRequest['payload']>) {
+      state.uploadInvoice.loading = true;
+      state.uploadInvoice.error = false;
+      state.uploadInvoice.success = false;
+      state.invoiceUploadError = null;
+    },
+    uploadInvoicesSuccess(state, action: PayloadAction<InvoiceUploadRequest['response']>) {
+      state.uploadInvoice.loading = false;
+      state.uploadInvoice.success = action.payload.status_code;
+      state.invoiceUploadError = null;
+      if (action.payload.data && state.currentSelectedAsset) {
+        state.currentSelectedAsset.invoice_file = action.payload.data;
+      }
+    },
+    uploadInvoicesFailure(state, action: PayloadAction<APIResponse<{file: string}>>) {
+      state.uploadInvoice.loading = false;
+      state.uploadInvoice.error = action.payload.status_code;
+      state.uploadInvoice.success = false;
+      const message = action.payload.message || action.payload.status_code;
+
+      state.invoiceUploadError = {
+        file: {
+          name: action.payload.data?.file ?? '',
+        },
+        validation_errors: [message],
+      };
+    },
+
+    // ====================================
+    // Delete Invoice
+    // ====================================
+    deleteInvoiceRequest(state, _action: PayloadAction<InvoiceDeleteRequest['payload']>) {
+      state.deleteInvoice.loading = true;
+      state.deleteInvoice.error = false;
+      state.deleteInvoice.success = false;
+      state.invoiceUploadError = null;
+    },
+    deleteInvoiceSuccess(state, action: PayloadAction<InvoiceDeleteRequest['response']>) {
+      state.deleteInvoice.loading = false;
+      state.deleteInvoice.success = true;
+      state.invoiceUploadError = null;
+      if (
+        state.currentSelectedAsset &&
+        action.payload.data &&
+        action.payload.data.asset_id === state.currentSelectedAsset.id &&
+        state.currentSelectedAsset.invoice_file &&
+        state.currentSelectedAsset.invoice_file.id === action.payload.data.invoice_id
+      ) {
+        state.currentSelectedAsset.invoice_file = null;
+      }
+    },
+    deleteInvoiceFailure(state, action: PayloadAction<APIResponse>) {
+      state.deleteInvoice.loading = false;
+      state.deleteInvoice.error = action.payload.status_code;
+      state.invoiceUploadError = null;
+    },
+
+    // ====================================
+    // Upload Invoice Settlement
+    // ====================================
+    uploadInvoiceSettlementRequest(state, _action: PayloadAction<InvoiceSettlementUploadRequest['payload']>) {
+      state.uploadInvoiceSettlement.loading = true;
+      state.uploadInvoiceSettlement.error = false;
+      state.uploadInvoiceSettlement.success = false;
+      state.invoiceSettlementUploadError = null;
+    },
+    uploadInvoiceSettlementSuccess(state, action: PayloadAction<InvoiceSettlementUploadRequest['response']>) {
+      state.uploadInvoiceSettlement.loading = false;
+      state.uploadInvoiceSettlement.success = action.payload.status_code;
+      state.invoiceSettlementUploadError = null;
+      if (action.payload.data && state.currentSelectedAsset) {
+        state.currentSelectedAsset.invoice_settlement_file = action.payload.data;
+      }
+    },
+    uploadInvoiceSettlementFailure(state, action: PayloadAction<APIResponse<{file: string}>>) {
+      state.uploadInvoiceSettlement.loading = false;
+      state.uploadInvoiceSettlement.error = action.payload.status_code;
+      state.uploadInvoiceSettlement.success = false;
+
+      const message = action.payload.message || action.payload.status_code;
+
+      state.invoiceSettlementUploadError = {
+        file: {
+          name: action.payload.data?.file ?? '',
+        },
+        validation_errors: [message],
+      };
+    },
+
+    // ====================================
+    // Delete Invoice Settlement
+    // ====================================
+    deleteInvoiceSettlementRequest(state, _action: PayloadAction<DeleteInvoiceSettlementRequest['payload']>) {
+      state.deleteInvoiceSettlement.loading = true;
+      state.deleteInvoiceSettlement.error = false;
+      state.deleteInvoiceSettlement.success = false;
+      state.invoiceSettlementUploadError = null;
+    },
+    deleteInvoiceSettlementSuccess(state, action: PayloadAction<DeleteInvoiceSettlementRequest['response']>) {
+      state.deleteInvoiceSettlement.loading = false;
+      state.deleteInvoiceSettlement.success = true;
+      state.invoiceSettlementUploadError = null;
+      if (
+        state.currentSelectedAsset &&
+        action.payload.data &&
+        action.payload.data.asset_id === state.currentSelectedAsset.id &&
+        state.currentSelectedAsset.invoice_settlement_file &&
+        state.currentSelectedAsset.invoice_settlement_file.id === action.payload.data.invoice_settlement_id
+      ) {
+        state.currentSelectedAsset.invoice_settlement_file = null;
+      }
+    },
+    deleteInvoiceSettlementFailure(state, action: PayloadAction<APIResponse>) {
+      state.deleteInvoiceSettlement.loading = false;
+      state.deleteInvoiceSettlement.error = action.payload.status_code;
+      state.invoiceSettlementUploadError = null;
     },
 
     // =======================================
@@ -2315,6 +2644,21 @@ export const {
   getAssetMarketPriceCorrelationMatrixSuccess,
   getAssetMarketPriceCorrelationMatrixFailure,
 
+  // get executive analysis monthly revenue comparision
+  getExecutiveAnalysisMonthlyRevenueComparisonFailure,
+  getExecutiveAnalysisMonthlyRevenueComparisonRequest,
+  getExecutiveAnalysisMonthlyRevenueComparisonSuccess,
+
+  // get executive analysis revenu by stream
+  getExecutiveAnalysisRevenueByStreamFailure,
+  getExecutiveAnalysisRevenueByStreamRequest,
+  getExecutiveAnalysisRevenueByStreamSuccess,
+
+  // get executive analysis summary
+  getExecutiveAnalysisSummaryFailure,
+  getExecutiveAnalysisSummaryRequest,
+  getExecutiveAnalysisSummarySuccess,
+
   // get asset IAR report upload
   uploadIARReportRequest,
   uploadIARReportSuccess,
@@ -2416,15 +2760,50 @@ export const {
   filterAggregatorScadaFilesSuccess,
   filterAggregatorScadaFilesFailure,
 
+  // filter merged dataset files
+  filterInvoiceFilesRequest,
+  filterInvoiceFilesSuccess,
+  filterInvoiceFilesFailure,
+
+  // filter invoice settlement files
+  filterInvoiceSettlementFilesRequest,
+  filterInvoiceSettlementFilesSuccess,
+  filterInvoiceSettlementFilesFailure,
+
   // update asset reporting period
   updateAssetReportingPeriodRequest,
   updateAssetReportingPeriodSuccess,
   updateAssetReportingPeriodFailure,
 
+  // update asset invoice reporting period
+  updateAssetInvoiceReportingPeriodRequest,
+  updateAssetInvoiceReportingPeriodSuccess,
+  updateAssetInvoiceReportingPeriodFailure,
+
   // remove asset files
   removeAssetFileRequest,
   removeAssetFileSuccess,
   removeAssetFileFailure,
+
+  // upload invoices
+  uploadInvoicesRequest,
+  uploadInvoicesSuccess,
+  uploadInvoicesFailure,
+
+  // delete invoice
+  deleteInvoiceRequest,
+  deleteInvoiceSuccess,
+  deleteInvoiceFailure,
+
+  // upload invoices settlement
+  uploadInvoiceSettlementRequest,
+  uploadInvoiceSettlementSuccess,
+  uploadInvoiceSettlementFailure,
+
+  // delete invoices settlement
+  deleteInvoiceSettlementRequest,
+  deleteInvoiceSettlementSuccess,
+  deleteInvoiceSettlementFailure,
 
   // utility & reset message
   cancelAssetsRequest,

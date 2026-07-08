@@ -6,3 +6,4 @@ export * from './UserManagement';
 export * from './ProjectManagement';
 export * from './SimulationWizard';
 export * from './SimulationListing'
+export * from './NotFound';

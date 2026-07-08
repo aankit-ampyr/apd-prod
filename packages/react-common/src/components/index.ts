@@ -15,3 +15,5 @@ export * from './SkelatonWrapper';
 export * from './SideNavBar';
 export * from './ConfirmModal';
 export * from './RoleBasedUI';
+export * from './IconDisplay';
+export * from './NotFound';

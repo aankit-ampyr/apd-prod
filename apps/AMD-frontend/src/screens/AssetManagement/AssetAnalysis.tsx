@@ -134,7 +134,7 @@ export function AssetAnalysis() {
   return (
     <ScreenWrapper
       className="bg-linear-to-br from-[#FBFDFF] to-[#F2F3FF]"
-      wrapperClassName="bg-transparent shadow-none flex flex-col gap-2 p-0 rounded-none">
+      wrapperClassName="bg-transparent shadow-none flex flex-col gap-2 p-0! rounded-none">
       <Text variant="h3">Data Analysis Preview</Text>
       <Text variant="caption" className="text-text-secondary! mb-4">
         Based on uploaded Aggregator + SCADA data

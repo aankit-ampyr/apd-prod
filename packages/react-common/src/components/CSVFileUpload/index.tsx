@@ -66,8 +66,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
     setRowCount(rows);
     setUploadedAt(new Date(persistedFile.created_at));
     setValidationState("success");
-    setMessage(`CSV validated — ${rows} hourly rows detected, no missing values found.`);
-  }, [persistedFile, externalErrorMessage, file, validationState, requireServerValidation]);
+    setMessage(
+      `CSV validated — ${rows} hourly rows detected, no missing values found.`,
+    );
+  }, [
+    persistedFile,
+    externalErrorMessage,
+    file,
+    validationState,
+    requireServerValidation,
+  ]);
 
   useEffect(() => {
     if (!externalErrorMessage) return;
@@ -85,7 +93,6 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
     return () => clearInterval(interval);
   }, [uploadedAt]);
-
 
   const handleFile = async (selectedFile: File) => {
     // Reset
@@ -164,12 +171,22 @@ const FileUpload: React.FC<FileUploadProps> = ({
       //  Check for required columns (timestamp and solar)
       if (hasHeader) {
         const headerRow = rows[0].toLowerCase();
-        const hasTimestampColumn = headerRow.includes("timestamp") || headerRow.includes("time") || headerRow.includes("date");
-        const hasSolarColumn = headerRow.includes("solar") || headerRow.includes("generation") || headerRow.includes("power") || headerRow.includes("kwh") || headerRow.includes("mwh");
+        const hasTimestampColumn =
+          headerRow.includes("timestamp") ||
+          headerRow.includes("time") ||
+          headerRow.includes("date");
+        const hasSolarColumn =
+          headerRow.includes("solar") ||
+          headerRow.includes("generation") ||
+          headerRow.includes("power") ||
+          headerRow.includes("kwh") ||
+          headerRow.includes("mwh");
 
         if (!hasTimestampColumn || !hasSolarColumn) {
           setValidationState("error");
-          setMessage("Invalid CSV structure: missing timestamp or solar generation columns.");
+          setMessage(
+            "Invalid CSV structure: missing timestamp or solar generation columns.",
+          );
           return;
         }
       }
@@ -181,7 +198,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
       const minRows = 8760;
       if (dataRows < minRows) {
         setValidationState("error");
-        setMessage(`Row count (${dataRows}) is less than ${minRows} hours per year required.`);
+        setMessage(
+          `Row count (${dataRows}) is less than ${minRows} hours per year required.`,
+        );
         return;
       }
 
@@ -193,7 +212,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       // Validate all columns for blank values and numeric columns for invalid values
       const dataStartIndex = hasHeader ? 1 : 0;
-      const headerColumns = hasHeader ? rows[0].split(",").map(col => col.trim()) : [];
+      const headerColumns = hasHeader
+        ? rows[0].split(",").map((col) => col.trim())
+        : [];
       const validationErrors: string[] = [];
       const blankRowsPerColumn: Record<string, number[]> = {};
       const negativeRowsPerColumn: Record<string, number[]> = {};
@@ -204,18 +225,25 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
         for (let colIdx = 0; colIdx < columns.length; colIdx++) {
           const cellValue = columns[colIdx]?.trim();
-          const columnName = hasHeader && headerColumns[colIdx] ? headerColumns[colIdx] : `Column ${colIdx + 1}`;
+          const columnName =
+            hasHeader && headerColumns[colIdx]
+              ? headerColumns[colIdx]
+              : `Column ${colIdx + 1}`;
           const colNameLower = columnName.toLowerCase();
 
           // Check for blank values in ALL columns (including timestamp)
           if (cellValue === undefined || cellValue === "") {
-            if (!blankRowsPerColumn[columnName]) blankRowsPerColumn[columnName] = [];
+            if (!blankRowsPerColumn[columnName])
+              blankRowsPerColumn[columnName] = [];
             blankRowsPerColumn[columnName].push(i + 1);
             continue;
           }
 
           // Skip timestamp/date columns for numeric validation only
-          const isTimestampColumn = colNameLower.includes("timestamp") || colNameLower.includes("time") || colNameLower.includes("date");
+          const isTimestampColumn =
+            colNameLower.includes("timestamp") ||
+            colNameLower.includes("time") ||
+            colNameLower.includes("date");
           if (isTimestampColumn) {
             continue;
           }
@@ -227,14 +255,16 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
           // Check for non-finite values (Infinity)
           if (!Number.isFinite(numValue)) {
-            if (!infiniteRowsPerColumn[columnName]) infiniteRowsPerColumn[columnName] = [];
+            if (!infiniteRowsPerColumn[columnName])
+              infiniteRowsPerColumn[columnName] = [];
             infiniteRowsPerColumn[columnName].push(i + 1);
             continue;
           }
 
           // Check for negative values
           if (numValue < 0) {
-            if (!negativeRowsPerColumn[columnName]) negativeRowsPerColumn[columnName] = [];
+            if (!negativeRowsPerColumn[columnName])
+              negativeRowsPerColumn[columnName] = [];
             negativeRowsPerColumn[columnName].push(i + 1);
             continue;
           }
@@ -269,17 +299,23 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
       // Add grouped blank value errors to validationErrors
       Object.entries(blankRowsPerColumn).forEach(([col, rows]) => {
-        validationErrors.push(`'${col}' has blank values at rows: ${formatRanges(rows)}.`);
+        validationErrors.push(
+          `'${col}' has blank values at rows: ${formatRanges(rows)}.`,
+        );
       });
 
       // Add grouped infinite value errors to validationErrors
       Object.entries(infiniteRowsPerColumn).forEach(([col, rows]) => {
-        validationErrors.push(`'${col}' has infinite values at rows: ${formatRanges(rows)}.`);
+        validationErrors.push(
+          `'${col}' has infinite values at rows: ${formatRanges(rows)}.`,
+        );
       });
 
       // Add grouped negative value errors to validationErrors
       Object.entries(negativeRowsPerColumn).forEach(([col, rows]) => {
-        validationErrors.push(`'${col}' has negative values at rows: ${formatRanges(rows)}.`);
+        validationErrors.push(
+          `'${col}' has negative values at rows: ${formatRanges(rows)}.`,
+        );
       });
       // If there are validation errors, show them all
       if (validationErrors.length > 0) {
@@ -309,11 +345,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
       setValidationState("error");
       // Handle general CSV parsing failures (encoding issues, malformed data)
       if (error instanceof TypeError) {
-        setMessage("CSV parsing failed: encoding issues or malformed data detected.");
+        setMessage(
+          "CSV parsing failed: encoding issues or malformed data detected.",
+        );
       } else if (error instanceof Error) {
         setMessage(`CSV parsing failed: ${error.message}`);
       } else {
-        setMessage("Error reading CSV file. Please ensure the file is properly formatted.");
+        setMessage(
+          "Error reading CSV file. Please ensure the file is properly formatted.",
+        );
       }
     }
   };
@@ -390,7 +430,7 @@ const FileUpload: React.FC<FileUploadProps> = ({
           onDragOver={(e) => e.preventDefault()}
           className={cn(
             "border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50",
-            disabled && "opacity-60 cursor-not-allowed"
+            disabled && "opacity-60 cursor-not-allowed",
           )}
         >
           <div className="flex justify-center">
@@ -435,8 +475,8 @@ const FileUpload: React.FC<FileUploadProps> = ({
               variant="primary"
               disabled={disabled}
               className={cn(
-                "text-white px-5 py-2 rounded-md self-center",
-                !disabled ? "cursor-pointer" : "cursor-not-allowed"
+                "text-white px-5 py-2 rounded-sm self-center",
+                !disabled ? "cursor-pointer" : "cursor-not-allowed",
               )}
             >
               Browse File
@@ -446,8 +486,13 @@ const FileUpload: React.FC<FileUploadProps> = ({
       )}
 
       {/* File Card */}
-      {(file) && (
-        <div className={cn("mt-4 rounded-lg p-4 bg-white", disabled && "opacity-80")}>
+      {file && (
+        <div
+          className={cn(
+            "mt-4 rounded-lg p-4 bg-white",
+            disabled && "opacity-80",
+          )}
+        >
           <div className="flex border-[1.4px] border-border p-3 rounded-lg justify-between items-center">
             <div className="flex items-center gap-3">
               <div className="bg-primary-tint-2! w-8 h-8 rounded-md flex items-center justify-center">
@@ -479,8 +524,15 @@ const FileUpload: React.FC<FileUploadProps> = ({
 
               {validationState === "loading" && (
                 <div className="flex items-center gap-3">
-                  <Icon name="circle-info" size={18} className="text-primary!" />
-                  <Text variant="caption2" className="text-primary! text-sm font-InterMedium">
+                  <Icon
+                    name="circle-info"
+                    size={18}
+                    className="text-primary!"
+                  />
+                  <Text
+                    variant="caption2"
+                    className="text-primary! text-sm font-InterMedium"
+                  >
                     Validating
                   </Text>
                 </div>
@@ -501,7 +553,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
               <button
                 className={cn(
                   "flex items-center gap-2",
-                  !disabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                  !disabled
+                    ? "cursor-pointer"
+                    : "cursor-not-allowed opacity-50",
                 )}
                 onClick={() => !disabled && fileInputRef.current?.click()}
                 disabled={disabled}
@@ -520,7 +574,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
                 disabled={disabled}
                 className={cn(
                   "text-text-secondary! text-lg!",
-                  !disabled ? "cursor-pointer" : "cursor-not-allowed opacity-50"
+                  !disabled
+                    ? "cursor-pointer"
+                    : "cursor-not-allowed opacity-50",
                 )}
               >
                 ✕
@@ -531,18 +587,27 @@ const FileUpload: React.FC<FileUploadProps> = ({
           {/* Validation Message */}
           {message && (
             <div
-              className={`mt-3 p-3 rounded-md text-sm ${validationState === "success"
-                ? "bg-green-50 text-green-700 border border-green-200"
-                : validationState === "loading"
-                  ? "bg-blue-50 text-blue-700 border border-blue-200"
-                  : "bg-red-50 text-red-700 border border-red-200"
-                }`}
+              className={`mt-3 p-3 rounded-md text-sm ${
+                validationState === "success"
+                  ? "bg-green-50 text-green-700 border border-green-200"
+                  : validationState === "loading"
+                    ? "bg-blue-50 text-blue-700 border border-blue-200"
+                    : "bg-red-50 text-red-700 border border-red-200"
+              }`}
             >
               <div className="flex items-start gap-2">
                 {validationState === "success" ? (
-                  <Icon name="tick" size={16} className="text-success! mt-0.5" />
+                  <Icon
+                    name="tick"
+                    size={16}
+                    className="text-success! mt-0.5"
+                  />
                 ) : validationState === "loading" ? (
-                  <Icon name="circle-info" size={16} className="text-primary! mt-0.5" />
+                  <Icon
+                    name="circle-info"
+                    size={16}
+                    className="text-primary! mt-0.5"
+                  />
                 ) : (
                   <Icon
                     name="circle-alert"
@@ -561,4 +626,3 @@ const FileUpload: React.FC<FileUploadProps> = ({
 };
 
 export default FileUpload;
-

@@ -60,6 +60,8 @@ class AssetEdit(BaseModel):
     status: Optional[bool] = None
     active_month: Optional[int] = None
     active_year: Optional[int] = None
+    active_invoice_month: Optional[int] = None
+    active_invoice_year: Optional[int] = None
 
     @validator("type")
     def validate_type(cls, v):

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { API, ENCRYPTION, UserSessionEndReason } from '@/constants';
 import { store } from '../redux/store';
-import { resetAuth, resetAuthWithReason } from '../redux/slice';
+import { logoutRequest, resetAuthWithReason } from '../redux/slice';
 import { resetCurrentSelectedProject } from '../redux/slice/simulationWizardSlice';
 import { encryptPayload, decryptPayload, encryptFormData } from '@/utils/encryption.utils';
 import { autoLogoutErrorCodes } from '@/constants/defaults';
@@ -64,7 +64,7 @@ export const createAxiosInstance = async (info: {
           store.dispatch(resetAuthWithReason({ reason: UserSessionEndReason.ForceLogout }));
         }
         else {
-          store.dispatch(resetAuth());
+          store.dispatch(logoutRequest());
         }
       }
 

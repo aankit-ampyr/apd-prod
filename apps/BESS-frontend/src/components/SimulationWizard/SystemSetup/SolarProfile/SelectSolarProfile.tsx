@@ -65,6 +65,7 @@ export const SelectSolarProfile = ({
   const previewSolar = useSelector(solarProfileData);
   const savedSolar = useSelector(savedSolarProfileData);
   const hydratedSolarData = previewSolar ?? data ?? savedSolar;
+  const currentSolarSourceId = hydratedSolarData?.source?.id ? Number(hydratedSolarData.source.id) : null;
 
   const solarData = isFileMode && !selectedProfile ? null : hydratedSolarData;
 
@@ -78,17 +79,23 @@ export const SelectSolarProfile = ({
 
   useEffect(() => {
     if (simulation_id) {
+      const selectedSourceId = selectedProfile ? Number(selectedProfile) : null;
+
+      if (!selectedSourceId || selectedSourceId === currentSolarSourceId) {
+        return;
+      }
+
       dispatch(
         solarProfileRequest({
           simulation_id,
           payload: {
             type: 'file',
-            source_id: Number(selectedProfile),
+            source_id: selectedSourceId,
           },
         }),
       );
     }
-  }, [selectedProfile]);
+  }, [currentSolarSourceId, dispatch, selectedProfile, simulation_id]);
 
   useEffect(() => {
     const initialProfileId = hydratedSolarData?.source?.id;
@@ -403,7 +410,7 @@ export const SelectSolarProfile = ({
                 className={`flex items-center gap-2 cursor-pointer ${(!selectedProfile && isFileMode) || !solarData ? 'opacity-50 pointer-events-none' : ''}`}
                 disabled={(!selectedProfile && isFileMode) || !solarData}>
                 <Text variant="caption2" className="text-primary! font-InterBold!">
-                  Click to Expand chart
+                  Click to Expand graph
                 </Text>
 
                 <div className="w-5 h-5 rounded-sm flex items-center justify-center bg-primary!">
@@ -417,10 +424,10 @@ export const SelectSolarProfile = ({
               <>
                 <div className="border-t border-gray-200 pt-4"></div>
 
-                <div className="flex relative">
+                <div className="flex flex-col xl:flex-row relative">
                   {/* ===== LEFT (Hourly) ===== */}
 
-                  <div className="w-[50%]">
+                  <div className="w-full xl:w-[50%]">
                     {/* Wrap heading and chart together for download */}
                     <div ref={chartRef} className="bg-white">
                       <div className="flex items-center justify-between mb-3 mr-4">
@@ -459,15 +466,25 @@ export const SelectSolarProfile = ({
                   </div>
 
                   {/* ===== DIVIDER ===== */}
-                  <div className="absolute left-1/2 -top-3.75 bottom-1 w-px bg-gray-300" />
-
+                  <div
+                    className="
+    absolute
+    left-0 right-0 top-1/2 h-px bg-gray-300
+    xl:left-1/2
+    xl:right-auto
+    xl:-top-3.75
+    xl:bottom-1
+    xl:w-px
+    xl:h-[calc(100%+1rem)]
+  "
+                  />
                   {/* ===== RIGHT (Monthly) ===== */}
-                  <div className="w-[50%]">
+                  <div className="w-full xl:w-[50%]">
                     {/* Wrap heading and chart together for download */}
                     <div ref={monthlyChartRef} className="bg-white">
                       <div className="flex items-center justify-between mb-3 mr-4">
-                        <div className="ml-11.5">
-                          <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1">
+                        <div className="ml-11.5 mt-4">
+                          <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1!">
                             Monthly Solar Generation
                           </Text>
                           <Text variant="small" className="text-sm text-text-secondary!">

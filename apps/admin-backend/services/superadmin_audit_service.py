@@ -4,7 +4,7 @@ from sqlalchemy import select, or_
 from models.audit_log_model import AuditLog
 from db.db_config import SessionBESS, SessionAMD
 from datetime import timedelta, datetime
-from python_common.constants.enums import AuditLogScenario, AuditLogModules
+from python_common.constants.enums import AuditLogScenario, AuditLogModules, UserRole
 from utils import Res
 import json
 
@@ -21,7 +21,7 @@ class SuperAdminAuditService:
                 targets = [(db_amd, "AMD"), (db_bess, "BESS")]
 
                 for session, env in targets:
-                    query = select(AuditLog)
+                    query = select(AuditLog).where(AuditLog.role == UserRole.ADMIN.value)
                     
                     # Search Filter
                     if filters.get("search"):
@@ -34,10 +34,6 @@ class SuperAdminAuditService:
                     
                     if filters.get("user_id"):
                         query = query.where(AuditLog.user_id == filters["user_id"])
-                    
-                    if filters.get("role"):
-                        role_val = filters["role"]
-                        query = query.where(AuditLog.role.in_(role_val) if isinstance(role_val, list) else AuditLog.role == role_val)
 
                     if filters.get("module"):
                         mod_val = filters["module"]

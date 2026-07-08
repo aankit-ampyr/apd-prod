@@ -1,24 +1,26 @@
-import { ActionType, ResourceType } from '@/constants';
-import { WebSocketContext } from '@/context/WebsocketContext';
-import { RootState } from '@/services/redux/rootReducer';
-import { stopMultiYearProjectionRequest, runMultiYearProjectionRequest } from '@/services/redux/slice/simulationWizardSlice';
-import { SIMULATION_JOB_STORAGE_KEY } from '@/services/socket/SocketManager';
-import { useCallback, useContext, useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
+import {ActionType, ResourceType} from '@/constants';
+import {WebSocketContext} from '@/context/WebsocketContext';
+import {RootState} from '@/services/redux/rootReducer';
+import {stopMultiYearProjectionRequest, runMultiYearProjectionRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {SIMULATION_JOB_STORAGE_KEY} from '@/services/socket/SocketManager';
+import {useCallback, useContext, useEffect, useRef, useState} from 'react';
+import {useDispatch, useSelector} from 'react-redux';
+import {useSimulationStatus} from '../../SimulationStatusContext';
 
 interface UseMultiYearProjectionSimulationParams {
   simulationId?: number;
   onSimulationCompleted: (processedYears: number) => void;
+  onSimulationStopped: () => void;
 }
 
 const MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY = `${SIMULATION_JOB_STORAGE_KEY}_multi_year_projection`;
 
-export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCompleted }: UseMultiYearProjectionSimulationParams) => {
+export const useMultiYearProjectionSimulation = ({simulationId, onSimulationCompleted, onSimulationStopped}: UseMultiYearProjectionSimulationParams) => {
   const dispatch = useDispatch();
-  const { subscribe } = useContext(WebSocketContext);
+  const {subscribe} = useContext(WebSocketContext);
+  const {isAnySimulationRunning, setIsMultiYearRunning, runningSimulationId} = useSimulationStatus();
 
   const runMultiYearProjectionData = useSelector((state: RootState) => state.simulationWizard.runMultiYearProjectionData);
-  const runMultiYearProjectionSuccess = useSelector((state: RootState) => state.simulationWizard.runMultiYearProjectionSuccess);
 
   const [simulationProgress, setSimulationProgress] = useState(0);
   const [currentConfig, setCurrentConfig] = useState(0);
@@ -37,7 +39,6 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
   const pendingRunRequestRef = useRef(false);
   const activeResourceIdRef = useRef<number | null>(null);
 
-
   const getSavedJobId = useCallback(() => {
     const savedJobId = Number(localStorage.getItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY));
     return Number.isFinite(savedJobId) && savedJobId > 0 ? savedJobId : null;
@@ -46,13 +47,14 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
   const isCurrentUserOwner = activeResourceId !== null && getSavedJobId() === activeResourceId;
   const isBlocked = isSimulationLocked && !isCurrentUserOwner && !isSimulationRunning;
 
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === simulationId;
+
   const resetProjectionProgressDetails = useCallback(() => {
     setSimulationProgress(0);
     setCurrentConfig(0);
     setTotalConfig(0);
     setCurrentYear(0);
   }, []);
-
 
   useEffect(() => {
     const unsubscribe = subscribe(event => {
@@ -104,7 +106,10 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
 
       if (action === 'Completed' || action === ActionType.Completed) {
         if (!isOwnerEvent) {
+          const yearsProcessed = Number(event.data?.year ?? event.data?.total_config ?? 0);
+
           setIsSimulationRunning(false);
+          setIsMultiYearRunning(false);
           setIsSimulationLocked(false);
           setRunSimulationDisabled(false);
           pendingRunRequestRef.current = false;
@@ -114,6 +119,7 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
           setActiveResourceId(null);
           localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
           resetProjectionProgressDetails();
+          onSimulationCompleted(yearsProcessed);
           return;
         }
 
@@ -140,12 +146,13 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
         setTimeout(() => {
           setShowCompletionProgress(false);
           setShowCompletionSummary(true);
-        }, 0);
+        }, 5000);
         return;
       }
 
       if (isTerminalAction) {
         setIsSimulationRunning(false);
+        setIsMultiYearRunning(false);
         setIsSimulationLocked(false);
         pendingRunRequestRef.current = false;
         setShowCompletionProgress(false);
@@ -155,11 +162,12 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
         localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
         resetProjectionProgressDetails();
         setRunSimulationDisabled(false);
+        onSimulationStopped();
       }
     });
 
     return () => unsubscribe();
-  }, [onSimulationCompleted, resetProjectionProgressDetails, simulationId, subscribe]);
+  }, [getSavedJobId, isSimulationRunning, onSimulationCompleted, onSimulationStopped, resetProjectionProgressDetails, simulationId, subscribe]);
 
   const handleRunProjection = useCallback(() => {
     if (!simulationId) return;
@@ -173,15 +181,16 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
     setRunSimulationDisabled(true);
     pendingRunRequestRef.current = true;
 
-    dispatch(runMultiYearProjectionRequest({ simulation_id: simulationId }));
+    dispatch(runMultiYearProjectionRequest({simulation_id: simulationId}));
   }, [dispatch, resetProjectionProgressDetails, simulationId]);
 
   const handleStopProjection = useCallback(() => {
     if (!simulationId) return;
 
-    dispatch(stopMultiYearProjectionRequest({ simulation_id: simulationId }));
+    dispatch(stopMultiYearProjectionRequest({simulation_id: simulationId}));
 
     setIsSimulationRunning(false);
+    setIsMultiYearRunning(false);
     setIsSimulationLocked(false);
     pendingRunRequestRef.current = false;
     setShowCompletionProgress(false);
@@ -192,7 +201,8 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
     setActiveResourceId(null);
     localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
     resetProjectionProgressDetails();
-  }, [dispatch, resetProjectionProgressDetails, simulationId]);
+    onSimulationStopped();
+  }, [dispatch, onSimulationStopped, resetProjectionProgressDetails, simulationId]);
 
   useEffect(() => {
     const jobId = runMultiYearProjectionData?.simulation_job_id;
@@ -204,12 +214,6 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
     setActiveResourceId(Number(jobId));
     setIsSimulationLocked(true);
   }, [isSimulationRunning, runMultiYearProjectionData?.simulation_job_id]);
-
-  useEffect(() => {
-    if (runMultiYearProjectionSuccess === 'S-20037') {
-      setRunSimulationDisabled(true);
-    }
-  }, [runMultiYearProjectionSuccess]);
 
   useEffect(() => {
     const normalizedSavedJobId = getSavedJobId();
@@ -229,7 +233,7 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
   }, [simulationId]);
 
   useEffect(() => {
-    if (!isSimulationRunning && !isBlocked) return;
+    if (!isSimulationRunning && !isBlocked && !shouldBlock) return;
 
     const handleClick = (event: MouseEvent) => {
       if (progressContainerRef.current?.contains(event.target as Node)) {
@@ -246,7 +250,7 @@ export const useMultiYearProjectionSimulation = ({ simulationId, onSimulationCom
       document.removeEventListener('click', handleClick, true);
       document.removeEventListener('mousedown', handleClick, true);
     };
-  }, [isBlocked, isSimulationRunning]);
+  }, [isBlocked, isSimulationRunning, shouldBlock]);
 
   return {
     currentConfig,

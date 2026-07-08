@@ -1,7 +1,7 @@
 from typing import List
-from sqlalchemy import delete, update, extract, select, or_, func, case, desc
+from sqlalchemy import delete, update, extract, select, or_, func, case, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, with_loader_criteria
 from models import (
     AssetOptimizationParameter,
     Asset,
@@ -9,8 +9,9 @@ from models import (
     AuditLog,
     Organization,
     User,
-    AuditLog,
     UserOrganization,
+    PdfInvoice,
+    Settlement,
 )
 from utils import Res, audit_logs, FileStorageManager, paginate
 from python_common.constants.country_list import countries_list
@@ -40,7 +41,6 @@ from uuid import uuid4
 from datetime import datetime, timezone, timedelta
 from fastapi import UploadFile, BackgroundTasks
 from fastapi.responses import StreamingResponse, Response
-from starlette.background import BackgroundTask
 import traceback
 import os
 import math
@@ -162,6 +162,14 @@ class AssetService:
             select(Asset, Organization)
             .outerjoin(Organization, Organization.id == Asset.organization_id)
             .options(selectinload(Asset.files))
+            .options(selectinload(Asset.invoices))
+            .options(
+                with_loader_criteria(
+                    PdfInvoice,
+                    PdfInvoice.is_deleted.is_(False),
+                    include_aliases=True,
+                )
+            )
         )
 
         if current_user.get("role") == UserRole.ANALYST.value:
@@ -185,7 +193,6 @@ class AssetService:
                 Asset.organization_id == analyst_organization_map.organization_id
             )
 
-        filter_applied = False
         if search:
             query = query.where(
                 or_(
@@ -194,20 +201,19 @@ class AssetService:
                     Asset.state.ilike(f"%{search}%"),
                 )
             )
-            filter_applied = True
 
         if type is not None:
             query = query.where(Asset.type == type)
-            filter_applied = True
+
         if organization:
             query = query.where(Asset.organization_id == organization)
-            filter_applied = True
+
         if country:
             query = query.where(Asset.country_id == country)
-            filter_applied = True
+
         if status is not None:
             query = query.where(Asset.status == status)
-            filter_applied = True
+
 
         result = await paginate(
             db=db,
@@ -241,23 +247,38 @@ class AssetService:
                 for f in asset.files
                 if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value
             ]
+
             # get file count
             file_count = len(merged_files)
 
+            # invoices
+            invoices = asset.invoices
+
             # override status
             status = asset.status
-            # if status == AssetStatus.DRAFT.value and file_count > 0:
-            #     status = AssetStatus.ANALYSIS_READY.value
 
             # evaluate available months
             available_periods = sorted(
                 [
                     {
-                        "month": f.projection_start_date.month,
-                        "year": f.projection_start_date.year,
+                        "month": f.month,
+                        "year": f.year,
                     }
                     for f in merged_files
-                    if f.projection_start_date
+                    if f.month and f.year
+                ],
+                key=lambda x: (x["year"], x["month"]),
+                reverse=True,
+            )
+
+            available_invoice_periods = sorted(
+                [
+                    {
+                        "month": i.month,
+                        "year": i.year,
+                    }
+                    for i in invoices
+                    if i.month and i.year
                 ],
                 key=lambda x: (x["year"], x["month"]),
                 reverse=True,
@@ -286,6 +307,7 @@ class AssetService:
                     "location": asset.state,
                     "analysis_available": file_count > 0,
                     "available_periods": available_periods,
+                    "available_invoice_periods": available_invoice_periods,
                     "current_step": asset.current_step,
                     "submitted_by": asset.submitted_by,
                     "submitted_at": (
@@ -502,103 +524,51 @@ class AssetService:
 
         # Audit Logs for Asset View
         if asset.status in [AssetStatus.DRAFT.value, AssetStatus.ANALYSIS_READY.value]:
-            asset_view_after = {
-                "Asset ID": asset.asset_id,
-                "Asset Name": asset.name,
-                "Viewed Section": "Basic Information",
-                "Status": AssetStatus(asset.status).name,
-            }
-            duplicate_log_query = await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.user_id == current_user.get("user_id"),
-                    AuditLog.role == current_user.get("role"),
-                    AuditLog.module == AuditLogModules.ASSET_ONBOARDING,
-                    AuditLog.action == AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION,
-                    AuditLog.resource_id == asset.asset_id,
-                    AuditLog.before.is_(None),
-                    AuditLog.after == json.dumps(asset_view_after),
-                    AuditLog.created_at
-                    >= datetime.now(timezone.utc) - timedelta(seconds=2),
-                )
-                .order_by(AuditLog.created_at.desc())
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.ASSET_ONBOARDING,
+                action=AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION,
+                before=None,
+                after={
+                    "Asset ID": asset.asset_id,
+                    "Asset Name": asset.name,
+                    "Viewed Section": "Basic Information",
+                    "Status": AssetStatus(asset.status).name,
+                },
+                resource_id=asset.asset_id,
             )
-            if not duplicate_log_query.scalars().first():
-                await audit_logs(
-                    db=db,
-                    user_id=current_user.get("user_id"),
-                    user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_ONBOARDING,
-                    action=AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION,
-                    before=None,
-                    after=asset_view_after,
-                    resource_id=asset.asset_id,
-                )
         elif asset.status == AssetStatus.PENDING_APPROVAL.value:
-            asset_view_after = {
-                "Asset ID": asset.asset_id,
-                "Asset Name": asset.name,
-                "Status": AssetStatus(asset.status).name,
-            }
-            duplicate_log_query = await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.user_id == current_user.get("user_id"),
-                    AuditLog.role == current_user.get("role"),
-                    AuditLog.module == AuditLogModules.ASSET_MANAGEMENT_AMD,
-                    AuditLog.action == AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET,
-                    AuditLog.resource_id == asset.asset_id,
-                    AuditLog.before.is_(None),
-                    AuditLog.after == json.dumps(asset_view_after),
-                    AuditLog.created_at
-                    >= datetime.now(timezone.utc) - timedelta(seconds=2),
-                )
-                .order_by(AuditLog.created_at.desc())
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                action=AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET,
+                before=None,
+                after={
+                    "Asset ID": asset.asset_id,
+                    "Asset Name": asset.name,
+                    "Status": AssetStatus(asset.status).name,
+                },
+                resource_id=asset.asset_id,
             )
-            if not duplicate_log_query.scalars().first():
-                await audit_logs(
-                    db=db,
-                    user_id=current_user.get("user_id"),
-                    user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_MANAGEMENT_AMD,
-                    action=AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET,
-                    before=None,
-                    after=asset_view_after,
-                    resource_id=asset.asset_id,
-                )
         elif asset.status in [AssetStatus.ACTIVE.value, AssetStatus.INACTIVE.value]:
-            asset_view_after = {
-                "Asset ID": asset.asset_id,
-                "Asset Name": asset.name,
-                "Status": AssetStatus(asset.status).name,
-            }
-            duplicate_log_query = await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.user_id == current_user.get("user_id"),
-                    AuditLog.role == current_user.get("role"),
-                    AuditLog.module == AuditLogModules.ASSET_MANAGEMENT_AMD,
-                    AuditLog.action == AuditLogScenario.VIEWED_ACTIVE_ASSET,
-                    AuditLog.resource_id == asset.asset_id,
-                    AuditLog.before.is_(None),
-                    AuditLog.after == json.dumps(asset_view_after),
-                    AuditLog.created_at
-                    >= datetime.now(timezone.utc) - timedelta(seconds=2),
-                )
-                .order_by(AuditLog.created_at.desc())
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                action=AuditLogScenario.VIEWED_ACTIVE_ASSET,
+                before=None,
+                after={
+                    "Asset ID": asset.asset_id,
+                    "Asset Name": asset.name,
+                    "Status": AssetStatus(asset.status).name,
+                },
+                resource_id=asset.asset_id,
             )
-            if not duplicate_log_query.scalars().first():
-                await audit_logs(
-                    db=db,
-                    user_id=current_user.get("user_id"),
-                    user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_MANAGEMENT_AMD,
-                    action=AuditLogScenario.VIEWED_ACTIVE_ASSET,
-                    before=None,
-                    after=asset_view_after,
-                    resource_id=asset.asset_id,
-                )
-            await db.commit()
 
         async def resolve_asset_users(key: str):
             user_id = getattr(asset, key)
@@ -696,6 +666,38 @@ class AssetService:
         result = await db.execute(iar_query)
         iar_file = result.scalar_one_or_none()
 
+        # =========== Invoice File Query ===========
+        invoice_query = select(PdfInvoice).where(
+            PdfInvoice.asset_id == asset_id,
+            PdfInvoice.is_deleted.is_(False),
+        )
+        
+        if asset.active_invoice_month:
+            invoice_query = invoice_query.where(PdfInvoice.month == asset.active_invoice_month)
+
+        if asset.active_invoice_year:
+            invoice_query = invoice_query.where(PdfInvoice.year == asset.active_invoice_year)
+        
+        invoice_query = invoice_query.order_by(PdfInvoice.uploaded_on.desc()).limit(1)
+        invoice_result = await db.execute(invoice_query)
+        invoice = invoice_result.scalar_one_or_none()
+
+        # =========== Invoice Settlement File Query ===========
+        invoice_settlement_query = select(Settlement).where(
+            Settlement.asset_id == asset_id,
+            Settlement.is_deleted.is_(False),
+        )
+        
+        if asset.active_invoice_month:
+            invoice_settlement_query = invoice_settlement_query.where(Settlement.month == asset.active_invoice_month)
+
+        if asset.active_invoice_year:
+            invoice_settlement_query = invoice_settlement_query.where(Settlement.year == asset.active_invoice_year)
+        
+        invoice_settlement_query = invoice_settlement_query.order_by(Settlement.uploaded_on.desc()).limit(1)
+        invoice_settlement_result = await db.execute(invoice_settlement_query)
+        invoice_settlement = invoice_settlement_result.scalar_one_or_none()
+
         # Fetch Available Periods
         periods_query = (
             select(
@@ -704,8 +706,7 @@ class AssetService:
             )
             .where(
                 AssetFile.asset_id == asset_id,
-                AssetFile.type
-                == AssetFileType.MERGED_SCADA_AGGREGATOR.value,  # ✅ key change
+                AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,  # ✅ key change
                 AssetFile.month.isnot(None),
                 AssetFile.year.isnot(None),
             )
@@ -718,6 +719,27 @@ class AssetService:
 
         periods_query_result = await db.execute(periods_query)
         available_periods = periods_query_result.fetchall()
+
+        # Fetch invoice available periods query
+        invoice_periods_query = (
+            select(
+                PdfInvoice.year.label("year"),
+                PdfInvoice.month.label("month"),
+            )
+            .where(
+                PdfInvoice.asset_id == asset_id,
+                PdfInvoice.month.isnot(None),
+                PdfInvoice.year.isnot(None),
+            )
+            .distinct()
+            .order_by(
+                desc(PdfInvoice.year),
+                desc(PdfInvoice.month),
+            )
+        )
+
+        invoice_periods_query_result = await db.execute(invoice_periods_query)
+        available_invoice_periods = invoice_periods_query_result.fetchall()
 
         def format_report_file(f):
             if not f:
@@ -810,6 +832,32 @@ class AssetService:
             data["optimized_dataset_file"] = format_generated_file(
                 files_map.get(AssetFileType.OPTIMIZED_DATASET.value)
             )
+            data['invoice_file'] = {
+                "id": invoice.id,
+                "invoice_file_name": invoice.invoice_file_name,
+                "invoice_file_size": invoice.size,
+                "type": invoice.type,
+                "invoice_number": invoice.invoice_number,
+                "invoice_date": invoice.invoice_date.strftime("%d %b %Y") if invoice.invoice_date else None,
+                "invoice_amount": invoice.invoice_amount,
+                "capacity_payment_month": invoice.capacity_payment_month,
+                "capacity_payment_year": invoice.capacity_payment_year,
+                "uploaded_on": invoice.uploaded_on.isoformat() if invoice.uploaded_on else None,
+                "month": invoice.month,
+                "year": invoice.year,
+            } if invoice else None
+
+            data["invoice_settlement_file"] = {
+                "id": invoice_settlement.id,
+                "settlement_file_name": invoice_settlement.file_name,
+                "settlement_file_size": invoice_settlement.file_size,
+                "extracted_invoice_number": invoice_settlement.extracted_invoice_number,
+                "extracted_invoice_date": invoice_settlement.extracted_invoice_date.strftime("%d %b %Y") if invoice_settlement.extracted_invoice_date else None,
+                "invoice_payment_date": invoice_settlement.invoice_payment_date.strftime("%d %b %Y") if invoice_settlement.invoice_payment_date else None,
+                "uploaded_on": invoice_settlement.uploaded_on.isoformat() if invoice_settlement.uploaded_on else None,
+                "month": invoice_settlement.month,
+                "year": invoice_settlement.year,
+            } if invoice_settlement else None
 
             # Time-Periods
             data["active_period"] = (
@@ -820,6 +868,16 @@ class AssetService:
                 if asset.active_month is not None and asset.active_year is not None
                 else None
             )
+
+            data['invoice_active_period'] = (
+                {
+                    "month": int(asset.active_invoice_month),
+                    "year": int(asset.active_invoice_year),
+                }
+                if asset.active_invoice_month is not None and asset.active_invoice_year is not None
+                else None
+            )
+
             data["available_periods"] = (
                 [
                     {
@@ -829,6 +887,18 @@ class AssetService:
                     for p in available_periods
                 ]
                 if available_periods is not None
+                else []
+            )
+
+            data['available_invoice_periods'] = (
+                [
+                    {
+                        "month": int(p.month),
+                        "year": int(p.year),
+                    }
+                    for p in available_invoice_periods
+                ]
+                if available_invoice_periods is not None
                 else []
             )
 
@@ -946,7 +1016,13 @@ class AssetService:
             )
 
         payload_fields = payload.model_fields_set
-        allowed_fields = {"current_step", "active_month", "active_year"}
+        allowed_fields = {
+            "current_step", 
+            "active_month", 
+            "active_year", 
+            "active_invoice_month",
+            "active_invoice_year"
+        }
 
         if (
             current_user.get("role") == UserRole.ANALYST.value
@@ -1054,6 +1130,8 @@ class AssetService:
             "status": ("status", "Status"),
             "active_month": ("active_month", "Active Month"),
             "active_year": ("active_year", "Active Year"),
+            "active_invoice_month": ("active_invoice_month", "Invoice Active Year"),
+            "active_invoice_year": ("active_invoice_year", "Invoice Active Year"),
         }
 
         for payload_field, (model_attr, label) in fields_map.items():
@@ -1124,6 +1202,10 @@ class AssetService:
             "active_period": {
                 "month": asset.active_month,
                 "year": asset.active_year,
+            },
+            "invoice_active_period": {
+                "month": asset.active_invoice_month,
+                "year": asset.active_invoice_year,
             },
             "current_step": asset.current_step,
             "created_at": asset.created_at.isoformat(),
@@ -1948,7 +2030,6 @@ class AssetService:
     def _last_sunday(self, year, month):
         """Get the last Sunday of a given month and year"""
         from datetime import date
-        import calendar
 
         # Get the last day of the month
         last_day = calendar.monthrange(year, month)[1]
@@ -3570,22 +3651,22 @@ class AssetService:
             traceback.print_exc()
             return Res.error("E-10001")
 
-    async def download_file_history(
+    async def download_file(
         self, db: AsyncSession, asset_id: int, file_id: int, current_user: dict
     ):
         try:
-            file = await db.get(AssetFile, file_id)
-            if not file:
+            asset_file = await db.get(AssetFile, file_id)
+            if not asset_file:
                 return Res.error("E-10124", message="File not found")
 
-            if file.asset_id != asset_id:
+            if asset_file.asset_id != asset_id:
                 return Res.error("E-10124", message="File not found")
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034", message="Asset not found")
 
-            file_bytes, _ = FileStorageManager.get_file_object(
-                file.key, storage_type=file.storage_server
+            file_bytes, content_type  = FileStorageManager.get_file_object(
+                asset_file.key, storage_type=asset_file.storage_server
             )
 
             action_map = {
@@ -3595,36 +3676,33 @@ class AssetService:
                 AssetFileType.MERGED_SCADA_AGGREGATOR.value: AuditLogScenario.MERGED_DATASET_DOWNLOADED,
                 AssetFileType.OPTIMIZED_DATASET.value: AuditLogScenario.OPTIMIZED_DATASET_DOWNLOADED,
             }
-            download_action = action_map.get(file.type)
+            download_action = action_map.get(asset_file.type)
             if download_action:
                 period = (
-                    file.projection_start_date.strftime("%B-%Y")
-                    if file.projection_start_date
+                    asset_file.projection_start_date.strftime("%B-%Y")
+                    if asset_file.projection_start_date
                     else "N/A"
                 )
+                await audit_logs(
+                    db=db,
+                    user_id=current_user.get("user_id"),
+                    user_role=current_user.get("role"),
+                    module=AuditLogModules.ASSET_MANAGEMENT_AMD,  # always post-approval
+                    action=download_action,
+                    before={
+                        "File History Record": period,
+                        "File": asset_file.name,
+                        "Download Status": "Not Started",
+                    },
+                    after="File downloaded by user",
+                    resource_id=asset.asset_id,
+                )
+                await db.commit()
 
             return StreamingResponse(
                 BytesIO(file_bytes),
-                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename={file.name}"},
-                background=(
-                    BackgroundTask(
-                        audit_logs,
-                        user_id=current_user.get("user_id"),
-                        user_role=current_user.get("role"),
-                        module=self._get_audit_module(asset),
-                        action=download_action,
-                        before={
-                            "File History Record": period,
-                            "File": file.name,
-                            "Download Status": "Not Started",
-                        },
-                        after="File downloaded by user",
-                        resource_id=asset.asset_id,
-                    )
-                    if download_action
-                    else None
-                ),
+                media_type=content_type,
+                headers={"Content-Disposition": f"attachment; filename=\"{asset_file.name}\""},
             )
         except Exception:
             traceback.print_exc()
@@ -4362,6 +4440,8 @@ class AssetService:
                     if is_agg_scada_file
                     else AssetSteps.UPLOAD_AGGREGATOR_SCADA.value
                 )
+                if is_agg_scada_file:
+                    asset.status = AssetStatus.DRAFT.value
 
         action_map = {
             AssetFileType.AGGREGATOR_REPORT.value: AuditLogScenario.AGGREGATOR_REPORT_REMOVED,

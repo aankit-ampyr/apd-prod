@@ -5,7 +5,11 @@ from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 from config import DATABASE_URL
 from db.db_config import AMDBase as Base
+import sys
+import os
+sys.path.append(r"C:\Users\Admin\Desktop\work\Lazarus-app\packages\python-common")
 from models import *  # ensure models are imported for autogenerate
+
 config = context.config
 
 print(f"Using DATABASE_URL: {DATABASE_URL}")

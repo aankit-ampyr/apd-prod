@@ -14,7 +14,7 @@ const TABS: {id: string; label: string; icon: IconTypes}[] = [
   },
   {
     id: 'hourly-chart',
-    label: 'Hourly Dispatch Chart',
+    label: 'Hourly Dispatch Graph',
     icon: 'analysis1',
   },
   {
@@ -46,12 +46,17 @@ export const ViewDetailedAnalysis = ({onBack}: ViewDetailedAnalysisProps) => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
-                'flex items-center gap-2 px-2 lg:px-12 py-1 lg:py-2 rounded-sm cursor-pointer',
+                'flex items-start xl:items-center  gap-2 px-2 lg:px-12 py-1 lg:py-2 rounded-sm cursor-pointer',
                 'font-InterMedium!',
                 isActive ? 'bg-white shadow text-text-primary!' : 'text-text-secondary!',
               )}>
-              <Icon name={tab.icon} size={16} />
-              <Text variant={'body1'} className={cn(isActive ? 'text-text-primary! font-InterMedium!' : 'text-text-secondary! font-InterMedium!', 'lg:text-[16px]!')}>
+              <Icon name={tab.icon} size={16} className="mt-1 xl:mt-0" />
+              <Text
+                variant={'body1'}
+                className={cn(
+                  isActive ? 'text-text-primary! font-InterMedium!' : 'text-text-secondary! font-InterMedium!',
+                  'lg:text-[16px]! lg:text-left xl:text-center',
+                )}>
                 {tab.label}
               </Text>
             </button>

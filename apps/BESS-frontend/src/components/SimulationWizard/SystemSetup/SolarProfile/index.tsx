@@ -1,9 +1,9 @@
-import { Button, Icon, Text } from '@/ui-kits';
-import { useEffect, useRef, useState } from 'react';
-import { SelectSolarProfile } from './SelectSolarProfile';
-import { CSVUpload } from './CSVUpload';
-import { useDispatch, useSelector } from 'react-redux';
-import { saveSolarProfileRequest } from '@/services/redux/slice/simulationWizardSlice';
+import {Button, Icon, Skeleton, Text} from '@/ui-kits';
+import {useEffect, useRef, useState} from 'react';
+import {SelectSolarProfile} from './SelectSolarProfile';
+import {CSVUpload} from './CSVUpload';
+import {useDispatch, useSelector} from 'react-redux';
+import {saveSolarProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {
   saveSolarProfileLoading,
   saveSolarProfileSuccess,
@@ -14,19 +14,66 @@ import {
   solarProfileError,
   initiateSimulationData,
   projectSimulationData,
+  solarProfileLoading,
+  solarProfileFetchLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
-import { authDataSelector, allProjectsData } from '@/services/redux/selectors';
+import {authDataSelector, allProjectsData} from '@/services/redux/selectors';
 
 type Props = {
   readonly onSaveComplete?: () => void;
   readonly readOnly?: boolean;
 };
 
-export const SolarProfile = ({ onSaveComplete, readOnly }: Props) => {
+function SolarProfileGhostLoader() {
+  return (
+    <>
+      {/* Divider */}
+      <div className="h-px bg-gray-200 my-6" />
+
+      {/* Heading */}
+      <div className="flex items-center gap-3 mb-6">
+        <Skeleton animation="wave" variant="circular" width={22} height={22} />
+        <Skeleton animation="wave" variant="rounded" width={220} height={22} className="rounded-full!" />
+      </div>
+
+      {/* Analysis Card */}
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+        <div className="grid grid-cols-4">
+          {[1, 2, 3, 4].map((item, index) => (
+            <div key={item} className={`px-6 py-7 ${index !== 3 ? 'border-r border-gray-100' : ''}`}>
+              <Skeleton animation="wave" variant="rounded" width={95} height={14} className="rounded-full!" />
+
+              <Skeleton animation="wave" variant="rounded" width="65%" height={28} className="rounded-full! mt-5" />
+
+              {index === 3 && <Skeleton animation="wave" variant="rounded" width={60} height={12} className="rounded-full! mt-3" />}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm overflow-hidden mt-5">
+        <div className="grid grid-cols-4">
+          {[1, 2, 3, 4].map((item, index) => (
+            <div key={item} className={`px-6 py-7 ${index !== 3 ? 'border-r border-gray-100' : ''}`}>
+              <Skeleton animation="wave" variant="rounded" width={95} height={14} className="rounded-full!" />
+
+              <Skeleton animation="wave" variant="rounded" width="65%" height={28} className="rounded-full! mt-5" />
+
+              {index === 3 && <Skeleton animation="wave" variant="rounded" width={60} height={12} className="rounded-full! mt-3" />}
+            </div>
+          ))}
+        </div>
+      </div>
+    </>
+  );
+}
+
+export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState<'existing' | 'csv'>('existing');
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
+  const solarLoading = useSelector(solarProfileFetchLoading);
 
   const simulation_id = simulData?.id ?? proSimulData?.id;
   const previewSolar = useSelector(solarProfileData);
@@ -42,7 +89,7 @@ export const SolarProfile = ({ onSaveComplete, readOnly }: Props) => {
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
   const projectId = simulData?.project_id ?? proSimulData?.project_id;
-  const currentProject = allProjData?.find(project => Number(project?.id) === projectId);
+  const currentProject = allProjData?.find((project: any) => Number(project?.id) === projectId);
   const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
   const isAssignedUser = Boolean(
     authData?.id && allProjData?.some(project => Number(project?.id) === projectId && project?.assigned_users?.some(user => user.id === authData.id)),
@@ -67,13 +114,13 @@ export const SolarProfile = ({ onSaveComplete, readOnly }: Props) => {
 
       let scrollContainer: HTMLElement | null = el.parentElement;
       while (scrollContainer) {
-        const { overflow, overflowY } = window.getComputedStyle(scrollContainer);
+        const {overflow, overflowY} = window.getComputedStyle(scrollContainer);
         if (/(auto|scroll)/.test(overflow + overflowY) && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
           const chartTop = el.getBoundingClientRect().top;
           const containerTop = scrollContainer.getBoundingClientRect().top;
           const offset = chartTop - containerTop + scrollContainer.scrollTop;
           const targetScroll = offset - scrollContainer.clientHeight * -0.5;
-          scrollContainer.scrollTo({ top: targetScroll, behavior: 'smooth' });
+          scrollContainer.scrollTo({top: targetScroll, behavior: 'smooth'});
           break;
         }
         scrollContainer = scrollContainer.parentElement;
@@ -161,12 +208,12 @@ export const SolarProfile = ({ onSaveComplete, readOnly }: Props) => {
                 Solar Profile
               </Text>
             </div>
-            <div className="bg-bg-card p-2 rounded-md flex w-[80%] xl:w-[45%] mt-4">
+            <div className="bg-bg-card p-2 rounded-sm flex w-[80%] xl:w-[45%] mt-4">
               {/* Select Existing File */}
               <button
                 onClick={() => !isReadOnly && setActiveTab('existing')}
                 disabled={isReadOnly}
-                className={`flex-1 py-2 self-center rounded-md text-center font-semibold transition-all duration-200
+                className={`flex-1 py-2 self-center rounded-sm text-center font-semibold transition-all duration-200
           ${activeTab === 'existing' ? 'bg-primary text-white shadow-sm' : 'text-gray-600'} ${isReadOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 Select Existing File
               </button>
@@ -175,35 +222,44 @@ export const SolarProfile = ({ onSaveComplete, readOnly }: Props) => {
               <button
                 onClick={() => !isReadOnly && setActiveTab('csv')}
                 disabled={isReadOnly}
-                className={`flex-1 py-2 self-center rounded-md text-center font-semibold transition-all duration-200
+                className={`flex-1 py-2 self-center rounded-sm text-center font-semibold transition-all duration-200
           ${activeTab === 'csv' ? 'bg-primary text-white shadow-sm' : 'text-gray-600'} ${isReadOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 Upload Custom CSV
               </button>
             </div>
-            {activeTab === 'existing' && (
-              <SelectSolarProfile
-                data={solarData}
-                onMaximize={(chart: 'hourly' | 'monthly') => setMaximizedChart(chart)}
-                isExpanded={isExpanded}
-                setIsExpanded={setIsExpanded}
-                readOnly={isReadOnly}
-                onProfileChange={handleProfileChange}
-              />
-            )}
+            {activeTab === 'existing' &&
+              (solarLoading ? (
+                <SolarProfileGhostLoader />
+              ) : (
+                <SelectSolarProfile
+                  data={solarData}
+                  onMaximize={(chart: 'hourly' | 'monthly') => setMaximizedChart(chart)}
+                  isExpanded={isExpanded}
+                  setIsExpanded={setIsExpanded}
+                  readOnly={isReadOnly}
+                  onProfileChange={handleProfileChange}
+                />
+              ))}
             {activeTab === 'csv' && <CSVUpload readOnly={isReadOnly} onFileChange={handleProfileChange} />}
           </div>
-          {activeTab === 'existing' && !isReadOnly && (
-            <div className="mt-6 flex justify-center">
-              <Button
-                variant="secondary"
-                size="md"
-                disabled={disableButton}
-                onClick={handleSave}
-                className={`self-center ${disableButton ? 'cursor-not-allowed' : ''}`}>
-                Save and Continue
-              </Button>
-            </div>
-          )}
+          {activeTab === 'existing' &&
+            !isReadOnly &&
+            (solarLoading ? (
+              <div className="mt-6 flex justify-center">
+                <Skeleton animation="wave" variant="rounded" width={180} height={42} className="rounded-xl!" />
+              </div>
+            ) : (
+              <div className="mt-6 flex justify-center">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  disabled={disableButton}
+                  onClick={handleSave}
+                  className={`self-center ${disableButton ? 'cursor-not-allowed' : ''}`}>
+                  Save and Continue
+                </Button>
+              </div>
+            ))}
         </>
       )}
       {maximizedChart && (

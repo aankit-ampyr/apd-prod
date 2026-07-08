@@ -1,8 +1,10 @@
 import type { SelectInputItem } from "../../interface";
 import { cn } from "../../utils";
-import React, { type Ref } from "react";
+import React, { useRef, type Ref } from "react";
 import { Icon } from "../Icon";
 import { Text } from "../Text";
+import { Tooltip } from "../Tooltip";
+import { useIsTruncated } from "../../hooks";
 
 interface DropdownProps {
   options: SelectInputItem[];
@@ -63,6 +65,7 @@ interface DropdownItemProps {
 
 const DropdownItem: React.FC<DropdownItemProps> = (props) => {
   const { option, isSelected, itemClassName, onSelect, render } = props;
+
   return (
     <button
       key={option.id}
@@ -78,21 +81,41 @@ const DropdownItem: React.FC<DropdownItemProps> = (props) => {
       {render ? (
         render(option, isSelected)
       ) : (
-        <Text
-          variant="caption"
-          className={cn(
-            "truncate",
-            isSelected
-              ? "font-InterMedium! text-text-primary"
-              : "text-text-primary font-InterRegular!",
-          )}
-        >
-          {option.label}
-        </Text>
+        <TruncatedDropdownLabel label={option.label} isSelected={isSelected} />
       )}
       {isSelected ? <Icon name="tick" className="size-4 text-primary" /> : null}
     </button>
   );
 };
+
+function TruncatedDropdownLabel({
+  label,
+  isSelected,
+}: {
+  label: string;
+  isSelected: boolean;
+}) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const isTruncated = useIsTruncated(textRef);
+
+  return (
+    <div className="relative flex-1 min-w-0">
+      <Text
+        ref={textRef}
+        variant="caption"
+        className={cn(
+          "block truncate",
+          isSelected
+            ? "font-InterMedium! text-text-primary"
+            : "text-text-primary font-InterRegular!",
+        )}
+      >
+        {label}
+      </Text>
+
+      {isTruncated ? <Tooltip message={label} position="top" portal /> : null}
+    </div>
+  );
+}
 
 export default Dropdown;

@@ -1,8 +1,17 @@
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {AssetSection, FilterGroup, ReassignAssetOwnership, ScreenWrapper, WithRole} from '@/components';
-import {ASSET_STATUS_LABELS, ASSET_TYPE_OPTIONS, AssetStatus, AssetType, Country, UserRole} from '@/constants';
-import {useDropdownValues, useRole, useToast} from '@/hooks';
+import {
+  ASSET_STATUS_LABELS,
+  ASSET_TYPE_OPTIONS,
+  AssetStatus,
+  AssetType,
+  Country,
+  TABLET_SCREEN_BREAKPOINT,
+  UserRole,
+} from '@/constants';
+import {useDropdownValues, useRole, useToast, useWindowDimensions} from '@/hooks';
+
 import {allOrganizationsList, assetSuccess, assetError, assetTypeLoading, noAsset} from '@/services/redux/selectors';
 import {getAllOrganizationsListRequest, resetAssetMessage, getAssetDetailsRequest} from '@/services/redux/slice';
 import {Button, Skeleton, Text} from '@/ui-kits';
@@ -53,6 +62,8 @@ export function AssetManagement() {
     selector: allOrganizationsList,
     allowFetch: isAMDAdmin, // Only fetch organizations if user is AMD Admin
   });
+  const {width} = useWindowDimensions();
+  const alwaysShrink = width <= TABLET_SCREEN_BREAKPOINT;
 
   // =================
   // selectors
@@ -87,7 +98,7 @@ export function AssetManagement() {
     </WithRole>
   );
   const EmptyScreen = ({message, children}: {message: string; children?: React.ReactNode}) => (
-    <div className="flex flex-col grow items-center justify-center gap-4 py-20">
+    <div className="flex h-full flex-col grow items-center justify-center gap-4 py-20">
       <img src={Images.noAssets} alt="No assets" className="size-20" />
       <Text variant="h3" className="text-text-secondary!">
         {message}
@@ -153,6 +164,9 @@ export function AssetManagement() {
     if (!asset.id) return;
     dispatch(getAssetDetailsRequest({id: asset.id}));
 
+
+
+
     if (isAssetOnboarded(asset)) {
       navigate(Routes.VIEW_ASSET.replace(':id', String(asset.id)));
     } else {
@@ -191,10 +205,14 @@ export function AssetManagement() {
   }, [failure, success]);
 
   return (
-    <ScreenWrapper>
+    <ScreenWrapper className="p-3 xl:p-8" wrapperClassName="p-3 xl:p-6">
       {isInitialAssetLoading && <LoadingScreen />}
 
-      <div className={cn('flex-col h-full gap-6 p-4', showEmptyScreen || isInitialAssetLoading ? 'hidden' : 'flex')}>
+      <div
+        className={cn(
+          'flex-col h-full gap-6 px-0 py-4 xl:p-4',
+          showEmptyScreen || isInitialAssetLoading ? 'hidden' : 'flex',
+        )}>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <Text variant="subtitle1" className="text-text-primary">
@@ -206,55 +224,62 @@ export function AssetManagement() {
         {/* Search & Filters */}
         <FilterGroup
           debounceMs={0}
-          config={[
-            {
-              key: 'search',
-              placeholder: 'Search by ID, name or location...',
-              type: 'search',
-              props: {
-                className: 'min-w-[300px]',
+          config={
+            [
+              {
+                key: 'search',
+                placeholder: 'Search by ID, name or location...',
+                type: 'search',
+                props: {
+                  className: alwaysShrink ? 'w-full' : 'min-w-[300px]',
+                },
+                wrapperClassName: alwaysShrink ? 'w-[calc(66.666%-8px)] shrink-0' : '',
               },
-            },
-            {
-              key: 'type',
-              placeholder: 'Asset Type',
-              type: 'select',
-              options: ASSET_TYPE_OPTIONS,
-              props: {
-                className: 'min-w-[150px]',
+              {
+                key: 'organization',
+                placeholder: 'All Organizations',
+                type: 'searchable-select',
+                options: allOrgs,
+                props: {
+                  className: alwaysShrink ? 'w-full' : 'min-w-40 max-w-50',
+                  onInvalidSearchChange: (invalid: boolean) => setInvalidOrgSearch(invalid),
+                },
+                hideFilter: !isAMDAdmin, // Only show organization filter for AMD Admins
+                wrapperClassName: alwaysShrink ? 'w-[calc(33.333%-8px)] shrink-0' : '',
               },
-            },
-            {
-              key: 'organization',
-              placeholder: 'Organization',
-              type: 'searchable-select',
-              options: allOrgs,
-              props: {
-                className: 'min-w-40 max-w-50',
-                onInvalidSearchChange: (invalid: boolean) => setInvalidOrgSearch(invalid),
+              {
+                key: 'status',
+                placeholder: 'All status',
+                type: 'select',
+                options: enumToSelectOptions(AssetStatus, ASSET_STATUS_LABELS),
+                props: {
+                  className: alwaysShrink ? 'w-full' : 'min-w-40',
+                },
+                wrapperClassName: alwaysShrink ? 'flex-1' : '',
               },
-              hideFilter: !isAMDAdmin, // Only show organization filter for AMD Admins
-            },
-            {
-              key: 'status',
-              placeholder: 'Status',
-              type: 'select',
-              options: enumToSelectOptions(AssetStatus, ASSET_STATUS_LABELS),
-              props: {
-                className: 'min-w-40',
+              {
+                key: 'country',
+                placeholder: 'All Countries',
+                type: 'searchable-select',
+                options: COUNTRIES_OPTIONS.map(option => ({...option, label: capitalize(option.label)})),
+                props: {
+                  className: alwaysShrink ? 'w-full' : 'max-w-50',
+                  onInvalidSearchChange: (invalid: boolean) => setInvalidCountrySearch(invalid),
+                },
+                wrapperClassName: alwaysShrink ? 'flex-1' : '',
               },
-            },
-            {
-              key: 'country',
-              placeholder: 'Country',
-              type: 'searchable-select',
-              options: COUNTRIES_OPTIONS.map(option => ({...option, label: capitalize(option.label)})),
-              props: {
-                className: 'max-w-50',
-                onInvalidSearchChange: (invalid: boolean) => setInvalidCountrySearch(invalid),
+              {
+                key: 'type',
+                placeholder: 'All Types',
+                type: 'select',
+                options: ASSET_TYPE_OPTIONS,
+                props: {
+                  className: alwaysShrink ? 'w-full' : 'min-w-[150px]',
+                },
+                wrapperClassName: alwaysShrink ? 'flex-1' : '',
               },
-            },
-          ]}
+            ] as any
+          }
           onChange={setFilter}
         />
         {(noAssetFound || invalidFilters) && <EmptyScreen message={getErrorMessage('E-10033')} />}
@@ -295,7 +320,7 @@ export function AssetManagement() {
         )}
       </div>
 
-      <div className={cn(showEmptyScreen ? 'block' : 'hidden')}>
+      <div className={cn('grow', showEmptyScreen ? 'block' : 'hidden')}>
         <EmptyScreen message={'No Assets have been added yet'}>{AddAssetCTA}</EmptyScreen>
       </div>
     </ScreenWrapper>

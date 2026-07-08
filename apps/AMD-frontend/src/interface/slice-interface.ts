@@ -18,6 +18,12 @@ import type {
   AssetImbalanceAnalytics,
   AssetBatteryHealthAnalytics,
   AssetTBSpreadAnalytics,
+  AssetExecutiveAnalysis,
+  Invoice,
+  InvoiceExtractionQualitySummary,
+  InvoiceExtractionCategorySummary,
+  InvoiceSettlement,
+  AssetCapacityMarketAnalytics,
 } from './common-interface';
 
 export interface UserSliceInitialState {
@@ -48,7 +54,7 @@ export interface OrganizationSliceInitialState {
   users: User[];
 }
 
-type AssetFileUploadError = {
+export type AssetFileUploadError = {
   file?: {name: string};
   validation_errors?: string[];
 };
@@ -95,9 +101,12 @@ export interface AssetSliceInitialState {
   allAssets: Asset[];
   currentSelectedAsset: Asset | null;
   currentAssetFiles: Array<AssetReportFile>;
+
   aggregatorReportUploadError: AssetFileUploadError | null;
   scadaReportUploadError: AssetFileUploadError | null;
   iarReportUploadError: AssetFileUploadError | null;
+  invoiceUploadError: AssetFileUploadError | null;
+  invoiceSettlementUploadError: AssetFileUploadError | null;
 
   users: User[];
 
@@ -298,6 +307,47 @@ export interface AssetSliceInitialState {
     revenueIARvsActual: boolean;
     multiMarketOptmization: boolean;
   };
+
+  // executive analysis data
+  executiveAnalysis: Partial<{
+    summary: Nullable<AssetExecutiveAnalysis['summary']>;
+    monthly_revenue_comparison: Nullable<AssetExecutiveAnalysis['monthly_revenue_comparison']>;
+    revenue_by_stream: Nullable<AssetExecutiveAnalysis['revenue_by_stream']>;
+  }>;
+  executiveAnalysisError: {
+    summary: boolean | string;
+    monthly_revenue_comparison: boolean | string;
+    revenue_by_stream: boolean | string;
+  };
+  executiveAnalysisLoading: {
+    summary: boolean;
+    monthly_revenue_comparison: boolean;
+    revenue_by_stream: boolean;
+  };
+
+  // upload invoice data
+  uploadInvoice: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
+  deleteInvoice: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
+
+  // upload invoice settlement data
+  uploadInvoiceSettlement: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
+  deleteInvoiceSettlement: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
 }
 
 export interface DigestSliceInitialState {
@@ -336,10 +386,57 @@ export interface AuditLogSliceInitialState {
   isLoading: boolean;
   auditLogError: string | boolean;
   auditLogSuccess: string | boolean;
-
   auditLogs: APDAuditLog[];
   totalPages: number;
   nextPage: number | null;
   currentPage: number;
   totalResults: number;
+}
+
+export interface InvoiceSliceInitialState {
+  // keeping loading, error, success and data states for invoice list in a seperate object
+  // instead of keeping centralized loading, error, success and data states for all invoice related data in this slice
+  // this is part of new coding standard that need to be implement from now onwards.
+  invoiceList: {
+    invoicesLoading: boolean;
+    assetId: Nullable<number>; // for which asset invoices are being fetched, for same assetId, loading will not be set to true again, until the assetId changes, this is to avoid flickering of invoice list when user is on same asset page and is fetching invoices again
+    invoicesError: string | boolean;
+    invoicesSuccess: string | boolean;
+    data: Invoice[];
+    totalPages: number;
+    nextPage: number | null;
+    currentPage: number;
+    totalResults: number;
+  };
+
+  // keeping loading, error, success and data states for invoice summary in a seperate object
+  summary: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+    data: {
+      total_invoices: number;
+      extraction_quality: Nullable<InvoiceExtractionQualitySummary>;
+      category_summary: Nullable<InvoiceExtractionCategorySummary>;
+    };
+  };
+
+  // invoice settlement list, with separate loading, error, success and data states
+  settlementList: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+    data: InvoiceSettlement[];
+    totalPages: number;
+    nextPage: number | null;
+    currentPage: number;
+    totalResults: number;
+  };
+
+  capacityMarket: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+    data: Nullable<AssetCapacityMarketAnalytics>;
+  };
 }

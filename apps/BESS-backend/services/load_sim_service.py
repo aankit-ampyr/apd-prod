@@ -3,16 +3,16 @@ from typing import Optional
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from constants.enums import LoadPattern, SimulationLogStep, SimulationSetupProgress
 from dtos import LoadProfilePayload, LoadProfileResponse, PatternInfo
 from dtos.simulation_dto import CONFIG_MAP, DataPoint, LoadProfileOutput
 from utils.log_utils import compare_and_log
 from utils.response_utils import Res
-from models import LoadProfile, Simulation
+from models import LoadProfile
 from python_common.constants.enums import AuditLogModules, AuditLogScenario
 from .service_support import (
     depreciate_simulation_job,
-    ensure_simulation_write_access,
     progress_simulation_setup,
 )
 
@@ -169,10 +169,13 @@ class LoadSimulationService:
             return Res.error(
                 status_code="E-20017",
                 message="Load profile calculation failed. Please try again.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         return Res.success(
-            status_code="S-20004", data=compute_result.model_dump(mode="json")
+            status_code="S-20004",
+            data=compute_result.model_dump(mode="json"),
+            http_status_code=status.HTTP_200_OK,
         )
 
     async def compute_and_save_load_profile(
@@ -183,12 +186,6 @@ class LoadSimulationService:
         current_user: dict,
         resource_id: str,
     ):
-        simulation, auth_error = await ensure_simulation_write_access(
-            db=bess_db, simulation_id=simulation_id, current_user=current_user
-        )
-        if auth_error:
-            return auth_error
-
         result = await bess_db.execute(
             select(LoadProfile).where(LoadProfile.simulation_id == simulation_id)
         )
@@ -203,11 +200,14 @@ class LoadSimulationService:
                 data = LoadProfileResponse.model_validate(existing_load_profile)
                 if data is None:
                     return Res.error(
-                        status_code="E-20001", message="Oops! Something went wrong"
+                        status_code="E-20001",
+                        message="Oops! Something went wrong",
+                        http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     )
                 return Res.success(
                     status_code="S-20004",
                     data=data.model_dump(mode="json"),
+                    http_status_code=status.HTTP_200_OK,
                 )
 
         computed_load = self._compute_load_profile(payload=payload)
@@ -216,6 +216,7 @@ class LoadSimulationService:
             return Res.error(
                 status_code="E-20017",
                 message="Load profile calculation failed. Please try again.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         before_config = {}
@@ -283,7 +284,9 @@ class LoadSimulationService:
             db=bess_db,
         )
 
-        await depreciate_simulation_job(simulation_id=simulation_id, db=bess_db)
+        await depreciate_simulation_job(
+            simulation_id=simulation_id, db=bess_db, include_green_job=True
+        )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -301,6 +304,7 @@ class LoadSimulationService:
         return Res.success(
             status_code="S-20004",
             data=computed_load.model_dump(mode="json"),
+            http_status_code=status.HTTP_200_OK,
         )
 
     async def get_load_profile(self, simulation_id: int, bess_db: AsyncSession):
@@ -310,7 +314,11 @@ class LoadSimulationService:
         load_profile = result.scalar_one_or_none()
 
         if not load_profile:
-            return Res.error(status_code="E-20026", message="Simulation not found")
+            return Res.error(
+                status_code="E-20026",
+                message="Simulation not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         # data = self._map_to_load_profile_response(load_profile=load_profile)
 
@@ -323,4 +331,5 @@ class LoadSimulationService:
         return Res.success(
             status_code="S-20004",
             data=data.model_dump(mode="json"),
+            http_status_code=status.HTTP_200_OK,
         )

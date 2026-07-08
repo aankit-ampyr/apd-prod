@@ -1,7 +1,7 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.dependencies import get_user_db
+from db.dependencies import get_db, get_user_db, allowed_roles
 from utils.mail_utils import MailUtils
 from utils.log_utils import audit_logs
 from python_common.services import AuthService
@@ -43,3 +43,10 @@ class AuthController:
             
     ):
         return await self.auth_service.refresh_token(payload.refresh_token)
+
+    async def logout(
+        self,
+        db: AsyncSession = Depends(get_db),
+        current_user=Depends(allowed_roles()),
+    ):
+        return await self.auth_service.logout(current_user=current_user, db=db)

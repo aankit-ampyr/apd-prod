@@ -1,6 +1,5 @@
 // export * from '@lazarus/react-common';
 export * from './Auth';
-export * from './Home';
 export * from './Help';
 export * from './UserManagement';
 export * from './Organizations';
@@ -8,3 +7,6 @@ export * from './AssetManagement';
 export * from './DigestManagement';
 export * from './AuditLog';
 export * from './Settings';
+export * from './NotFound';
+export * from './ExecutiveAnalysis';
+export * from './InvoiceAnalysis';

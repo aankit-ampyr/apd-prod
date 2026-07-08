@@ -1,7 +1,7 @@
 from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db.dependencies import get_user_db, get_bess_db
+from db.dependencies import get_user_db, allowed_roles, get_bess_db
 from utils.log_utils import audit_logs
 from python_common.services import AuthService
 from python_common.dto import OTPRequestPayload, OTPLoginPayload, RefreshTokenPayload
@@ -47,3 +47,11 @@ class AuthController:
             payload: RefreshTokenPayload
     ):
         return await self.auth_service.refresh_token(payload.refresh_token)
+    
+    async def logout(
+        self,
+        db: AsyncSession = Depends(get_bess_db),
+        current_user=Depends(allowed_roles()),
+    ):
+        return await self.auth_service.logout(current_user=current_user, db=db)
+

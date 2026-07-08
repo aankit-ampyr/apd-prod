@@ -7,16 +7,19 @@ import {
   initiateSimulationData,
   projectSimulationData,
   multiYearRunSuccess,
+  greenAnalysisRunSuccess,
+  detailedGreenRunSuccess,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {ChangeConfiguration} from './ChangeConfiguration';
 import {WebSocketContext} from '@/context/WebsocketContext';
 import {ActionType, ResourceType} from '@/constants';
 import {useParams} from 'react-router-dom';
-import {simulationProgressRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {getDGSizingSilentRequest, simulationProgressRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {SIMULATION_JOB_STORAGE_KEY} from '@/services/socket/SocketManager';
 
 type PendingChange = {
   onStay?: () => void;
+  forceOpen?: boolean;
 };
 
 type ChangeConfigurationContextValue = {
@@ -57,11 +60,15 @@ export const ChangeConfigurationProvider = ({children}: {children: React.ReactNo
   const simulationRunSuccess = useSelector(runSimulationSuccess);
   const customSimulationResultStatus = useSelector(customSimulationSuccess);
   const multiYearProjectionRunSuccess = useSelector(multiYearRunSuccess);
+  const greenAnalysisRunSuccessStatus = useSelector(greenAnalysisRunSuccess);
+  const detailedGreenRunSuccessStatus = useSelector(detailedGreenRunSuccess);
   const shouldConfirmConfigurationChange =
     simulationResultsStatus === 'S-20032' ||
     simulationRunSuccess === 'S-20033' ||
     customSimulationResultStatus === 'S-20038' ||
-    multiYearProjectionRunSuccess === 'S-20043';
+    multiYearProjectionRunSuccess === 'S-20043' ||
+    greenAnalysisRunSuccessStatus === 'S-20048' ||
+    detailedGreenRunSuccessStatus === 'S-20054';
   const [open, setOpen] = useState(false);
   const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [activeSimulationJobId, setActiveSimulationJobId] = useState<number | null>(null);
@@ -92,14 +99,30 @@ export const ChangeConfigurationProvider = ({children}: {children: React.ReactNo
 
   // Reset popup state after every successful simulation completion
   useEffect(() => {
-    if (simulationResultsStatus === 'S-20032' || simulationRunSuccess === 'S-20033' || customSimulationResultStatus === 'S-20038' || multiYearProjectionRunSuccess === 'S-20043') {
+    if (
+      simulationResultsStatus === 'S-20032' ||
+      simulationRunSuccess === 'S-20033' ||
+      customSimulationResultStatus === 'S-20038' ||
+      multiYearProjectionRunSuccess === 'S-20043' ||
+      greenAnalysisRunSuccessStatus === 'S-20048' ||
+      detailedGreenRunSuccessStatus === 'S-20054'
+    ) {
       hasShownPopupRef.current = false;
     }
-  }, [simulationResultsStatus, simulationRunSuccess, customSimulationResultStatus, multiYearProjectionRunSuccess]);
+  }, [
+    simulationResultsStatus,
+    simulationRunSuccess,
+    customSimulationResultStatus,
+    multiYearProjectionRunSuccess,
+    greenAnalysisRunSuccessStatus,
+    detailedGreenRunSuccessStatus,
+  ]);
 
   const requestChangeConfigurationConfirmation = useCallback(
     (change?: PendingChange) => {
-      if (!shouldConfirmConfigurationChange || open || hasShownPopupRef.current) {
+      const shouldAllowOpen = change?.forceOpen || shouldConfirmConfigurationChange;
+
+      if (!shouldAllowOpen || open || hasShownPopupRef.current) {
         return;
       }
       pendingChangeRef.current = change || null;
@@ -127,8 +150,8 @@ export const ChangeConfigurationProvider = ({children}: {children: React.ReactNo
     const unsubscribe = subscribe(event => {
       // Only handle SimulationJob events
       if (event.resource_type !== ResourceType.SizingSimulationJob) return;
-
-      if (event.data?.simulation_id === simulationId) {
+      const isCurrentSimulation = event.data?.simulation_id === simulationId || event.resource_id === activeSimulationJobId;
+      if (isCurrentSimulation) {
         if (event.action_id === ActionType.Started) {
           const startedJobId = Number(event.resource_id);
           setActiveSimulationJobId(startedJobId);
@@ -151,18 +174,21 @@ export const ChangeConfigurationProvider = ({children}: {children: React.ReactNo
           if (simulationId !== null) {
             dispatch(simulationProgressRequest({simulation_id: simulationId}));
           }
+          if (simulationId !== null) {
+            dispatch(getDGSizingSilentRequest({simulation_id: simulationId}));
+          }
         }
       }
     });
 
     return () => unsubscribe();
-  }, [dispatch, getStoredSimulationJobId, simulationId, subscribe]);
+  }, [dispatch, getStoredSimulationJobId, simulationId, subscribe, activeSimulationJobId]);
 
   useEffect(() => {
     if (!isSimulationRunningByAnotherUser) {
       setSimulationRunningMessage(null);
     } else if (!simulationRunningMessage) {
-      setSimulationRunningMessage('Another simulation is currently running. You’ll be able to start a new one once it finishes.');
+      setSimulationRunningMessage("Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.");
     }
   }, [isSimulationRunningByAnotherUser, simulationRunningMessage]);
 

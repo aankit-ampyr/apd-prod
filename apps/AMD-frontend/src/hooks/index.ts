@@ -3,3 +3,4 @@ export * from './useAppRoute';
 export * from './useRole';
 export * from './useRouteLeave';
 export * from './useUnsavedChangesBlocker';
+export * from './useLandingRoute';

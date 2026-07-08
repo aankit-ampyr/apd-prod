@@ -62,10 +62,7 @@ class AuthService(Generic[T]):
     def _normalize_email(self, email: str) -> str:
         return email.strip().lower()
 
-    def _check_role_authorized(self, user_role: int):
-        if user_role == UserRole.SUPER_ADMIN.value:
-            return True
-        
+    def _check_role_authorized(self, user_role: int):      
         allowed_values = [role.value for role in self.allowed_roles]
         return user_role in allowed_values
 
@@ -138,12 +135,6 @@ class AuthService(Generic[T]):
 
         return attempts, prev_otps
 
-    def _get_normalized_role(self, user: Type[T]):
-        if self.allowed_platform is None: # this is will none for all super admin related routes 
-            return user.role # this will be super admin anyways
-        
-        return user.role if user.role != UserRole.SUPER_ADMIN else UserRole.ADMIN
-
     async def get_otp(self, data: OTPRequestPayload, user_db: AsyncSession):
         normalized_email = self._normalize_email(data.email)
 
@@ -160,8 +151,11 @@ class AuthService(Generic[T]):
                 "E-10038", message="User with the given email does not exist"
             )
         
+        if user.role not in [role.value for role in self.allowed_roles]:
+            return Res.error("E-10011", message="You are not authorized to access this platform.")
+        
         # skip role based platform based access check for super admin
-        if self.allowed_platform is not None and user.role != UserRole.SUPER_ADMIN:
+        if self.allowed_platform is not None:
             allowed_platform_ids = (
                 self.allowed_platform.value
                 if hasattr(self.allowed_platform, "value")
@@ -175,7 +169,7 @@ class AuthService(Generic[T]):
         email = user.email
         # for super admin do not pass super admin as the role, modify it as admin role so that he/she can access all the admin related apis 
         # we are disguising super admin as admin 
-        role = self._get_normalized_role(user)
+        role = user.role
         name = user.name
         user_id = user.user_id
 
@@ -302,7 +296,7 @@ class AuthService(Generic[T]):
                 "E-10038", message="User with the given email does not exist"
             )
 
-        if self.allowed_platform is not None and user.role != UserRole.SUPER_ADMIN.value:
+        if self.allowed_platform is not None:
             allowed_platform_ids = (
                 self.allowed_platform.value
                 if hasattr(self.allowed_platform, "value")
@@ -418,9 +412,7 @@ class AuthService(Generic[T]):
             email=user.email,
             user_id=user.id,
             name=user.name,
-            # for super admin do not pass super admin as the role, modify it as admin role so that he/she can access all the admin related apis 
-            # we are disguising super admin as admin 
-            role = self._get_normalized_role(user),
+            role = user.role,
             platform=user.platform,
             expires_delta=timedelta(seconds=self.jwt_life_seconds),
         )
@@ -429,9 +421,7 @@ class AuthService(Generic[T]):
             email=user.email,
             user_id=user.id,
             name=user.name,
-            # for super admin do not pass super admin as the role, modify it as admin role so that he/she can access all the admin related apis 
-            # we are disguising super admin as admin 
-            role =self._get_normalized_role(user),
+            role =user.role,
             platform=user.platform,
             expires_delta=timedelta(seconds=self.refresh_life_seconds),
         )
@@ -441,7 +431,7 @@ class AuthService(Generic[T]):
 
         data = {
             "id": user.id,
-            "role": user.role if user.role != UserRole.SUPER_ADMIN else UserRole.ADMIN,
+            "role": user.role,
             "email": user.email,
             "username": user.name,
             "platform": user.platform,
@@ -513,3 +503,25 @@ class AuthService(Generic[T]):
                 status_code="E-10106",
                 message="Invalid or expired refresh token",
             )
+
+    async def logout(self, current_user: dict, db: AsyncSession):
+        user_id = current_user.get("user_id")
+        user_role = current_user.get("role")
+        user_name = current_user.get("name")
+
+        if self.audit_log_fn:
+            await self.audit_log_fn(
+                user_id=user_id,
+                resource_id=user_id,
+                user_role=user_role,
+                module=AuditLogModules.AUTHENTICATION.value,
+                action=AuditLogScenario.LOGOUT.value,
+                before="Logged in",
+                after=f"User: {user_name} logged out successfully",
+                db=db,
+            )
+            await db.commit()
+
+        return Res.success("S-10092",
+            message="Logged out successfully",
+        )

@@ -7,6 +7,7 @@ from constants.enums import UserRole
 from utils.response_utils import Res
 from constants.enums import Platform
 
+
 class AuditController:
     def __init__(self):
         self.service = AuditService()
@@ -25,12 +26,11 @@ class AuditController:
         start_date: str | None = Query(None),
         end_date: str | None = Query(None),
         db: AsyncSession = Depends(get_bess_db),
-        current_user = Depends(allowed_roles(UserRole.ADMIN.value))
+        current_user=Depends(allowed_roles(UserRole.ADMIN.value)),
     ):
 
         if Platform.BESS not in current_user["platform"]:
             return Res.error("E-10013", message="Access denied")
-        
 
         return await self.service.get_audit_logs(
             db=db,
@@ -43,5 +43,6 @@ class AuditController:
             action=action,
             start_date=start_date,
             end_date=end_date,
-            search=search
+            search=search,
         )
+

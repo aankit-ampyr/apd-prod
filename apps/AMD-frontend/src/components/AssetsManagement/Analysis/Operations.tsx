@@ -340,7 +340,7 @@ export function AssetOperations(props: AssetOperationProps) {
               xTickInterval: 143,
               yTickStep: 40,
               lineStrokeWidth: 1,
-              
+
               // hideFirstXAxisTickLabel: true,
               hideFirstYAxisTickLabel: true,
               tooltipCursor: {
@@ -378,7 +378,6 @@ export function AssetOperations(props: AssetOperationProps) {
             isLoading={batteryPowerOverTimeLoading}
             chartMargin={{left: 50}}
             config={{
-              
               yTickStep: 2,
               xKey: 'timestamp',
               hideFirstYAxisTickLabel: true,

@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {DataTable, FilterGroup, ScreenWrapper} from '@/components';
 import {SIMULATION_STATUS} from '@/constants';
 import {useDropdownValues, useToast} from '@/hooks';
@@ -46,6 +46,7 @@ type SimulationStatus = 'in_progress' | 'completed' | 'failed';
 type SimulationRow = {
   id: number;
   sim_id: number;
+  editedStep: number;
   simulation: string;
   status: SimulationStatus;
   statusLabel: string | React.ReactNode;
@@ -126,7 +127,7 @@ export const SimulationListing = () => {
 
   useEffect(() => {
     if (simulData?.id) {
-      navigate(`${Routes.SIMULATION_WIZARD}/${simulData.id}`, {replace: true});
+      navigate(`${Routes.SIMULATION_WIZARD}/${simulData.id}`);
       dispatch(resetInitiateSimulation());
     }
   }, [simulData?.id, dispatch, navigate]);
@@ -302,32 +303,38 @@ export const SimulationListing = () => {
     handleCloseSimulationModal();
   }
 
+  const getStepName = (editedStep: number) => {
+    if (editedStep >= 1 && editedStep <= 4) return 'System Setup';
+    if (editedStep === 5) return 'Dispatch Rules';
+    if (editedStep === 6) return 'BESS & DG Sizing';
+    if (editedStep === 7) return 'Simulation Result';
+    if (editedStep === 8 || editedStep === 9) return 'Custom Configuration';
+    if (editedStep === 10 || editedStep === 11) return 'Multi Year Projection';
+    if (editedStep === 12) return 'Green Energy Analysis';
+    if (editedStep === 13) return 'Completed';
+
+    return 'System Setup';
+  };
+
   function mapSimulationData(apiData: any[]): SimulationRow[] {
     return apiData.reduce<SimulationRow[]>((rows, item) => {
-      const status = STATUS_FILTER_MAP[item.status];
+      let status = STATUS_FILTER_MAP[item.status];
+
+      const editedStep = Number(item.edited_step) || 1;
+
+      // Only step 13 should be completed
+      if (editedStep !== 13 && status === 'completed') {
+        status = 'in_progress';
+      }
 
       if (isAssignedUser && status === 'failed') {
         return rows;
       }
 
-      const progress = Number(item.progress) || 1;
-      // 1-4 => 1, 5 => 2, 6 => 3, 7 => 4, 8 => 5, ...
-      let currentStep = 1;
-      if (progress >= 7) currentStep = 4;
-      else if (progress === 6) currentStep = 3;
-      else if (progress === 5) currentStep = 2;
-      else currentStep = 1;
+      let statusLabel = getStepName(editedStep);
 
-      let statusLabel: string | React.ReactNode = '';
-
-      if (status === 'completed') statusLabel = 'Completed';
-      else if (status === 'failed') statusLabel = 'Failed';
-      else if (status === 'in_progress') {
-        statusLabel = (
-          <>
-            In Progress <span className="text-black">(step {currentStep} of 4)</span>
-          </>
-        );
+      if (status === 'failed') {
+        statusLabel = 'Failed';
       }
 
       rows.push({
@@ -335,6 +342,7 @@ export const SimulationListing = () => {
         sim_id: item.sim_id,
         simulation: item.name,
         status,
+        editedStep,
         statusLabel,
         updatedAt: item.last_updated,
       });
@@ -600,20 +608,23 @@ function SimulationActionCell({
   const navigate = useNavigate();
   const projSimlSuccess = useSelector(projectSimulationSuccess) as SuccessCodes;
   const proSimulData = useSelector(projectSimulationData);
+  const resumeRequestedRef = useRef(false);
 
   const handleResumeSetup = () => {
+    resumeRequestedRef.current = true;
     dispatch(getProjectSimulationRequest({simulation_id: row?.id}));
   };
 
   useEffect(() => {
-    if (projSimlSuccess === 'S-20031') {
-      navigate(`${Routes.SIMULATION_WIZARD}/${proSimulData?.id}`, {replace: true});
+    if (projSimlSuccess === 'S-20031' && resumeRequestedRef.current) {
+      resumeRequestedRef.current = false;
+      navigate(`${Routes.SIMULATION_WIZARD}/${proSimulData?.id}`);
       dispatch(resetProjectSimulation());
     }
   }, [projSimlSuccess, proSimulData, dispatch, navigate]);
 
   if (isAssignedUser) {
-    if (row.status === 'completed') {
+    if (row.editedStep === 13) {
       return (
         <div className="flex items-center gap-3">
           <ActionButton icon="eye" label="View Results" variant="teal" onClick={handleResumeSetup} />
@@ -628,7 +639,7 @@ function SimulationActionCell({
     );
   }
 
-  if (row.status === 'completed') {
+  if (row.editedStep === 13) {
     return (
       <div className="flex items-center gap-3">
         <ActionButton icon="eye" label="View Results" variant="teal" onClick={handleResumeSetup} />

@@ -194,9 +194,9 @@ export function MultiMarketOptmizationVsActual(props: MultiMarketOptmizationVsAc
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <Text variant="h3">Multi-Market Optimization vs Actual</Text>
+        <Text variant="h3">Optimized vs Actual</Text>
         <Text variant="16M" className="text-text-secondary!">
-          Compare actual Actual Revenue against Optimized Multi-market Revenue potential to understand monthly capture performance and missed opportunity.
+          Compare actual Actual Revenue against Optimized Revenue potential to understand monthly capture performance and missed opportunity.
         </Text>
       </div>
 

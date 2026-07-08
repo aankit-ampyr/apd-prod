@@ -29,6 +29,12 @@ import type {
   AssetImbalanceAnalytics,
   AssetBatteryHealthAnalytics,
   AssetGenerateReport,
+  AssetExecutiveAnalysis,
+  InvoiceExtractionCategorySummary,
+  InvoiceExtractionQualitySummary,
+  Invoice,
+  InvoiceSettlement,
+  AssetCapacityMarketAnalytics,
 } from './common-interface';
 import type {SortType, APIResponse} from '@lazarus/react-common/interface';
 export type {APIResponse, LoginRequest, VerifyOtpRequest} from '@lazarus/react-common/interface/api-interface';
@@ -43,6 +49,8 @@ export interface ApiConfigInterface {
     verifyOtp: string;
   };
   authUrls: {
+    logout: string;
+
     users: string;
     user_id: (id: number) => string;
     user_organization: (id: number) => string;
@@ -123,6 +131,13 @@ export interface ApiConfigInterface {
     asset_analysis_market_revenue_distribution: (assetId: number) => string;
     asset_analysis_market_hourly_price_patterns: (assetId: number) => string;
 
+    // executive analysis related APIs
+    asset_executive_analysis_monthly_revenue_comparison: (assetId: number) => string;
+    asset_executive_analysis_monthly_revenue_comparison_export: (assetId: number) => string;
+    asset_executive_analysis_revenue_by_stream: (assetId: number) => string;
+    asset_executive_analysis_revenue_by_stream_export: (assetId: number) => string;
+    asset_executive_analysis_summary: (assetId: number) => string;
+
     metrics_benchmarks: string;
     metrics_monthly_values: string;
     modo_benchmark_monthly_value: string;
@@ -130,8 +145,23 @@ export interface ApiConfigInterface {
     // audit log related APIs
     audit_logs: string;
 
+    // digest related APIs
     digests: string;
     digest_id: (digestId: string) => string;
+
+    // invoices slice
+    asset_invoices: (assetId: number) => string;
+    asset_invoices_summary: (assetId: number) => string;
+    asset_invoices_id: (assetId: number, invoiceId: number) => string;
+    asset_invoices_id_preview: (assetId: number, invoiceId: number) => string;
+    asset_invoices_id_export: (assetId: number, invoiceId: number) => string;
+    asset_invoices_export: (assetId: number) => string;
+    asset_invoices_settlement: (assetId: number) => string;
+    asset_invoices_settlement_id: (assetId: number, settlementId: number) => string;
+    asset_invoices_settlement_id_export: (assetId: number, settlementId: number) => string;
+
+    asset_invoice_analysis_capacity_market: (assetId: number) => string;
+    asset_invoice_analysis_capacity_market_export: (assetId: number) => string;
   };
 }
 
@@ -295,6 +325,8 @@ export interface EditAssetRequest {
     status?: boolean;
     active_month?: number;
     active_year?: number;
+    active_invoice_month?: number;
+    active_invoice_year?: number;
   };
   response: APIResponse<Asset>;
   errorResponse: APIResponse<Record<string, any>>;
@@ -1061,4 +1093,284 @@ export interface ModoBenchmarkMonthlyValueRequest {
   response: APIResponse<{
     modo_benchmark_per_mw_per_year: number;
   }>;
+}
+
+// =============================== Asset Executive Analysis ===============================
+export interface AssetExecutiveAnalysisMonthlyRevenueComparisonRequest {
+  params: {
+    months?: number[];
+    year: number;
+    assetId: number;
+  };
+  response: APIResponse<AssetExecutiveAnalysis['monthly_revenue_comparison']>;
+}
+
+export interface AssetExecutiveAnalysisRevenueByStreamRequest {
+  params: {
+    months?: number[];
+    year: number;
+    assetId: number;
+  };
+  response: APIResponse<AssetExecutiveAnalysis['revenue_by_stream']>;
+}
+
+export interface AssetExecutiveAnalysisSummaryRequest {
+  params: {
+    year: number;
+    assetId: number;
+  };
+  response: APIResponse<AssetExecutiveAnalysis['summary']>;
+}
+
+export interface AssetExecutiveAnalysisMonthlyRevenueComparisonExportRequest {
+  params: {
+    months?: number[];
+    year: number;
+    assetId: number;
+    fileName: string;
+  };
+}
+
+export interface AssetExecutiveAnalysisRevenueByStreamExportRequest {
+  params: {
+    months?: number[];
+    year: number;
+    assetId: number;
+    fileName: string;
+  };
+}
+
+// =============================== Invoice Request ===============================
+
+/**
+ *
+ * @method GET
+ * @description Get list of invoices with pagination and filters
+ * @endpoint /api/v1/assets/{assetId}/invoices
+ *
+ */
+export interface InvoiceListRequest {
+  params: {
+    search?: string;
+    type?: Invoice['type'];
+    page?: number;
+    limit: number;
+    sort?: string[];
+    month?: number[];
+    year?: number[];
+    assetId: number;
+  };
+  response: APIResponse<{
+    current_page: number;
+    total_pages: number;
+    next_page: number | null;
+    total_files: number;
+    invoices: Array<Invoice>;
+  }>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Get summary for PDF invoices
+ * @endpoint /api/v1/assets/{assetId}/invoices/summary
+ *
+ */
+export interface InvoiceSummaryRequest {
+  params: {
+    assetId: number;
+    year?: number[];
+    month?: number[];
+  };
+  response: APIResponse<{
+    total_files: number;
+    extraction_quality: InvoiceExtractionQualitySummary;
+    category_summary: InvoiceExtractionCategorySummary;
+  }>;
+}
+
+/**
+ *
+ * @method POST
+ * @description Upload PDF invoices for processing
+ * @endpoint /api/v1/assets/{assetId}/invoices
+ *
+ */
+export interface InvoiceUploadRequest {
+  payload: {
+    assetId: number;
+    formData: FormData;
+  };
+  response: APIResponse<Invoice>;
+}
+
+/**
+ *
+ * @method DELETE
+ * @description Delete a specific PDF invoice
+ * @endpoint /api/v1/assets/{assetId}/invoices/{invoiceId}
+ *
+ */
+export interface InvoiceDeleteRequest {
+  payload: {
+    assetId: number;
+    invoiceId: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    invoice_id: number;
+    message: string;
+  }>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Download a specific PDF invoice
+ * @endpoint /api/v1/assets/{assetId}/invoices/{invoiceId}/export
+ *
+ */
+export interface InvoiceDownloadRequest {
+  params: {
+    invoiceId: number;
+    fileName?: string;
+    assetId: number;
+  };
+}
+
+/**
+ *
+ * @method GET
+ * @description Download CSV export for invoice list
+ * @endpoint /api/v1/assets/{assetId}/invoices/export
+ *
+ */
+export interface InvoiceListExportRequest {
+  params: {
+    search?: string;
+    type?: Invoice['type'];
+    page?: number;
+    limit?: number;
+    sort?: string[];
+    month?: number[];
+    year?: number[];
+    assetId: number;
+    fileName: string;
+  };
+}
+
+/**
+ *
+ * @method GET
+ * @description Preview a specific PDF invoice
+ * @endpoint /api/v1/assets/{assetId}/invoices/{invoiceId}/preview
+ *
+ */
+export interface InvoicePreviewRequest {
+  params: {
+    invoiceId: number;
+    assetId: number;
+  };
+}
+
+/**
+ *
+ * @method GET
+ * @description Get List of settlement invoices for a specific asset
+ * @endpoint /api/v1/assets/{asset_id}/invoices/settlement
+ *
+ */
+export interface InvoiceSettlementListRequest {
+  params: {
+    month: number[];
+    year: number[];
+    assetId: number;
+  };
+  response: APIResponse<{
+    current_page?: number;
+    next_page?: number | null;
+    total_pages?: number;
+    total_files: number;
+    settlement: Array<InvoiceSettlement>;
+  }>;
+}
+
+/**
+ *
+ * @method POST
+ * @description Upload settlement invoices for a specific asset
+ * @endpoint /api/v1/assets/{asset_id}/invoices/settlement
+ *
+ */
+export interface InvoiceSettlementUploadRequest {
+  payload: {
+    formData: FormData;
+    assetId: number;
+  };
+  response: APIResponse<InvoiceSettlement>;
+}
+
+/**
+ *
+ * @method DELETE
+ * @description Delete a specific settlement CSV
+ * @endpoint /api/v1/assets/{asset_id}/invoices/settlement/{settlement_id}
+ *
+ */
+export interface DeleteInvoiceSettlementRequest {
+  payload: {
+    assetId: number;
+    settlementId: number;
+  };
+  response: APIResponse<{
+    invoice_settlement_id: number;
+    asset_id: number;
+    message: string;
+  }>;
+}
+/**
+ *
+ * @method GET
+ * @description Export a specific settlement CSV
+ * @endpoint /api/v1/assets/{asset_id}/invoices/settlement/{settlement_id}/export
+ *
+ */
+export interface ExportInvoiceSettlementRequest {
+  payload: {
+    assetId: number;
+    settlementId: number;
+    fileName?: string;
+  };
+}
+
+/**
+ *
+ * @method GET
+ * @description Get Capacity Market analytics
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market
+ *
+ */
+export interface AssetCapacityMarketRequest {
+  params: {
+    assetId: number;
+    year: number;
+    month?: number;
+  };
+  response: APIResponse<AssetCapacityMarketAnalytics>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Export Capacity Market analytics
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market/export
+ *
+ */
+export interface AssetCapacityMarketExportRequest {
+  params: {
+    assetId: number;
+    year: number;
+    month?: number;
+    fileName: string;
+  };
 }

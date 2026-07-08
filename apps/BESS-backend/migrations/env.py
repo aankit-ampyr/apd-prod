@@ -1,13 +1,8 @@
 import asyncio
-import os
-import sys
 from logging.config import fileConfig
 from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
-
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
 from config import BESS_DATABASE_URL
 from db.db_config import BessBase
 from models import *  # ensure models are imported for autogenerate

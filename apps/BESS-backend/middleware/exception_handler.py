@@ -5,6 +5,7 @@ import traceback
 import logging
 
 from exceptions import (
+    PermissionDenied,
     UserSessionExpired,
     UserNotAuthorized,
     UserNotFound,
@@ -28,8 +29,9 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
         except UserNotAuthenticated:
             return Res.error("E-20002", http_status_code=401)
         except UserTokenExpired:
-            logger.info("User token expired",
-            extra={"error_code": "E-20002", "path": request.url.path},
+            logger.info(
+                "User token expired",
+                extra={"error_code": "E-20002", "path": request.url.path},
             )
             return Res.error("E-20002")
         except UserSessionExpired:
@@ -37,15 +39,19 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
         except UserNotAuthorized:
             return Res.error("E-20003", http_status_code=403)
         except UserNotFound:
-            return Res.error("E-20017", http_status_code=404)
+            return Res.error("E-20000", http_status_code=404)
         except UserDeleted:
-            return Res.error("E-20017", http_status_code=404)
+            return Res.error("E-20000", http_status_code=404)
         except UserAccountBlocked as e:
-            return Res.error('E-20037')
+            return Res.error("E-20037")
         except ProjectDeleted as e:
             return Res.error("E-20015", message=str(e), http_status_code=404)
         except SimulationNotFound as e:
             return Res.error("E-20043", message=str(e), http_status_code=404)
+        except PermissionDenied as e:
+            return Res.error(
+                status_code="E-20004", message=str(e), http_status_code=403
+            )
         except Exception as e:
             traceback.print_exc()
             return Res.error(message=str(e))

@@ -270,6 +270,11 @@
     "message": "Please enter a valid email address",
     "type": "validation_error"
   },
+  "E-10011": {
+    "key": "unauthorized_access",
+    "message": "Unauthorized Access! Sorry, we could not verify the user.",
+    "type": "auth_error"
+  },
   "E-10036": {
     "key": "email_field_empty",
     "message": "Email field cannot be empty.",

@@ -3,7 +3,7 @@
  */
 
 import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
-import type {APIResponse, AuthSliceInitalState, LoginRequest, VerifyOtpRequest} from '@/interface';
+import type {APIResponse, AuthSliceInitalState, LoginRequest, LogoutRequest, VerifyOtpRequest} from '@/interface';
 import { UserSessionEndReason } from '@/constants';
 
 const initialState: AuthSliceInitalState = {
@@ -107,6 +107,24 @@ const authSlice = createSlice({
       }
     },
 
+    // logout otp
+    logoutRequest(state) {
+      state.isLoading = true;
+      state.authSuccess = false;
+      state.authFailure = false;
+    },
+    logoutSuccess(state, action: PayloadAction<LogoutRequest['response']>) {
+      state.isLoading = false;
+      // if logout successfully
+      if (action.payload.status_code === 'S-10092') {
+        return { ...initialState };
+      }
+    },
+    logoutFailure(state, action: PayloadAction<APIResponse>) {
+      state.isLoading = false;
+      state.authFailure = action.payload.status_code;
+    },
+
     // reset auth
     resetAuth(_state, _action: PayloadAction<void>) {
       return { ...initialState };
@@ -150,6 +168,11 @@ export const {
   verifyOtpRequest,
   verifyOtpSuccess,
   verifyOtpFailure,
+
+  // logout actions
+  logoutRequest,
+  logoutSuccess,
+  logoutFailure,
 
   // utility actions
   resetAuthMessage,

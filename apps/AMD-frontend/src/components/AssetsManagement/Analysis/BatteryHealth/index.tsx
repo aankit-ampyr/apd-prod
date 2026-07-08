@@ -108,7 +108,7 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
         },
         {
           icon: 'trending-down',
-          label: 'Optimized Multi-Market Discharge Energy',
+          label: 'Optimized Discharge Energy',
           unitLabel: 'MWh',
           value: optimizedDischargeEnergy.toLocaleString(),
         },
@@ -135,7 +135,7 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
         },
         {
           icon: 'trending-up',
-          label: 'Optimized Multi-Market Charge Energy',
+          label: 'Optimized Charge Energy',
           unitLabel: 'MWh',
           value: optimizedChargeEnergy.toLocaleString(),
         },
@@ -181,7 +181,7 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
     },
     {
       key: 'multi_market',
-      title: 'Multi-Market',
+      title: 'Optimized',
       align: 'center',
       renderCell: value => <Text variant="14R">{value}</Text>,
     },

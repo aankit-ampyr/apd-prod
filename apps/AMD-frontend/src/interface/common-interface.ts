@@ -8,6 +8,7 @@ import type {
   AssetType,
   DigestFrequency,
   DigestScope,
+  InvoiceType,
   Platform,
   UserRole,
 } from '@/constants';
@@ -17,6 +18,7 @@ export {Auth, Nullable, AuditLog} from '@lazarus/react-common/interface';
 // utlilities
 export type ENV = 'loc' | 'dev' | 'qa' | 'uat' | 'prod';
 export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+export type SSEEvent = 'progress' | 'success' | 'error';
 
 export type AssetMarket = 'multi' | 'epex_daily' | 'epex_efa' | 'actual';
 
@@ -67,6 +69,7 @@ export interface AssetGenerateReport {
 }
 
 export interface Asset {
+  // Basic Information
   id: number;
   asset_id: string;
   name: string;
@@ -83,8 +86,8 @@ export interface Asset {
     name: string;
   };
   location: string;
-  analysis_available?: boolean;
 
+  // optmization params
   max_charging_rate?: number;
   max_discharging_rate?: number;
   usable_capacity?: number;
@@ -93,22 +96,33 @@ export interface Asset {
   round_trip_efficiency?: number;
   max_daily_cycles?: number;
 
-  aggregator_report_file?: AssetReportFile | null;
-  scada_report_file?: AssetReportFile | null;
-  iar_report_file?: AssetReportFile | null;
-
+  // asset files
+  aggregator_report_file?: Nullable<AssetReportFile>;
+  scada_report_file?: Nullable<AssetReportFile>;
+  iar_report_file?: Nullable<AssetReportFile>;
   merged_dataset_file?: Nullable<AssetGenerateReport>;
-
   optimized_dataset_file?: Nullable<AssetGenerateReport>;
 
+  // invoice files
+  invoice_file?: Nullable<Invoice>;
+  invoice_settlement_file?: Nullable<InvoiceSettlement>;
+
+  // meta data
   active_period: Nullable<MonthYear>;
+  invoice_active_period: Nullable<MonthYear>;
   available_periods?: Array<MonthYear>;
-  submitted_by: {
+  available_invoice_periods?: Array<MonthYear>;
+
+  // attributes flags
+  analysis_available?: boolean;
+  is_asset_alert_seen_before?: boolean;
+
+  // ownership info
+  created_by: {
     id: number;
     name: string;
   };
-  is_asset_alert_seen_before?: boolean;
-  created_by: {
+  submitted_by: {
     id: number;
     name: string;
   };
@@ -116,6 +130,8 @@ export interface Asset {
     id: number;
     name: string;
   };
+
+  // timestamps
   activated_at: string;
   submitted_at: string;
   created_at: string;
@@ -529,7 +545,7 @@ export interface AssetBatteryHealthAnalytics {
         date: string; // dd-mm-yyyy
         daily_cycles: number;
         over_limit: number;
-      }>
+      }>;
       multi_market: Array<{
         date: string; // dd-mm-yyyy
         daily_cycles: number;
@@ -621,6 +637,59 @@ export interface AssetBenchmarkMultiMarketOptmizationVsActual {
 }
 
 // ===============================
+// Executive Analysis
+// ===============================
+export interface AssetExecutiveAnalysis {
+  summary: {
+    asset_id: number;
+    year: number;
+    strongest_month: Nullable<{
+      month: number;
+      capture_rate: number | null;
+      revenue_gap: number | null;
+      imbalance: number | null;
+    }>;
+    weakest_month: Nullable<{
+      month: number;
+      capture_rate: number | null;
+      revenue_gap: number | null;
+      imbalance: number | null;
+    }>;
+  };
+  monthly_revenue_comparison: {
+    asset_id: number;
+    year: number;
+    monthly_comparison: Array<{
+      month: number;
+      actual_revenue: number | null;
+      capacity_market: number | null;
+      duos_net_credit: number | null;
+      total_revenue: number | null;
+      optimized_revenue: number | null;
+      net_imbalance: number | null;
+      revenue_gap: number | null;
+      capture_rate: number | null;
+    }>;
+  };
+  revenue_by_stream: {
+    asset_id: number;
+    year: number;
+    monthly_comparison: Array<{
+      month: number;
+      sffr: number | null;
+      epex: number | null;
+      ida1: number | null;
+      idc: number | null;
+      imbalance: number | null;
+      asset_sub_total: number | null;
+      capacity_market: number | null;
+      duos_net_credit: number | null;
+      total_revenue: number | null;
+    }>;
+  };
+}
+
+// ===============================
 // Digest Management Entities
 // ===============================
 export interface DigestResource {
@@ -687,6 +756,87 @@ export interface MetricMonthlyValueTabluar {
     value: MetricMonthlyValues['value'];
   }>;
 }
+
+// ===============================
+// Invoices
+// ===============================
+export interface Invoice {
+  id: number;
+  invoice_file_name: string;
+  invoice_file_size?: number;
+  type: InvoiceType;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  invoice_amount: number | null;
+  capacity_payment_month?: number | null;
+  capacity_payment_year?: number | null;
+  uploaded_on?: string;
+  extraction_status?: string;
+  month?: number;
+  year?: number;
+}
+
+export interface InvoiceExctractionQualitySummaryDataPoint {
+  extracted: number;
+  total: number;
+  missing: number;
+  percentage: number;
+}
+export interface InvoiceExtractionQualitySummary {
+  invoice_number: InvoiceExctractionQualitySummaryDataPoint;
+  invoice_date: InvoiceExctractionQualitySummaryDataPoint;
+  invoice_amount: InvoiceExctractionQualitySummaryDataPoint;
+}
+export type InvoiceExtractionCategorySummary = Array<{
+  type: InvoiceType;
+  count: number;
+}>;
+
+export type UploadInvoiceProgress = {
+  step: number;
+  message: string;
+  description: string;
+};
+
+export interface AssetCapacityMarketAnalytics {
+  kpis: {
+    capacity_payments: number | null;
+    emr_invoices: number | null;
+    average_monthly_payment: number | null;
+  };
+  payment_trend: Array<{
+    month: number;
+    year: number;
+    monthly_payment: number | null;
+    cumulative_payment: number | null;
+  }>;
+  capacity_market_payments: Array<{
+    capacity_month: number;
+    capacity_year: number;
+    invoice_number: string | null;
+    invoice_date: string | null;
+    payment_date: string | null;
+    amount: number | null;
+    absolute_amount: number | null;
+  }>;
+}
+
+export type InvalidInvoiceFile = {
+  file_name: string;
+  reason: string;
+};
+
+export type InvoiceSettlement = {
+  id: number;
+  settlement_file_name: string;
+  settlement_file_size: number;
+  extracted_invoice_number: string;
+  extracted_invoice_date: string;
+  invoice_payment_date: string;
+  uploaded_on: string;
+  month: number;
+  year: number;
+};
 
 // ===============================
 // APD Audit Logs

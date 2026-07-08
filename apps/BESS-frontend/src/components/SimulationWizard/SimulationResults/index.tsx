@@ -58,9 +58,10 @@ function SimulationResultsGhostLoader() {
     </div>
   );
 }
-import {useCallback, useEffect, useMemo, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useChartsActionV2, useToast} from '@/hooks';
 import {useDispatch, useSelector} from 'react-redux';
+import {useParams} from 'react-router-dom';
 import {
   bessContainerConfigData,
   initiateSimulationData,
@@ -76,6 +77,8 @@ import type {ErrorCodes} from '@/utils';
 import {Images} from '@lazarus/react-common/assets';
 import {DGDriggerType, DGRunScheduleMode, LoadProfilePattern, LoadServingPriority} from '@/constants';
 import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
+import {createPortal} from 'react-dom';
+import {SimulationStatusProvider, useSimulationStatus} from '../SimulationStatusContext';
 
 const SIMULATION_RESULTS_REQUEST_DEDUPE_WINDOW_MS = 1000;
 const simulationResultsRequestCache = new Map<string, number>();
@@ -101,7 +104,7 @@ const shouldDispatchSimulationResultsRequest = (requestKey: string) => {
 const PAGE_SIZE = 100;
 const DURATION_FILTER_CONTROL_CLASS = 'w-[230px] min-w-[230px] max-w-[230px] flex-none';
 const DG_FILTER_CONTROL_CLASS = 'w-[310px] min-w-[310px] max-w-[310px] flex-none';
-const BESS_FILTER_CONTROL_CLASS = 'w-[320px] min-w-[320px] max-w-[320px] flex-none';
+const BESS_FILTER_CONTROL_CLASS = 'xl:w-[320px] xl:min-w-[320px] xl:max-w-[320px] w-[556px] min-w-[556px] max-w-[556px] flex-none';
 const FILTER_INLINE_CHIP_CLASS = 'rounded-[8px] px-3 py-1 bg-primary-tint-2';
 const BESS_FILTER_INLINE_CHIP_CLASS = 'rounded-[8px] px-2 py-1 bg-primary-tint-2';
 const FILTER_INLINE_CHIP_TEXT_CLASS = 'text-[12px]! leading-[16px]! font-InterMedium!';
@@ -221,13 +224,18 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   const dispatch = useDispatch();
   const {showToast} = useToast();
   const {setIsStepsHidden, isFullScreen = false} = props;
+  const {id: simulationIdFromUrl} = useParams();
   const {
     chartRef: tableRef,
     onMaximize,
     onMinimize,
   } = useChartsActionV2({
     downloadFileName: '',
-    renderFullScreen: () => <SimulationResults {...props} isFullScreen />,
+    renderFullScreen: () => (
+      <SimulationStatusProvider>
+        <SimulationResults {...props} isFullScreen />
+      </SimulationStatusProvider>
+    ),
   });
 
   /**
@@ -241,9 +249,11 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   const bessSavedData = useSelector(bessContainerConfigData);
   const simulResErr = useSelector(simulationResultError);
   const simulResData = useSelector(simulationResultsData);
-  const {activeSimulationJobId, isSimulationRunning, isSimulationRunningByAnotherUser, simulationRunningMessage} = useChangeConfigurationConfirmation();
+  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
 
-  const simulation_id = simulData?.id ?? proSimulData?.id;
+  const {activeSimulationJobId, isSimulationRunning, isSimulationRunningByAnotherUser} = useChangeConfigurationConfirmation();
+
+  const simulation_id = simulData?.id ?? proSimulData?.id ?? (simulationIdFromUrl ? Number(simulationIdFromUrl) : undefined);
 
   const [showFullDeliveryOnly, setShowFullDeliveryOnly] = useState(false);
   const [showZeroDgHoursOnly, setShowZeroDgHoursOnly] = useState(false);
@@ -253,6 +263,25 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   const [filter, setFilter] = useState<SimulationResultFilter>({});
   const [dgCapacityOptions, setDgCapacityOptions] = useState<FilterOption[]>([]);
   const [bessCapacityOptions, setBessCapacityOptions] = useState<FilterOption[]>([]);
+
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
+
+  useEffect(() => {
+    if (!shouldBlock) return;
+
+    const handleClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mousedown', handleClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('mousedown', handleClick, true);
+    };
+  }, [shouldBlock]);
 
   /**
    * =======================================
@@ -379,8 +408,10 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     showZeroDgHoursOnly,
   );
   const hasResultRows = Array.isArray(simulResData?.results);
+  const isInitialResultsPending = Boolean(simulation_id && !simulResData && !simulResErr && !hasActiveFilters);
   const shouldShowEmptyState =
     !hasActiveFilters &&
+    !isInitialResultsPending &&
     !isLoading &&
     (!simulation_id ||
       simulResErr === 'E-20046' ||
@@ -499,7 +530,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
       name: 'green',
       title: (
         <ColumnHeader
-          label="Green Energy (%)"
+          label="Green Hours (%)"
           sort={getSortDirection('green_percentage')}
           onSortChange={() => handleSortChange('green_percentage')}
           tooltip="% hours without generator"
@@ -676,17 +707,30 @@ export const SimulationResults = (props: SimulationResultsProps) => {
    * Gaurd Renders
    * =======================================
    */
-  if (isLoading && !hasActiveFilters) {
+  if (!hasActiveFilters && isInitialResultsPending) {
     return <SimulationResultsGhostLoader />;
   }
   if (shouldShowEmptyState) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
-        <img src={Images.noBatteryPlay} alt="No Simulations" className="w-22" />
-        <Text variant="h4" className="text-text-secondary! font-InterMedium!">
-          Run the sizing simulation in Step 3 to generate and view configuration results.
-        </Text>
-      </div>
+      <>
+        {shouldBlock && (
+          <div className="mt-4 flex justify-center">
+            <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
+              <Icon name="infoCircle" className="size-4.5! text-warning!" />
+              <Text variant="14M" className="text-warning!">
+                Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
+              </Text>
+            </div>
+          </div>
+        )}
+        <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
+          <img src={Images.noBatteryPlay} alt="No Simulations" className="w-22" />
+          <Text variant="h4" className="text-text-secondary! font-InterMedium!">
+            Run the sizing simulation in Step 3 to generate and view configuration results.
+          </Text>
+        </div>
+        {shouldBlock && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
+      </>
     );
   }
 
@@ -697,19 +741,19 @@ export const SimulationResults = (props: SimulationResultsProps) => {
    */
   return (
     <div>
-      {isSimulationRunningByAnotherUser && simulationRunningMessage && (
+      {shouldBlock && (
         <div className="mt-4 flex justify-center">
           <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
             <Icon name="infoCircle" className="size-4.5! text-warning!" />
             <Text variant="14M" className="text-warning!">
-              {simulationRunningMessage}
+              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
             </Text>
           </div>
         </div>
       )}
 
       {!isFullScreen && (
-        <Text variant="14R" className="text-text-secondary! mt-3">
+        <Text variant="14R" className="text-text-secondary!">
           Completed {simulResData?.total_configs} Configurations
         </Text>
       )}
@@ -732,7 +776,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
                 </div>
               </div>
 
-              <div className="mt-5 rounded-md border border-border bg-white p-5">
+              <div className="mt-1 rounded-md border border-border bg-white p-5">
                 <div className="flex items-center gap-2">
                   <Icon name="bulb" className="text-[#168E80]!" size={20} />
 
@@ -756,12 +800,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
             <div className="w-full rounded-lg border border-[#D9E1E7] bg-white px-5 py-6 mt-3">
               <div className="flex items-start justify-between gap-6">
                 <div className="flex items-start gap-4 min-w-0">
-                  <div className="flex h-[44px] shrink-0 items-center">
+                  <div className="flex h-11 shrink-0 items-center">
                     <Icon name="funnel" className="size-6 text-[#475467]!" />
                   </div>
 
                   <div className="flex flex-col gap-3 min-w-0">
-                    <div className="flex items-start gap-4 min-w-0 flex-nowrap">
+                    <div className="flex items-start gap-4 min-w-0 flex-wrap">
                       <MultiSelectInput
                         isFilter
                         className={DURATION_FILTER_CONTROL_CLASS}
@@ -880,8 +924,16 @@ export const SimulationResults = (props: SimulationResultsProps) => {
             </div>
           )}
           {isFullScreen && (
-            <div className="flex justify-end">
-              <div className="flex items-center gap-5 pt-1">
+            <div className={`flex ${isFullScreen ? 'justify-between' : 'justify-end'} w-full gap-5`}>
+              {isFullScreen && (
+                <div className="flex flex-col">
+                  <Text variant="h3">Simulation Result</Text>
+                  <Text variant="14R" className="text-text-secondary! my-1.5">
+                    Completed {simulResData?.total_configs} Configurations
+                  </Text>
+                </div>
+              )}
+              <div className="flex items-center gap-5">
                 <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
                 {isFullScreen ? (
                   <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
@@ -901,10 +953,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
               totalResult={simulResData?.total_configs ?? resultRows.length}
               onPageChange={setCurrentPage}
               stickyHeader
+              persistHorizontalScrollKey={simulation_id ? `bess-simulation-results-${simulation_id}` : undefined}
             />
           </div>
         </div>
       </div>
+      {shouldBlock && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
     </div>
   );
 };
@@ -1187,7 +1241,7 @@ function SimulationConfigurationSummary() {
   }
 
   return (
-    <div className="border rounded-md border-[#B6D7D3] bg-[#F7FDFC] p-4 flex flex-col gap-2">
+    <div className="border rounded-md border-[#B6D7D3] bg-[#F7FDFC] p-4 flex flex-col gap-4">
       <button onClick={() => setOpen(prev => !prev)} className="outline-none cursor-pointer justify-between flex w-full items-center gap-2">
         <Text variant="h4" className="leading-none!">
           Configuration Summary
@@ -1195,7 +1249,7 @@ function SimulationConfigurationSummary() {
         <Icon name={open ? 'cheveron-up' : 'cheveron-down'} className="text-text-secondary! mr-2!" />
       </button>
       {open && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid md:grid-cols-2 xl:grid-cols-3 gap-4">
           {configSummaryData.map((data, index) => (
             <ConfigurationSummaryCard key={index} {...data} />
           ))}
@@ -1206,6 +1260,37 @@ function SimulationConfigurationSummary() {
 }
 
 interface ConfigSummaryCardProps extends ConfigSummaryDataType {}
+
+function TruncatedTextWithTooltip({text}: {text: string}) {
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
+  useEffect(() => {
+    const element = textRef.current;
+    if (!element) return;
+
+    setIsTruncated(element.scrollWidth > element.clientWidth);
+  }, [text]);
+
+  return (
+    <div className="relative flex-1 min-w-0 group">
+      <Text ref={textRef} variant="12SB" className="block w-full overflow-hidden whitespace-nowrap text-ellipsis">
+        {text}
+      </Text>
+
+      {isTruncated && (
+        <Tooltip
+          arrowClassName="hidden"
+          textClassName="font-InterMedium!"
+          portal
+          className="z-999 -translate-x-5! border border-[#9ECBC5]! whitespace-normal!"
+          position="top"
+          message={text}
+        />
+      )}
+    </div>
+  );
+}
 function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
   const {title, icon, points, bgGradientStart = '#FFFFFF', bgGradientEnd = '#FFFFFF'} = props;
 
@@ -1222,19 +1307,19 @@ function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
         </Text>
       </div>
       <ul className="list-disc! pl-6 pb-2! flex flex-col gap-1 marker:text-text-secondary marker:text-small">
-        {points.map((point, index) => (
-          <li key={index}>
-            <div className="flex whitespace-nowrap gap-2">
-              {point.label && (
-                <Text variant="small" className="text-text-secondary!">
-                  {point.label}:
+        {points.map((point, index) => {
+          const showTooltip = title === 'SOLAR' && point.label === 'Profile';
+          return (
+            <li key={`${point.label ?? point.value}-${index}`}>
+              <div className="flex items-center gap-1 min-w-0">
+                <Text variant="small" className="text-text-secondary! shrink-0">
+                  {point.label} :
                 </Text>
-              )}
-
-              <Text variant="12SB">{point.value}</Text>
-            </div>
-          </li>
-        ))}
+                {showTooltip ? <TruncatedTextWithTooltip text={point.value} /> : <Text variant="12SB">{point.value}</Text>}
+              </div>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

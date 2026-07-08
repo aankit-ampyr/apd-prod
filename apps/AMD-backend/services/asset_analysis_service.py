@@ -1,10 +1,10 @@
-from sqlalchemy import extract, select
+from typing import List
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import (
     AssetOptimizationParameter,
     Asset,
     AssetFile,
-    AuditLog,
     MetricIndustryConfiguration,
     MonthlyHardcodedValue,
     Metric,
@@ -22,14 +22,14 @@ from constants.enums import (
 )
 import pandas as pd
 from io import BytesIO
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from fastapi.responses import StreamingResponse
 import numpy as np
 import traceback
-import botocore
+import botocore  # noqa: F403,F405
 import csv
 import json
-from pulp import *
+from pulp import *  # noqa: F403,F405
 import logging
 import io
 from io import StringIO
@@ -84,118 +84,6 @@ class AnalysisService:
 
         return start, end
 
-    # async def get_benchmark_analysis(
-    #     self, db: AsyncSession, asset_id: int, year: list[int] | None, current_user: dict
-    # ):
-    #     try:
-    #         if not year:
-    #             return Res.error("E-10134", message="Year parameter is required")
-
-    #         asset = await db.get(Asset, asset_id)
-    #         if not asset: return Res.error("E-10034")
-
-    #         metric_names = ["Asset Revenue (£)", "Modo Benchmark (£/MW/yr)", "IAR Projection"]
-    #         metric_stmt = select(MetricIndustryConfiguration, Metric.metric_name).join(
-    #             Metric, Metric.id == MetricIndustryConfiguration.metric_id
-    #         ).where(Metric.metric_name.in_(metric_names))
-
-    #         metrics_res = await db.execute(metric_stmt)
-    #         metrics_lookup = {
-    #             row.metric_name: {
-    #                 "id": row.MetricIndustryConfiguration.metric_id,
-    #                 "low": row.MetricIndustryConfiguration.industry_low,
-    #                 "mid": row.MetricIndustryConfiguration.industry_mid,
-    #                 "high": row.MetricIndustryConfiguration.industry_high
-    #             } for row in metrics_res.all()
-    #         }
-
-    #         file_query = await db.execute(select(AssetFile).where(
-    #             AssetFile.asset_id == asset_id,
-    #             AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
-    #             extract('year', AssetFile.projection_start_date).in_(year),
-    #             AssetFile.is_active == True
-    #         ).order_by(AssetFile.projection_start_date))
-
-    #         merged_files = file_query.scalars().all()
-    #         if not merged_files: return Res.error("E-10100")
-
-    #         benchmark_results = []
-    #         for merged_file in merged_files:
-    #             m, y = merged_file.projection_start_date.month, merged_file.projection_start_date.year
-
-    #             file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
-    #             df = pd.read_excel(BytesIO(file_obj))
-
-    #             sffr_revenue = round_2_float(df['SFFR revenues'].sum())
-    #             epex_revenue = round_2_float(df['EPEX DA Revenues'].sum() + df['EPEX 30 DA Revenue'].sum())
-    #             ida1_revenue = round_2_float(df['IDA1 Revenue'].sum())
-    #             idc_revenue = round_2_float(df['IDC Revenue'].sum())
-    #             imbalance_net = round_2_float(df['Imbalance Revenue'].sum() - df['Imbalance Charge'].sum())
-
-    #             gb_gross = round_2_float(sffr_revenue + epex_revenue + ida1_revenue + idc_revenue + imbalance_net)
-    #             gb_net = gb_gross * 0.95
-
-    #             # fetch monthly hardcoded values for the month
-    #             monthly_values = await self._get_monthly_hardcoded(db=db, month=m, year=y)
-
-    #             capacity_market = monthly_values(AssetMetrics.CAPACITY_MARKET.value)
-    #             duos_credit = monthly_values(AssetMetrics.DUOS_CREDIT.value)
-    #             duos_fixed = monthly_values(AssetMetrics.DUOS_FIXED_CHARGES.value)
-
-    #             total_revenue = gb_net + capacity_market + duos_credit - duos_fixed
-
-    #             daily_revenue = total_revenue / get_days_in_month(month=m, year=y)
-
-    #             annual_revenue = daily_revenue * 365
-
-    #             annual_per_mw = annual_revenue / 4.2
-    #             actual_monthly = annual_per_mw * (30.4 / 365)
-
-    #             modo_val = monthly_values(AssetMetrics.MODO_BENCHMARK.value)
-    #             iar_val = await self._extract_iar_row_value(db, asset_id, m, y)
-
-    #             actual_cfg = metrics_lookup.get("Asset Revenue (£)", {})
-    #             modo_cfg = metrics_lookup.get("Modo Benchmark (£/MW/yr)", {})
-    #             iar_cfg = metrics_lookup.get("IAR Projection", {})
-
-    #             benchmark_results.append({
-    #                 "month": m,
-    #                 "year": y,
-    #                 "actual": {
-    #                     "metric_id": actual_cfg.get("id"),
-    #                     "value": round(actual_monthly, 2),
-    #                     "industry_low": actual_cfg.get("low"),
-    #                     "industry_mid": actual_cfg.get("mid"),
-    #                     "industry_high": actual_cfg.get("high")
-    #                 },
-    #                 "modo": {
-    #                     "metric_id": modo_cfg.get("id"),
-    #                     "value": round(modo_val, 2),
-    #                     "industry_low": modo_cfg.get("low"),
-    #                     "industry_mid": modo_cfg.get("mid"),
-    #                     "industry_high": modo_cfg.get("high"),
-    #                     "variance_modo": round(((actual_monthly - modo_val) / modo_val * 100) if modo_val else 0, 2)
-    #                 },
-    #                 "iar": {
-    #                     "metric_id": iar_cfg.get("id"),
-    #                     "value": round(iar_val, 2),
-    #                     "industry_low": iar_cfg.get("low"),
-    #                     "industry_mid": iar_cfg.get("mid"),
-    #                     "industry_high": iar_cfg.get("high"),
-    #                     "variance_iar": round(((actual_monthly - iar_val) / iar_val * 100) if iar_val else 0, 2)
-    #                 }
-    #             })
-
-    #         return Res.success("S-10045", data={
-    #             "asset_id": asset_id,
-    #             "asset_name": asset.name,
-    #             "benchmarks": benchmark_results
-    #         })
-
-    #     except Exception:
-    #         traceback.print_exc()
-    #         return Res.error("E-10001")
-
     async def get_benchmark_analysis(
         self,
         db: AsyncSession,
@@ -211,39 +99,21 @@ class AnalysisService:
             if not asset:
                 return Res.error("E-10034")
 
-            before_payload = {
-                "Asset": asset.name,
-                "Year": year,
-                "Benchmark Analysis Status": "Available",
-            }
-            after_payload = "User viewed Benchmark Analysis visualisations"
-            current_time = datetime.now(timezone.utc)
-            duplicate_log_query = await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.user_id == current_user.get("user_id"),
-                    AuditLog.role == current_user.get("role"),
-                    AuditLog.module == AuditLogModules.BENCHMARK_ANALYSIS,
-                    AuditLog.action == AuditLogScenario.VIEWED_BENCHMARK_ANALYSIS,
-                    AuditLog.resource_id == asset.asset_id,
-                    AuditLog.before == json.dumps(before_payload),
-                    AuditLog.after == after_payload,
-                    AuditLog.created_at >= current_time - timedelta(seconds=2),
-                )
-                .order_by(AuditLog.created_at.desc())
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.BENCHMARK_ANALYSIS,
+                action=AuditLogScenario.VIEWED_BENCHMARK_ANALYSIS,
+                before={
+                    "Asset": asset.name,
+                    "Year": year,
+                    "Benchmark Analysis Status": "Available",
+                },
+                after="User viewed Benchmark Analysis visualisations",
+                resource_id=asset.asset_id,
             )
-            if not duplicate_log_query.scalars().first():
-                await audit_logs(
-                    db=db,
-                    user_id=current_user.get("user_id"),
-                    user_role=current_user.get("role"),
-                    module=AuditLogModules.BENCHMARK_ANALYSIS,
-                    action=AuditLogScenario.VIEWED_BENCHMARK_ANALYSIS,
-                    before=before_payload,
-                    after=after_payload,
-                    resource_id=asset.asset_id,
-                )
-                await db.commit()
+            await db.commit()
 
             metric_names = [
                 "Asset Revenue (£)",
@@ -273,7 +143,7 @@ class AnalysisService:
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.year.in_(year),
-                    AssetFile.is_active == True,
+                    AssetFile.is_active.is_(True),
                 )
                 .order_by(AssetFile.projection_start_date)
             )
@@ -428,7 +298,7 @@ class AnalysisService:
         query = select(AssetFile).where(
             AssetFile.asset_id == asset_id,
             AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
-            AssetFile.is_active == True,
+            AssetFile.is_active.is_(True),
         )
         res = await db.execute(query)
         iar_file = res.scalars().first()
@@ -563,39 +433,20 @@ class AnalysisService:
                     "E-10034", message=f"Asset with ID {asset_id} not found."
                 )
 
-            before_payload = {
-                "Asset": asset.name,
-                "Month/Year": f"{month}/{year}",
-            }
-            after_payload = "User viewed Asset Analysis visualisations"
-            current_time = datetime.now(timezone.utc)
-            duplicate_log_query = await db.execute(
-                select(AuditLog)
-                .where(
-                    AuditLog.user_id == current_user.get("user_id"),
-                    AuditLog.role == current_user.get("role"),
-                    AuditLog.module == AuditLogModules.ASSET_ANALYSIS,
-                    AuditLog.action == AuditLogScenario.VIEWED_ASSET_ANALYSIS,
-                    AuditLog.resource_id == asset.asset_id,
-                    AuditLog.before == json.dumps(before_payload),
-                    AuditLog.after == after_payload,
-                    AuditLog.created_at >= current_time - timedelta(seconds=2),
-                )
-                .order_by(AuditLog.created_at.desc())
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.VIEW_ANALYSIS,
+                action=AuditLogScenario.VIEWED_ASSET_ANALYSIS,
+                before={
+                    "Asset": asset.name,
+                    "Month/Year": f"{month}/{year}",
+                },
+                after="User viewed Asset Analysis visualisations",
+                resource_id=asset.asset_id,
             )
-            if not duplicate_log_query.scalars().first():
-                await audit_logs(
-                    db=db,
-                    user_id=current_user.get("user_id"),
-                    user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_ANALYSIS,
-                    action=AuditLogScenario.VIEWED_ASSET_ANALYSIS,
-                    before=before_payload,
-                    after=after_payload,
-                    resource_id=asset.asset_id,
-                )
-                await db.commit()
-
+            await db.commit()
             file_query = await db.execute(
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
@@ -848,7 +699,7 @@ class AnalysisService:
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
-                    AssetFile.is_active == True,
+                    AssetFile.is_active.is_(True),
                 )
             )
 
@@ -922,65 +773,6 @@ class AnalysisService:
         except Exception:
             traceback.print_exc()
             return Res.error("E-10001", message="Failed to compute SOC distribution")
-
-    # async def get_asset_energy_price_comparison(self, asset_id: int, month: int, year: int, db: AsyncSession, current_user: dict):
-    #     if Platform.AMD.value not in current_user.get("platform", []):
-    #         return Res.error("E-10013", message="Unauthorized: AMD platform required")
-
-    #     asset = await db.get(Asset, asset_id)
-    #     if not asset:
-    #         return Res.error("E-10034", message=f"Asset with ID {asset_id} not found.")
-
-    #     file_query = await db.execute(
-    #         select(AssetFile).where(
-    #             AssetFile.asset_id == asset_id,
-    #             AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
-    #             extract('month', AssetFile.projection_start_date) == month,
-    #             extract('year', AssetFile.projection_start_date) == year,
-    #         )
-    #     )
-
-    #     merged_file = file_query.scalars().first()
-    #     if not merged_file:
-    #         return Res.error("E-10100", message="Merged dataset is not available.")
-
-    #     file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
-    #     df = pd.read_excel(BytesIO(file_obj), engine="openpyxl")
-
-    #     if not 'Timestamp' in df.columns:
-    #         return Res.error('E-10001', 'Malformed Aggragator file')
-
-    #     # convert time stamp for indexing
-    #     df['Timestamp'] = pd.to_datetime(df['Timestamp'], dayfirst=True)
-    #     df.set_index('Timestamp', inplace=True)
-
-    #     # extract data
-    #     energy_price_comparison = []
-    #     for timestamp, row in df.iterrows():
-
-    #         day_ahead = row.get('Day Ahead Price (EPEX)')
-    #         intra_day = row.get('GB-ISEM Intraday 1 Price')
-
-    #         if pd.isna(day_ahead) and pd.isna(intra_day):
-    #             continue
-
-    #         energy_price_comparison.append({
-    #             "timestamp": timestamp.isoformat(),
-    #             "day_ahead_price": (
-    #                 float(day_ahead)
-    #                 if pd.notna(day_ahead) else None
-    #             ),
-    #             "intraday_price": (
-    #                 float(intra_day)
-    #                 if pd.notna(intra_day) else None
-    #             ),
-    #         })
-
-    #     return Res.success('S-10050', data={
-    #         "month": month,
-    #         "year": year,
-    #         "energy_price_comparison": energy_price_comparison
-    #     })
 
     async def get_asset_energy_price_comparison(
         self, asset_id: int, month: int, year: int, db: AsyncSession, current_user: dict
@@ -1181,12 +973,20 @@ class AnalysisService:
 
             # Improvements are calculated based on the net values
             imp_efa = ((efa_rev - daily_rev) / daily_rev * 100) if daily_rev != 0 else 0
-            imp_multi = ((multi_rev - daily_rev) / daily_rev * 100) if daily_rev != 0 else 0
+            imp_multi = (
+                ((multi_rev - daily_rev) / daily_rev * 100) if daily_rev != 0 else 0
+            )
 
             diff_revenue = multi_rev - daily_rev
 
-            actual_df, _ = await self._process_actual_strategy_df(db, asset_id, month, year)            
-            actual_revenue_total = float(actual_df['assigned_net_revenue'].sum()) if not actual_df.empty else 0.0
+            actual_df, _ = await self._process_actual_strategy_df(
+                db, asset_id, month, year
+            )
+            actual_revenue_total = (
+                float(actual_df["assigned_net_revenue"].sum())
+                if not actual_df.empty
+                else 0.0
+            )
 
             return Res.success(
                 "S-10055",
@@ -1207,14 +1007,16 @@ class AnalysisService:
                     },
                     "additional_revenue": round(diff_revenue, 2),
                     "actual_revenue": round(actual_revenue_total, 2),
-                    "note": "All revenue values are shown after deducting the 5% GridBeyond revenue share."
+                    "note": "All revenue values are shown after deducting the 5% GridBeyond revenue share.",
                 },
             )
         except Exception as e:
             traceback.print_exc()
             return Res.error("E-10001", errors=[str(e)])
-        
-    async def _process_actual_strategy_df(self, db: AsyncSession, asset_id: int, month: int, year: int):
+
+    async def _process_actual_strategy_df(
+        self, db: AsyncSession, asset_id: int, month: int, year: int
+    ):
         file_stmt = select(AssetFile).where(
             AssetFile.asset_id == asset_id,
             AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
@@ -1226,7 +1028,9 @@ class AnalysisService:
         try:
             dfs = []
             for f in merged_records:
-                obj, _ = FileStorageManager.get_file_object(f.key, storage_type=f.storage_server)
+                obj, _ = FileStorageManager.get_file_object(
+                    f.key, storage_type=f.storage_server
+                )
                 sub_df = pd.read_excel(BytesIO(obj))
                 sub_df.columns = [str(c).strip() for c in sub_df.columns]
                 dfs.append(sub_df)
@@ -1236,33 +1040,48 @@ class AnalysisService:
 
         ts_col = None
         for col in df.columns:
-            if col.lower().strip() == 'timestamp':
+            if col.lower().strip() == "timestamp":
                 ts_col = col
                 break
         if not ts_col:
             return None, "E-10139"
 
-        df[ts_col] = pd.to_datetime(df[ts_col], errors='coerce')
+        df[ts_col] = pd.to_datetime(df[ts_col], errors="coerce")
         df = df[(df[ts_col].dt.month == month) & (df[ts_col].dt.year == year)].copy()
         if df.empty:
             return pd.DataFrame(), None
 
         col_map = {c.lower().strip(): c for c in df.columns}
-        required = ["epex 30 da revenue", "epex da revenues", "ida1 revenue", "idc revenue", "imbalance revenue", "imbalance charge", "sffr revenues", "power_mw"]
+        required = [
+            "epex 30 da revenue",
+            "epex da revenues",
+            "ida1 revenue",
+            "idc revenue",
+            "imbalance revenue",
+            "imbalance charge",
+            "sffr revenues",
+            "power_mw",
+        ]
         for r in required:
             if r not in col_map:
                 return None, "E-10139"
 
         epex_30_da = df[col_map["epex 30 da revenue"]].fillna(0).astype(float)
         epex_da = df[col_map["epex da revenues"]].fillna(0).astype(float)
-        df['derived_epex_revenue'] = epex_30_da + epex_da
-        
-        df['derived_ida1_revenue'] = df[col_map["ida1 revenue"]].fillna(0).astype(float)
-        df['derived_idc_revenue'] = df[col_map["idc revenue"]].fillna(0).astype(float)
-        df['derived_imb_revenue'] = df[col_map["imbalance revenue"]].fillna(0).astype(float)
-        df['derived_imb_charge'] = df[col_map["imbalance charge"]].fillna(0).astype(float)
-        df['derived_sffr_revenue'] = df[col_map["sffr revenues"]].fillna(0).astype(float)
-        df['derived_power_mw'] = df[col_map["power_mw"]].fillna(0).astype(float)
+        df["derived_epex_revenue"] = epex_30_da + epex_da
+
+        df["derived_ida1_revenue"] = df[col_map["ida1 revenue"]].fillna(0).astype(float)
+        df["derived_idc_revenue"] = df[col_map["idc revenue"]].fillna(0).astype(float)
+        df["derived_imb_revenue"] = (
+            df[col_map["imbalance revenue"]].fillna(0).astype(float)
+        )
+        df["derived_imb_charge"] = (
+            df[col_map["imbalance charge"]].fillna(0).astype(float)
+        )
+        df["derived_sffr_revenue"] = (
+            df[col_map["sffr revenues"]].fillna(0).astype(float)
+        )
+        df["derived_power_mw"] = df[col_map["power_mw"]].fillna(0).astype(float)
 
         assigned_markets = []
         assigned_revenues = []
@@ -1280,7 +1099,10 @@ class AnalysisService:
             elif abs(row.derived_idc_revenue) > 0.01:
                 market = "IDC"
                 rev = row.derived_idc_revenue
-            elif abs(row.derived_imb_revenue) > 0.01 or abs(row.derived_imb_charge) > 0.01:
+            elif (
+                abs(row.derived_imb_revenue) > 0.01
+                or abs(row.derived_imb_charge) > 0.01
+            ):
                 market = "Imbalance"
                 rev = row.derived_imb_revenue - abs(row.derived_imb_charge)
             elif abs(row.derived_sffr_revenue) > 0.01:
@@ -1299,22 +1121,36 @@ class AnalysisService:
             assigned_markets.append(market)
             assigned_revenues.append(rev)
 
-        df['assigned_market_label'] = assigned_markets
-        df['assigned_net_revenue'] = [r * 0.95 for r in assigned_revenues]
+        df["assigned_market_label"] = assigned_markets
+        df["assigned_net_revenue"] = [r * 0.95 for r in assigned_revenues]
 
         return df, None
 
-    async def get_market_utilization(self, db: AsyncSession, asset_id: int, month: int, year: int, market_strategy: str):
+    async def get_market_utilization(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        market_strategy: str,
+    ):
         try:
             utilization_data = []
 
             if market_strategy == "actual":
-                df, err_code = await self._process_actual_strategy_df(db, asset_id, month, year)
-                if err_code: return Res.error(err_code)
-                if df.empty: return Res.error("E-10100", message="No actual data available for the selected period.")
-                
-                group_col = 'assigned_market_label'
-                rev_col = 'assigned_net_revenue'
+                df, err_code = await self._process_actual_strategy_df(
+                    db, asset_id, month, year
+                )
+                if err_code:
+                    return Res.error(err_code)
+                if df.empty:
+                    return Res.error(
+                        "E-10100",
+                        message="No actual data available for the selected period.",
+                    )
+
+                group_col = "assigned_market_label"
+                rev_col = "assigned_net_revenue"
             else:
                 df_full = await self._get_optimized_df(db, asset_id, month, year)
                 if df_full is None or len(df_full) == 0:
@@ -1322,15 +1158,15 @@ class AnalysisService:
 
                 df = df_full.copy()
                 if market_strategy == "multi":
-                    group_col = 'Market_Used_Multi'
-                    rev_col = 'Optimised_Revenue_Multi'
+                    group_col = "Market_Used_Multi"
+                    rev_col = "Optimised_Revenue_Multi"
                     df.loc[df["Strategy_Selected_Multi"] == "SFFR", group_col] = "SFFR"
                 elif market_strategy == "epex_daily":
-                    group_col = 'Strategy_Selected_Daily'
-                    rev_col = 'Optimised_Revenue_Daily'
+                    group_col = "Strategy_Selected_Daily"
+                    rev_col = "Optimised_Revenue_Daily"
                 elif market_strategy == "epex_efa":
-                    group_col = 'Strategy_Selected_EFA'
-                    rev_col = 'Optimised_Revenue_EFA'
+                    group_col = "Strategy_Selected_EFA"
+                    rev_col = "Optimised_Revenue_EFA"
                 else:
                     return Res.error("E-10132", message="Invalid strategy selected.")
 
@@ -1340,31 +1176,48 @@ class AnalysisService:
                 for label, count in counts.items():
                     mask = df[group_col] == label
                     total_rev = float(df.loc[mask, rev_col].sum())
-                    
+
                     # Convert labels format dynamically for backwards optimization compliance
-                    clean_label = str(label).replace('-', '_') if market_strategy != "actual" else str(label)
-                    
-                    utilization_data.append({
-                        "market_used": clean_label,
-                        "count": int(count),
-                        "percentage": round((count / total_strategy_rows) * 100, 2),
-                        "total_revenue": round(total_rev, 2)
-                    })
+                    clean_label = (
+                        str(label).replace("-", "_")
+                        if market_strategy != "actual"
+                        else str(label)
+                    )
+
+                    utilization_data.append(
+                        {
+                            "market_used": clean_label,
+                            "count": int(count),
+                            "percentage": round((count / total_strategy_rows) * 100, 2),
+                            "total_revenue": round(total_rev, 2),
+                        }
+                    )
 
                     clean_label = str(label).replace("-", "_")
 
-            return Res.success("S-10056", data={
-                "asset_id": asset_id,
-                "month": month,
-                "year": year,
-                "market_strategy": market_strategy,
-                "data": utilization_data
-            })
+            return Res.success(
+                "S-10056",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "market_strategy": market_strategy,
+                    "data": utilization_data,
+                },
+            )
         except Exception as e:
             traceback.print_exc()
             return Res.error("E-10140", errors=[str(e)])
 
-    async def get_market_statistics_table(self, db: AsyncSession, asset_id: int, month: int, year: int, market_strategy: str, current_user: dict):
+    async def get_market_statistics_table(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        market_strategy: str,
+        current_user: dict,
+    ):
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
@@ -1375,27 +1228,47 @@ class AnalysisService:
                 return Res.error("E-10134", message="Invalid market strategy passed")
 
             rows = []
-            
+
             if market_strategy == "actual":
-                df, err_code = await self._process_actual_strategy_df(db, asset_id, month, year)
-                if err_code: return Res.error(err_code)
-                if df.empty: return Res.error("E-10100", message="No actual data available for the selected period.")
+                df, err_code = await self._process_actual_strategy_df(
+                    db, asset_id, month, year
+                )
+                if err_code:
+                    return Res.error(err_code)
+                if df.empty:
+                    return Res.error(
+                        "E-10100",
+                        message="No actual data available for the selected period.",
+                    )
 
                 strategy_col = "assigned_market_label"
                 revenue_col = "assigned_net_revenue"
             else:
                 df = await self._get_optimized_df(db, asset_id, month, year)
                 if df is None or df.empty:
-                    return Res.error("E-10100", message="Optimized dataset not available")
+                    return Res.error(
+                        "E-10100", message="Optimized dataset not available"
+                    )
 
                 if market_strategy == "epex_daily":
-                    strategy_col, revenue_col = "Strategy_Selected_Daily", "Optimised_Revenue_Daily"
+                    strategy_col, revenue_col = (
+                        "Strategy_Selected_Daily",
+                        "Optimised_Revenue_Daily",
+                    )
                 elif market_strategy == "epex_efa":
-                    strategy_col, revenue_col = "Strategy_Selected_EFA", "Optimised_Revenue_EFA"
-                else: # multi
-                    strategy_col, revenue_col = "Market_Used_Multi", "Optimised_Revenue_Multi"
+                    strategy_col, revenue_col = (
+                        "Strategy_Selected_EFA",
+                        "Optimised_Revenue_EFA",
+                    )
+                else:  # multi
+                    strategy_col, revenue_col = (
+                        "Market_Used_Multi",
+                        "Optimised_Revenue_Multi",
+                    )
                     df = df.copy()
-                    df.loc[df["Strategy_Selected_Multi"] == "SFFR", strategy_col] = "SFFR"
+                    df.loc[df["Strategy_Selected_Multi"] == "SFFR", strategy_col] = (
+                        "SFFR"
+                    )
 
             total_periods = len(df)
             total_revenue = float(df[revenue_col].fillna(0).sum())
@@ -1405,39 +1278,54 @@ class AnalysisService:
                 mask = df[strategy_col] == market
                 market_periods = int(mask.sum())
                 market_revenue = float(df.loc[mask, revenue_col].fillna(0).sum())
-                
-                pct_time = round((market_periods / total_periods) * 100, 1) if total_periods else 0.0
-                pct_revenue = round((market_revenue / total_revenue) * 100, 1) if total_revenue else 0.0
-                
-                rows.append({
-                    "market": market,
-                    "periods": market_periods,
-                    "percentage_time": pct_time,
-                    "revenue": round(market_revenue, 2),
-                    "percentage_revenue": pct_revenue,
-                })
 
-            rows.append({
-                "market": "TOTAL",
-                "periods": total_periods,
-                "percentage_time": 100.0,
-                "revenue": round(total_revenue, 2),
-                "percentage_revenue": 100.0,
-            })
+                pct_time = (
+                    round((market_periods / total_periods) * 100, 1)
+                    if total_periods
+                    else 0.0
+                )
+                pct_revenue = (
+                    round((market_revenue / total_revenue) * 100, 1)
+                    if total_revenue
+                    else 0.0
+                )
 
-            return Res.success("S-10057", data={
-                "asset_id": asset_id,
-                "month": month,
-                "year": year,
-                "market_strategy": market_strategy,
-                "total_periods": total_periods,
-                "total_revenue": round(total_revenue, 2),
-                "rows": rows,
-            })
+                rows.append(
+                    {
+                        "market": market,
+                        "periods": market_periods,
+                        "percentage_time": pct_time,
+                        "revenue": round(market_revenue, 2),
+                        "percentage_revenue": pct_revenue,
+                    }
+                )
+
+            rows.append(
+                {
+                    "market": "TOTAL",
+                    "periods": total_periods,
+                    "percentage_time": 100.0,
+                    "revenue": round(total_revenue, 2),
+                    "percentage_revenue": 100.0,
+                }
+            )
+
+            return Res.success(
+                "S-10057",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "market_strategy": market_strategy,
+                    "total_periods": total_periods,
+                    "total_revenue": round(total_revenue, 2),
+                    "rows": rows,
+                },
+            )
         except Exception:
             traceback.print_exc()
             return Res.error("E-10135", message="Aggregation/calculation failed")
-        
+
     async def download_market_statistics_table(
         self,
         db: AsyncSession,
@@ -1445,7 +1333,7 @@ class AnalysisService:
         month: int,
         year: int,
         market_strategy: str,
-        current_user: dict
+        current_user: dict,
     ):
         result = await self.get_market_statistics_table(
             db=db,
@@ -1456,35 +1344,47 @@ class AnalysisService:
             current_user=current_user,
         )
 
-        res_body = json.loads(result.body.decode()) if hasattr(result, 'body') else result
+        res_body = (
+            json.loads(result.body.decode()) if hasattr(result, "body") else result
+        )
         if res_body.get("status") == "error":
             return result
 
-        data          = res_body["data"]
-        rows          = data["rows"]
+        data = res_body["data"]
+        rows = data["rows"]
 
         output = StringIO()
-        output.write('\ufeff')
+        output.write("\ufeff")
         writer = csv.writer(output)
 
-        writer.writerow(["Market", "Periods", "% of Time", "Revenue (£)", "% of Revenue"])
+        writer.writerow(
+            ["Market", "Periods", "% of Time", "Revenue (£)", "% of Revenue"]
+        )
 
         for row in rows:
-            rev_val = float(row["revenue"]) if isinstance(row["revenue"], (int, float)) else 0.0
-            
-            writer.writerow([
-                row["market"],
-                row["periods"],
-                f"{row['percentage_time']}%",
-                f"{rev_val:,.2f}",
-                f"{row['percentage_revenue']}%",
-            ])
+            rev_val = (
+                float(row["revenue"])
+                if isinstance(row["revenue"], (int, float))
+                else 0.0
+            )
+
+            writer.writerow(
+                [
+                    row["market"],
+                    row["periods"],
+                    f"{row['percentage_time']}%",
+                    f"{rev_val:,.2f}",
+                    f"{row['percentage_revenue']}%",
+                ]
+            )
 
         output.seek(0)
 
         asset = await db.get(Asset, asset_id)
         asset_str = asset.asset_id if asset else str(asset_id)
-        file_name = f"{asset_str}_{month}_{year}_{market_strategy}_market_statistics.csv"
+        file_name = (
+            f"{asset_str}_{month}_{year}_{market_strategy}_market_statistics.csv"
+        )
 
         return StreamingResponse(
             BytesIO(output.getvalue().encode("utf-8")),
@@ -1492,10 +1392,19 @@ class AnalysisService:
             headers={"Content-Disposition": f"attachment; filename={file_name}"},
         )
 
-    async def get_revenue_distribution_chart(self, db: AsyncSession, asset_id: int, month: int, year: int, market_strategy: str, current_user: dict):
+    async def get_revenue_distribution_chart(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        market_strategy: str,
+        current_user: dict,
+    ):
         try:
             asset = await db.get(Asset, asset_id)
-            if not asset: return Res.error("E-10034", message="Asset not found")
+            if not asset:
+                return Res.error("E-10034", message="Asset not found")
 
             valid_strategies = ["epex_daily", "epex_efa", "multi", "actual"]
             if market_strategy not in valid_strategies:
@@ -1504,50 +1413,79 @@ class AnalysisService:
             chart_data = []
 
             if market_strategy == "actual":
-                df, err_code = await self._process_actual_strategy_df(db, asset_id, month, year)
-                if err_code: return Res.error(err_code)
+                df, err_code = await self._process_actual_strategy_df(
+                    db, asset_id, month, year
+                )
+                if err_code:
+                    return Res.error(err_code)
                 if df.empty:
-                    return Res.success("S-10058", data={"asset_id": asset_id, "month": month, "year": year, "market_strategy": market_strategy, "chart_data": []})
+                    return Res.success(
+                        "S-10058",
+                        data={
+                            "asset_id": asset_id,
+                            "month": month,
+                            "year": year,
+                            "market_strategy": market_strategy,
+                            "chart_data": [],
+                        },
+                    )
 
                 strategy_col = "assigned_market_label"
                 revenue_col = "assigned_net_revenue"
             else:
                 df_raw = await self._get_optimized_df(db, asset_id, month, year)
                 if df_raw is None or df_raw.empty:
-                    return Res.error("E-10100", message="Optimized dataset not available")
+                    return Res.error(
+                        "E-10100", message="Optimized dataset not available"
+                    )
                 df = df_raw.copy()
 
                 if market_strategy == "epex_daily":
-                    strategy_col, revenue_col = "Strategy_Selected_Daily", "Optimised_Revenue_Daily"
+                    strategy_col, revenue_col = (
+                        "Strategy_Selected_Daily",
+                        "Optimised_Revenue_Daily",
+                    )
                 elif market_strategy == "epex_efa":
-                    strategy_col, revenue_col = "Strategy_Selected_EFA", "Optimised_Revenue_EFA"
-                else: # multi
-                    strategy_col, revenue_col = "Market_Used_Multi", "Optimised_Revenue_Multi"
-                    df.loc[df["Strategy_Selected_Multi"] == "SFFR", strategy_col] = "SFFR"
+                    strategy_col, revenue_col = (
+                        "Strategy_Selected_EFA",
+                        "Optimised_Revenue_EFA",
+                    )
+                else:  # multi
+                    strategy_col, revenue_col = (
+                        "Market_Used_Multi",
+                        "Optimised_Revenue_Multi",
+                    )
+                    df.loc[df["Strategy_Selected_Multi"] == "SFFR", strategy_col] = (
+                        "SFFR"
+                    )
 
             markets = df[strategy_col].dropna().unique().tolist()
             for market in markets:
                 if str(market).lower().strip() in ["idle", "unknown operation / idle"]:
                     continue
-                    
-                revenue = float(df.loc[df[strategy_col] == market, revenue_col].fillna(0).sum())
-                chart_data.append({
-                    "market": market,
-                    "revenue": round(revenue, 2)
-                })
 
-            return Res.success("S-10058", data={
-                "asset_id": asset_id,
-                "month": month,
-                "year": year,
-                "market_strategy": market_strategy,
-                "chart_data": chart_data
-            })
+                revenue = float(
+                    df.loc[df[strategy_col] == market, revenue_col].fillna(0).sum()
+                )
+                chart_data.append({"market": market, "revenue": round(revenue, 2)})
+
+            return Res.success(
+                "S-10058",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "market_strategy": market_strategy,
+                    "chart_data": chart_data,
+                },
+            )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10135", message="Aggregation/calculation failed")  
-              
-    async def get_best_markets(self, db: AsyncSession, asset_id: int, month: int, year: int):
+            return Res.error("E-10135", message="Aggregation/calculation failed")
+
+    async def get_best_markets(
+        self, db: AsyncSession, asset_id: int, month: int, year: int
+    ):
         try:
             df = await self._get_optimized_df(db, asset_id, month, year)
             if df is None or len(df) == 0:
@@ -2145,8 +2083,6 @@ class AnalysisService:
                     "E-10149", message="Asset capacity configuration missing"
                 )
 
-            asset_capacity = float(opt_params.usable_capacity_mwh)
-
             files_stmt = select(AssetFile).where(
                 AssetFile.asset_id == asset_id,
                 AssetFile.type.in_(
@@ -2155,16 +2091,28 @@ class AnalysisService:
                         AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     ]
                 ),
-                AssetFile.is_active == True,
+                AssetFile.is_active.is_(True),
             )
             files_res = await db.execute(files_stmt)
             all_files = files_res.scalars().all()
 
-            iar_records = [f for f in all_files if f.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value]
-            merged_records = [f for f in all_files if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value]
+            iar_records = [
+                f
+                for f in all_files
+                if f.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value
+            ]
+            merged_records = [
+                f
+                for f in all_files
+                if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value
+            ]
 
-            if not iar_records: return Res.error("E-10145", message="IAR dataset is not available")
-            if not merged_records: return Res.error("E-10146", message="Actual revenue dataset is not available")
+            if not iar_records:
+                return Res.error("E-10145", message="IAR dataset is not available")
+            if not merged_records:
+                return Res.error(
+                    "E-10146", message="Actual revenue dataset is not available"
+                )
 
             async def fetch_iar(file_record):
                 obj, _ = FileStorageManager.get_file_object(
@@ -2173,23 +2121,32 @@ class AnalysisService:
                 return pd.read_excel(BytesIO(obj), header=None)
 
             async def fetch_merged_file(file_record):
-                obj, _ = FileStorageManager.get_file_object(file_record.key, storage_type=file_record.storage_server)
+                obj, _ = FileStorageManager.get_file_object(
+                    file_record.key, storage_type=file_record.storage_server
+                )
                 return pd.read_excel(BytesIO(obj))
 
             try:
                 iar_df_raw = await fetch_iar(iar_records[0])
             except Exception:
-                return Res.error("E-10153", message="Failed to load IAR baseline template file")
+                return Res.error(
+                    "E-10153", message="Failed to load IAR baseline template file"
+                )
 
             try:
-                merged_dfs = await asyncio.gather(*(fetch_merged_file(f) for f in merged_records))
-                
+                merged_dfs = await asyncio.gather(
+                    *(fetch_merged_file(f) for f in merged_records)
+                )
+
                 for sub_df in merged_dfs:
                     sub_df.columns = [str(c).strip() for c in sub_df.columns]
-                
+
                 merged_df = pd.concat(merged_dfs, ignore_index=True)
             except Exception:
-                return Res.error("E-10153", message="Revenue IAR vs Actual calculation failed to load merged datasets")
+                return Res.error(
+                    "E-10153",
+                    message="Revenue IAR vs Actual calculation failed to load merged datasets",
+                )
 
             hardcoded_stmt = select(MonthlyHardcodedValue).where(
                 MonthlyHardcodedValue.year == year
@@ -2223,13 +2180,38 @@ class AnalysisService:
                 )
 
             stream_config = {
-                "Wholesale Day Ahead": {"iar_label": "Wholesale Day Ahead Battery Revenue", "csv_cols": ["epex 30 da revenue", "epex da revenues"]},
-                "Wholesale Intraday": {"iar_label": "Wholesale Intraday Revenue", "csv_cols": ["ida1 revenue"]},
-                "Balancing Mechanism": {"iar_label": "Balancing Mechanism Revenue", "csv_cols": []},
-                "Frequency Response": {"iar_label": "Frequency Response Revenues", "csv_cols": ["sffr revenues"]},
-                "Capacity Market": {"iar_label": "Capacity Market Revenues", "use_settings": True, "metric_id": AssetMetrics.CAPACITY_MARKET.value},
-                "DUoS Battery": {"iar_label": "DUoS Battery Revenues", "use_settings": True, "metric_id": AssetMetrics.DUOS_CREDIT.value},
-                "DUoS Fixed Charges": {"iar_label": "DUoS Fixed Charges", "use_settings": True, "metric_id": AssetMetrics.DUOS_FIXED_CHARGES.value, "is_cost": True},
+                "Wholesale Day Ahead": {
+                    "iar_label": "Wholesale Day Ahead Battery Revenue",
+                    "csv_cols": ["epex 30 da revenue", "epex da revenues"],
+                },
+                "Wholesale Intraday": {
+                    "iar_label": "Wholesale Intraday Revenue",
+                    "csv_cols": ["ida1 revenue"],
+                },
+                "Balancing Mechanism": {
+                    "iar_label": "Balancing Mechanism Revenue",
+                    "csv_cols": [],
+                },
+                "Frequency Response": {
+                    "iar_label": "Frequency Response Revenues",
+                    "csv_cols": ["sffr revenues"],
+                },
+                "Capacity Market": {
+                    "iar_label": "Capacity Market Revenues",
+                    "use_settings": True,
+                    "metric_id": AssetMetrics.CAPACITY_MARKET.value,
+                },
+                "DUoS Battery": {
+                    "iar_label": "DUoS Battery Revenues",
+                    "use_settings": True,
+                    "metric_id": AssetMetrics.DUOS_CREDIT.value,
+                },
+                "DUoS Fixed Charges": {
+                    "iar_label": "DUoS Fixed Charges",
+                    "use_settings": True,
+                    "metric_id": AssetMetrics.DUOS_FIXED_CHARGES.value,
+                    "is_cost": True,
+                },
                 "TNUoS": {"iar_label": "TNUoS Revenues", "csv_cols": []},
                 "Imbalance Revenue": {
                     "iar_label": None,
@@ -2242,7 +2224,7 @@ class AnalysisService:
             }
 
             def calculate_variance(actual, target):
-                if target == 0.0: 
+                if target == 0.0:
                     return None
                 return round(((actual - target) / target) * 100, 2)
 
@@ -2255,7 +2237,7 @@ class AnalysisService:
                 ]
 
                 if filtered_actual_df.empty:
-                    continue  
+                    continue
 
                 actual_col_map = {
                     col.lower().strip(): col for col in filtered_actual_df.columns
@@ -2309,12 +2291,18 @@ class AnalysisService:
                         actual_values[stream_name], iar_values[stream_name]
                     )
 
-                    streams_list.append({
-                        "revenue_stream": stream_name,
-                        "iar_revenue": round(iar_values[stream_name], 2),
-                        "actual_revenue": round(actual_values[stream_name], 2),
-                        "variance_percentage": variance_pct if isinstance(variance_pct, str) or variance_pct is None else round(variance_pct, 2)
-                    })
+                    streams_list.append(
+                        {
+                            "revenue_stream": stream_name,
+                            "iar_revenue": round(iar_values[stream_name], 2),
+                            "actual_revenue": round(actual_values[stream_name], 2),
+                            "variance_percentage": (
+                                variance_pct
+                                if isinstance(variance_pct, str) or variance_pct is None
+                                else round(variance_pct, 2)
+                            ),
+                        }
+                    )
 
                 iar_ex_bm = sum(
                     iar_values[s]
@@ -2330,7 +2318,7 @@ class AnalysisService:
                 iar_all = (
                     iar_ex_bm + iar_values["Balancing Mechanism"] + iar_values["TNUoS"]
                 )
-                
+
                 actual_ex_bm_monthly_sum = (
                     actual_values["Wholesale Day Ahead"]
                     + actual_values["Wholesale Intraday"]
@@ -2338,7 +2326,7 @@ class AnalysisService:
                     + actual_values["Imbalance Revenue"]
                     - actual_values["Imbalance Charge"]
                 )
-                
+
                 actual_all_monthly_sum = (
                     actual_ex_bm_monthly_sum
                     + actual_values["Capacity Market"]
@@ -2351,28 +2339,37 @@ class AnalysisService:
                     "streams": streams_list,
                     "total_excluding_bm_tnuos": {
                         "iar_revenue": round(iar_ex_bm, 2),
-                        "actual_revenue": round(actual_ex_bm_monthly_sum, 2), # Use Monthly Sum
+                        "actual_revenue": round(
+                            actual_ex_bm_monthly_sum, 2
+                        ),  # Use Monthly Sum
                         "variance_percentage": calculate_variance(
                             actual_ex_bm_monthly_sum, iar_ex_bm
                         ),
                     },
                     "total_all_streams": {
                         "iar_revenue": round(iar_all, 2),
-                        "actual_revenue": round(actual_all_monthly_sum, 2), # Use Monthly Sum
+                        "actual_revenue": round(
+                            actual_all_monthly_sum, 2
+                        ),  # Use Monthly Sum
                         "variance_percentage": calculate_variance(
                             actual_all_monthly_sum, iar_all
                         ),
                     },
                 }
-            return Res.success("S-10066", data={
-                "asset_id": asset_id,
-                "year": year,
-                "monthly_data": monthly_data_payload
-            })
+            return Res.success(
+                "S-10066",
+                data={
+                    "asset_id": asset_id,
+                    "year": year,
+                    "monthly_data": monthly_data_payload,
+                },
+            )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10153", message="Revenue IAR vs Actual calculation failed")
-                                    
+            return Res.error(
+                "E-10153", message="Revenue IAR vs Actual calculation failed"
+            )
+
     def _extract_iar_dataset(self, df_raw):
         mandatory_lower = [
             "wholesale day ahead battery revenue",
@@ -2546,17 +2543,17 @@ class AnalysisService:
         )
 
     async def get_multi_market_optimized_vs_actual(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            year: int,
-            current_user: dict,
-        ):
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        current_user: dict,
+    ):
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034", message="Asset not found")
-            
+
             files_stmt = select(AssetFile).where(
                 AssetFile.asset_id == asset_id,
                 AssetFile.type.in_(
@@ -2565,54 +2562,56 @@ class AnalysisService:
                         AssetFileType.OPTIMIZED_DATASET.value,
                     ]
                 ),
-                AssetFile.is_active == True,
+                AssetFile.is_active.is_(True),
             )
             files_res = await db.execute(files_stmt)
             all_files = files_res.scalars().all()
             merged_records = [
-                f for f in all_files
+                f
+                for f in all_files
                 if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value
             ]
-            
+
             optimized_records = [
-                f for f in all_files
-                if f.type == AssetFileType.OPTIMIZED_DATASET.value
+                f for f in all_files if f.type == AssetFileType.OPTIMIZED_DATASET.value
             ]
-            
+
             if not merged_records:
                 return Res.error("E-10107", message="Merged dataset unavailable")
-            
+
             if not optimized_records:
                 return Res.error("E-10154", message="Optimized dataset unavailable")
-            
+
             async def fetch_merged_file(file_record):
-                obj, _ = FileStorageManager.get_file_object(file_record.key, storage_type=file_record.storage_server)
+                obj, _ = FileStorageManager.get_file_object(
+                    file_record.key, storage_type=file_record.storage_server
+                )
                 return pd.read_excel(BytesIO(obj))
-            
+
             async def fetch_optimized_file(file_record):
-                obj, _ = FileStorageManager.get_file_object(file_record.key, storage_type=file_record.storage_server)
+                obj, _ = FileStorageManager.get_file_object(
+                    file_record.key, storage_type=file_record.storage_server
+                )
                 return pd.read_csv(BytesIO(obj))
-            
+
             try:
-                merged_dfs = await asyncio.gather(*(fetch_merged_file(f) for f in merged_records))
-                optimized_dfs = await asyncio.gather(*(fetch_optimized_file(f) for f in optimized_records))
+                merged_dfs = await asyncio.gather(
+                    *(fetch_merged_file(f) for f in merged_records)
+                )
+                optimized_dfs = await asyncio.gather(
+                    *(fetch_optimized_file(f) for f in optimized_records)
+                )
                 for df in merged_dfs:
-                    df.columns = [
-                        str(c).strip().lower()
-                        for c in df.columns
-                    ]
+                    df.columns = [str(c).strip().lower() for c in df.columns]
                 for df in optimized_dfs:
-                    df.columns = [
-                        str(c).strip().lower()
-                        for c in df.columns
-                    ]
+                    df.columns = [str(c).strip().lower() for c in df.columns]
                 merged_df = pd.concat(merged_dfs, ignore_index=True)
                 optimized_df = pd.concat(optimized_dfs, ignore_index=True)
-            
+
             except Exception:
                 traceback.print_exc()
                 return Res.error("E-10157", message="Failed to load datasets")
-            
+
             required_merged_cols = [
                 "timestamp",
                 "sffr revenues",
@@ -2623,51 +2622,67 @@ class AnalysisService:
                 "imbalance revenue",
                 "imbalance charge",
             ]
-            
+
             required_optimized_cols = [
                 "timestamp",
                 "market_used_multi",
                 "optimised_revenue_multi",
             ]
-            
+
             missing_merged = [
-                c for c in required_merged_cols
-                if c not in merged_df.columns
+                c for c in required_merged_cols if c not in merged_df.columns
             ]
-            
+
             if missing_merged:
-                return Res.error("E-10155", message=f"Missing merged columns: {missing_merged}")
-            
+                return Res.error(
+                    "E-10155", message=f"Missing merged columns: {missing_merged}"
+                )
+
             missing_optimized = [
-                c for c in required_optimized_cols
-                if c not in optimized_df.columns
+                c for c in required_optimized_cols if c not in optimized_df.columns
             ]
-            
+
             if missing_optimized:
-                return Res.error("E-10156", message=f"Missing optimized columns: {missing_optimized}")
-            
-            merged_df["timestamp"] = pd.to_datetime(merged_df["timestamp"], format="mixed", errors="coerce")
-            optimized_df["timestamp"] = pd.to_datetime(optimized_df["timestamp"], format="mixed", errors="coerce")
+                return Res.error(
+                    "E-10156", message=f"Missing optimized columns: {missing_optimized}"
+                )
+
+            merged_df["timestamp"] = pd.to_datetime(
+                merged_df["timestamp"], format="mixed", errors="coerce"
+            )
+            optimized_df["timestamp"] = pd.to_datetime(
+                optimized_df["timestamp"], format="mixed", errors="coerce"
+            )
             monthly_data_payload = {}
-            
+
             for m in range(1, 13):
-                merged_month_df = merged_df[(merged_df["timestamp"].dt.month == m) 
-                & (merged_df["timestamp"].dt.year == year)].copy()
-                
-                optimized_month_df = optimized_df[(optimized_df["timestamp"].dt.month == m) 
-                & (optimized_df["timestamp"].dt.year == year)].copy()
-                
-                if (merged_month_df.empty and optimized_month_df.empty):
+                merged_month_df = merged_df[
+                    (merged_df["timestamp"].dt.month == m)
+                    & (merged_df["timestamp"].dt.year == year)
+                ].copy()
+
+                optimized_month_df = optimized_df[
+                    (optimized_df["timestamp"].dt.month == m)
+                    & (optimized_df["timestamp"].dt.year == year)
+                ].copy()
+
+                if merged_month_df.empty and optimized_month_df.empty:
                     continue
-                
+
                 actual_streams = {
                     "SFFR": (merged_month_df["sffr revenues"].sum()),
-                    "EPEX DA": (merged_month_df["epex 30 da revenue"].sum() + merged_month_df["epex da revenues"].sum()),
+                    "EPEX DA": (
+                        merged_month_df["epex 30 da revenue"].sum()
+                        + merged_month_df["epex da revenues"].sum()
+                    ),
                     "IDA1": (merged_month_df["ida1 revenue"].sum()),
                     "IDC": (merged_month_df["idc revenue"].sum()),
-                    "Imbalance": (merged_month_df["imbalance revenue"].sum() - merged_month_df["imbalance charge"].sum())
+                    "Imbalance": (
+                        merged_month_df["imbalance revenue"].sum()
+                        - merged_month_df["imbalance charge"].sum()
+                    ),
                 }
-                
+
                 actual_streams = {k: v * 0.95 for k, v in actual_streams.items()}
                 market_totals = {
                     "SFFR": 0.0,
@@ -2686,20 +2701,32 @@ class AnalysisService:
                 }
                 for _, row in optimized_month_df.iterrows():
                     market = str(row["market_used_multi"]).strip().upper()
-                    revenue = pd.to_numeric(row["optimised_revenue_multi"], errors="coerce")
+                    revenue = pd.to_numeric(
+                        row["optimised_revenue_multi"], errors="coerce"
+                    )
                     revenue = 0.0 if pd.isna(revenue) else float(revenue)
 
                     if market in market_totals:
                         market_totals[market] += revenue
                 optimized_streams = {
                     "SFFR": (market_totals["SFFR"]),
-                    "EPEX DA": (market_totals["BUY-EPEX"] + market_totals["SELL-EPEX"] + market_totals["BUY-DA_HH"] + market_totals["SELL-DA_HH"]),
+                    "EPEX DA": (
+                        market_totals["BUY-EPEX"]
+                        + market_totals["SELL-EPEX"]
+                        + market_totals["BUY-DA_HH"]
+                        + market_totals["SELL-DA_HH"]
+                    ),
                     "IDA1": (market_totals["BUY-ISEM"] + market_totals["SELL-ISEM"]),
                     "IDC": (market_totals["IDC"]),
-                    "Imbalance": (market_totals["BUY-SSP"] + market_totals["SELL-SSP"] + market_totals["BUY-SBP"] + market_totals["SELL-SBP"]),
+                    "Imbalance": (
+                        market_totals["BUY-SSP"]
+                        + market_totals["SELL-SSP"]
+                        + market_totals["BUY-SBP"]
+                        + market_totals["SELL-SBP"]
+                    ),
                 }
                 optimized_streams = {k: v * 0.95 for k, v in optimized_streams.items()}
-                
+
                 stream_names = [
                     "SFFR",
                     "EPEX DA",
@@ -2730,11 +2757,12 @@ class AnalysisService:
                         }
                     )
                 revenue_gap = round(total_optimized_revenue - total_actual_revenue)
-                capture_rate = (round((total_actual_revenue / total_optimized_revenue) * 100)
-                                if total_optimized_revenue != 0
-                                else "N/A"
-                            )
-                
+                capture_rate = (
+                    round((total_actual_revenue / total_optimized_revenue) * 100)
+                    if total_optimized_revenue != 0
+                    else "N/A"
+                )
+
                 monthly_data_payload[m] = {
                     "revenue_streams": revenue_streams,
                     "totals": {
@@ -2754,41 +2782,53 @@ class AnalysisService:
             )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10157", message="Multi-market optimized vs actual calculation failed")
+            return Res.error(
+                "E-10157", message="Multi-market optimized vs actual calculation failed"
+            )
 
     async def export_multi_market_optimized_vs_actual(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            year: int,
-            current_user: dict,
-        ):
-        result = await self.get_multi_market_optimized_vs_actual(db=db, asset_id=asset_id, year=year, current_user=current_user,)
-        res_body = (json.loads(result.body.decode())
-                    if hasattr(result, "body")
-                    else result
-                )
-        
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        current_user: dict,
+    ):
+        result = await self.get_multi_market_optimized_vs_actual(
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            current_user=current_user,
+        )
+        res_body = (
+            json.loads(result.body.decode()) if hasattr(result, "body") else result
+        )
+
         if res_body.get("status") == "error":
             return result
-        
+
         data = res_body["data"]
         monthly_records = data["monthly_data"]
         output = StringIO()
         output.write("\ufeff")
         writer = csv.writer(output)
-        
-        writer.writerow( ["Multi-Market Optimized vs Actual Revenue Report"])
-        writer.writerow([f"Asset ID: {asset_id}", f"Year: {year}",])
-        writer.writerow([])
-        writer.writerow([
-            "Month",
-            "Revenue Stream",
-            "Actual Revenue (£)",
-            "Optimized Revenue (£)",
-        ]
+
+        writer.writerow(["Multi-Market Optimized vs Actual Revenue Report"])
+        writer.writerow(
+            [
+                f"Asset ID: {asset_id}",
+                f"Year: {year}",
+            ]
         )
-        
+        writer.writerow([])
+        writer.writerow(
+            [
+                "Month",
+                "Revenue Stream",
+                "Actual Revenue (£)",
+                "Optimized Revenue (£)",
+            ]
+        )
+
         month_names = {
             1: "Jan",
             2: "Feb",
@@ -2799,29 +2839,57 @@ class AnalysisService:
             7: "Jul",
             8: "Aug",
             9: "Sep",
-           10: "Oct",
-           11: "Nov",
-           12: "Dec",
+            10: "Oct",
+            11: "Nov",
+            12: "Dec",
         }
-        
+
         for m in sorted(int(k) for k in monthly_records.keys()):
             m_str = str(m)
             m_label = month_names.get(m, f"Month {m}")
             data_slice = monthly_records[m_str]
-            
+
             for stream in data_slice["revenue_streams"]:
                 actual_val = float(stream["actual_revenue"])
                 optimized_val = float(stream["optimized_revenue"])
-                writer.writerow([m_label, stream["revenue_stream"], f"{actual_val:,.2f}", f"{optimized_val:,.2f}",])
-            
+                writer.writerow(
+                    [
+                        m_label,
+                        stream["revenue_stream"],
+                        f"{actual_val:,.2f}",
+                        f"{optimized_val:,.2f}",
+                    ]
+                )
+
             totals = data_slice["totals"]
             total_actual = float(totals["total_actual_revenue"])
             total_optimized = float(totals["total_optimized_revenue"])
             revenue_gap = float(totals["revenue_gap"])
             capture_rate = totals["capture_rate"]
-            writer.writerow([m_label, "TOTAL", f"{total_actual:,.2f}", f"{total_optimized:,.2f}",])
-            writer.writerow([m_label, "Revenue Gap", "", f"{revenue_gap:,.2f}",])
-            writer.writerow([m_label, "Capture Rate", "",(f"{capture_rate}%" if isinstance(capture_rate, (int, float))
+            writer.writerow(
+                [
+                    m_label,
+                    "TOTAL",
+                    f"{total_actual:,.2f}",
+                    f"{total_optimized:,.2f}",
+                ]
+            )
+            writer.writerow(
+                [
+                    m_label,
+                    "Revenue Gap",
+                    "",
+                    f"{revenue_gap:,.2f}",
+                ]
+            )
+            writer.writerow(
+                [
+                    m_label,
+                    "Capture Rate",
+                    "",
+                    (
+                        f"{capture_rate}%"
+                        if isinstance(capture_rate, (int, float))
                         else capture_rate
                     ),
                 ]
@@ -2829,73 +2897,61 @@ class AnalysisService:
             writer.writerow([])
         output.seek(0)
         asset = await db.get(Asset, asset_id)
-        asset_str = (asset.asset_id if asset else str(asset_id))
-        
-        file_name = (f"Multi_Market_Optimized_vs_Actual_" 
-                     f"{asset_str}.csv")
-        
+        asset_str = asset.asset_id if asset else str(asset_id)
+
+        file_name = f"Multi_Market_Optimized_vs_Actual_" f"{asset_str}.csv"
+
         return StreamingResponse(
             BytesIO(output.getvalue().encode()),
             media_type="application/csv",
-            headers={"Content-Disposition": f"attachment; filename={file_name}"}
+            headers={"Content-Disposition": f"attachment; filename={file_name}"},
         )
-    
+
     async def get_ancillary_summary(
-        self,
-        db: AsyncSession,
-        asset_id: int,
-        month: int,
-        year: int,
-        current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
             asset = await db.get(Asset, asset_id)
-            
+
             if not asset:
                 return Res.error("E-10034")
-            
+
             file_query = await db.execute(
                 select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
-                AssetFile.month == month,
-                AssetFile.year == year,
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                    AssetFile.month == month,
+                    AssetFile.year == year,
                 )
             )
             merged_file = file_query.scalars().first()
-            
+
             if not merged_file:
                 return Res.error("E-10100")
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
-            services = [
-                "SFFR",
-                "DCL",
-                "DCH",
-                "DML",
-                "DMH",
-                "DRL",
-                "DRH"
-            ]
+            services = ["SFFR", "DCL", "DCH", "DML", "DMH", "DRL", "DRH"]
             revenues = {}
             for service in services:
                 revenue_col = f"{service} revenues"
-                
+
                 if revenue_col not in df.columns:
                     return Res.error("E-10160")
-                
+
                 revenues[service] = float(df[revenue_col].sum()) * 0.95
             total_ancillary_revenue = round(sum(revenues.values()), 2)
             top_service = max(revenues, key=revenues.get)
             top_service_revenue = revenues[top_service]
             services_used = len([v for v in revenues.values() if v > 0])
-            
-            top_service_share = (round(
-                (top_service_revenue / total_ancillary_revenue) * 100, 2)
+
+            top_service_share = (
+                round((top_service_revenue / total_ancillary_revenue) * 100, 2)
                 if total_ancillary_revenue > 0
                 else 0
             )
-            
+
             return Res.success(
                 "S-10068",
                 data={
@@ -2908,22 +2964,19 @@ class AnalysisService:
                         "top_service_revenue": round(top_service_revenue, 2),
                         "services_used": services_used,
                         "total_services": len(services),
-                        "top_service_share": top_service_share
-                    }
-                }
+                        "top_service_share": top_service_share,
+                    },
+                },
             )
-        
+
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10163", message="Ancillary revenue summary calculation failed")
-    
+            return Res.error(
+                "E-10163", message="Ancillary revenue summary calculation failed"
+            )
+
     async def get_ancillary_breakdown(
-        self,
-        db: AsyncSession,
-        asset_id: int,
-        month: int,
-        year: int,
-        current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
             SERVICE_MAPPING = {
@@ -2936,31 +2989,30 @@ class AnalysisService:
                 "DRH": "DR High",
             }
             asset = await db.get(Asset, asset_id)
-            
+
             if not asset:
                 return Res.error("E-10034")
-            
+
             file_query = await db.execute(
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.month == month,
-                    AssetFile.year == year
+                    AssetFile.year == year,
                 )
             )
             merged_file = file_query.scalars().first()
-            
+
             if not merged_file:
                 return Res.error("E-10100")
-            
+
             file_obj, _ = FileStorageManager.get_file_object(
-                merged_file.key,
-                storage_type=merged_file.storage_server
+                merged_file.key, storage_type=merged_file.storage_server
             )
             df = pd.read_excel(BytesIO(file_obj))
-            
+
             service_breakdown = []
-            
+
             for service in SERVICE_MAPPING:
                 revenue_col = f"{service} revenues"
                 availability_col = f"{service} Availability"
@@ -2972,35 +3024,35 @@ class AnalysisService:
                     return Res.error("E-10161")
                 if price_col not in df.columns:
                     return Res.error("E-10162")
-                
+
             for service, service_name in SERVICE_MAPPING.items():
-                
+
                 revenue_col = f"{service} revenues"
                 availability_col = f"{service} Availability"
                 price_col = f"{service} Clearing Price"
-                
+
                 total_revenue_service = float(df[revenue_col].sum()) * 0.95
                 periods_active = int((df[availability_col] > 0).sum())
-                
+
                 active_rows = df[df[availability_col] > 0]
-                avg_price = (float(active_rows[price_col].mean())
-                        if not active_rows.empty
-                        else 0
-                    )
-                total_mwh = (float(df[availability_col].sum()) * 0.5)
-                revenue_per_mwh = (total_revenue_service / total_mwh
-                        if total_mwh > 0
-                        else 0
-                    )
-                
-                service_breakdown.append({
-                    "service": service,
-                    "service_name": service_name,
-                    "total_revenue": round(total_revenue_service, 2),
-                    "periods_active": periods_active,
-                    "avg_price": round(avg_price, 2),
-                    "revenue_per_mwh": round(revenue_per_mwh, 2)
-                })
+                avg_price = (
+                    float(active_rows[price_col].mean()) if not active_rows.empty else 0
+                )
+                total_mwh = float(df[availability_col].sum()) * 0.5
+                revenue_per_mwh = (
+                    total_revenue_service / total_mwh if total_mwh > 0 else 0
+                )
+
+                service_breakdown.append(
+                    {
+                        "service": service,
+                        "service_name": service_name,
+                        "total_revenue": round(total_revenue_service, 2),
+                        "periods_active": periods_active,
+                        "avg_price": round(avg_price, 2),
+                        "revenue_per_mwh": round(revenue_per_mwh, 2),
+                    }
+                )
 
             return Res.success(
                 "S-10068",
@@ -3008,76 +3060,87 @@ class AnalysisService:
                     "asset_id": asset_id,
                     "month": month,
                     "year": year,
-                    "service_breakdown": service_breakdown
-                }
+                    "service_breakdown": service_breakdown,
+                },
             )
-        
+
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10164", message="Ancillary revenue breakdown calculation failed")
-    
-    async def export_ancillary_breakdown(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            current_user: dict,
-        ):
-        
-        result = await self.get_ancillary_breakdown(db=db, asset_id=asset_id, month=month, year=year, current_user=current_user)
-        res_body = (json.loads(result.body.decode())
-                if hasattr(result, "body")
-                else result
+            return Res.error(
+                "E-10164", message="Ancillary revenue breakdown calculation failed"
             )
+
+    async def export_ancillary_breakdown(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        current_user: dict,
+    ):
+
+        result = await self.get_ancillary_breakdown(
+            db=db, asset_id=asset_id, month=month, year=year, current_user=current_user
+        )
+        res_body = (
+            json.loads(result.body.decode()) if hasattr(result, "body") else result
+        )
         if res_body.get("status") == "error":
             return result
-        
+
         data = res_body["data"]
         service_breakdown = data["service_breakdown"]
         output = StringIO()
         output.write("\ufeff")
         writer = csv.writer(output)
         writer.writerow(["Ancillary Service Breakdown Report"])
-        writer.writerow([
-            f"Asset ID: {asset_id}",
-            f"Month: {month}",
-            f"Year: {year}",
+        writer.writerow(
+            [
+                f"Asset ID: {asset_id}",
+                f"Month: {month}",
+                f"Year: {year}",
             ]
         )
         writer.writerow([])
-        writer.writerow([
-            "Service",
-            "Service Name",
-            "Total Revenue (£)",
-            "Periods Active",
-            "Average Price (£/MW/h)",
-            "Revenue Per MW-Hour (£)",
+        writer.writerow(
+            [
+                "Service",
+                "Service Name",
+                "Total Revenue (£)",
+                "Periods Active",
+                "Average Price (£/MW/h)",
+                "Revenue Per MW-Hour (£)",
             ]
         )
         for service in service_breakdown:
-            writer.writerow([
-                service["service"],
-                service["service_name"],
-                f'{float(service["total_revenue"]):,.2f}',
-                service["periods_active"],
-                f'{float(service["avg_price"]):,.2f}',
-                f'{float(service["revenue_per_mwh"]):,.2f}',
+            writer.writerow(
+                [
+                    service["service"],
+                    service["service_name"],
+                    f'{float(service["total_revenue"]):,.2f}',
+                    service["periods_active"],
+                    f'{float(service["avg_price"]):,.2f}',
+                    f'{float(service["revenue_per_mwh"]):,.2f}',
                 ]
             )
         output.seek(0)
         asset = await db.get(Asset, asset_id)
-        asset_str = (asset.asset_id if asset else str(asset_id))
-        file_name = (f"ancillary_service_breakdown_" f"{asset_str}_{month}_{year}.csv")
-        
-        return StreamingResponse(BytesIO(output.getvalue().encode()), media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename={file_name}"}
-            )
+        asset_str = asset.asset_id if asset else str(asset_id)
+        file_name = f"ancillary_service_breakdown_" f"{asset_str}_{month}_{year}.csv"
 
-    async def get_opportunity_cost_analysis(self, db: AsyncSession, asset_id: int, month: int, year: int):
+        return StreamingResponse(
+            BytesIO(output.getvalue().encode()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={file_name}"},
+        )
+
+    async def get_opportunity_cost_analysis(
+        self, db: AsyncSession, asset_id: int, month: int, year: int
+    ):
         try:
             asset = await db.get(Asset, asset_id)
-            if not asset: return Res.error("E-10034")
+            if not asset:
+                return Res.error("E-10034")
 
             file_query = await db.execute(
                 select(AssetFile).where(
@@ -3088,9 +3151,12 @@ class AnalysisService:
                 )
             )
             merged_file = file_query.scalars().first()
-            if not merged_file: return Res.error("E-10100")
+            if not merged_file:
+                return Res.error("E-10100")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
 
             services = ["SFFR", "DCL", "DCH", "DML", "DMH", "DRL", "DRH"]
@@ -3107,34 +3173,46 @@ class AnalysisService:
 
             avg_rate = (total_rev / total_mwh) if total_mwh > 0 else 0
 
-            best_rate = list(service_rates.values())[0]        # default initialize to first element
-            best_service: str = list(service_rates.keys())[0]  # default initialise to first element
+            best_rate = list(service_rates.values())[
+                0
+            ]  # default initialize to first element
+            best_service: str = list(service_rates.keys())[
+                0
+            ]  # default initialise to first element
             for s in service_rates:
                 rate = service_rates[s]
                 if rate > best_rate:
                     best_rate = rate
                     best_service = s
-            
+
             optimal_rev = best_rate * total_mwh
             opp_cost = max(0.0, optimal_rev - total_rev)
 
-            return Res.success("S-10069", data={
-                "asset_id": asset_id, "month": month, "year": year,
-                "opportunity_cost_analysis": {
-                    "current_avg_rate": round(avg_rate, 2), 
-                    "best_service_rate": round(best_rate, 2), 
-                    "opportunity_cost": round(opp_cost, 2),
-                    "best_service": best_service.upper()
-                }
-            })
+            return Res.success(
+                "S-10069",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "opportunity_cost_analysis": {
+                        "current_avg_rate": round(avg_rate, 2),
+                        "best_service_rate": round(best_rate, 2),
+                        "opportunity_cost": round(opp_cost, 2),
+                        "best_service": best_service.upper(),
+                    },
+                },
+            )
         except Exception:
             traceback.print_exc()
             return Res.error("E-10166")
 
-    async def get_service_revenue_by_hour(self, db: AsyncSession, asset_id: int, month: int, year: int):
+    async def get_service_revenue_by_hour(
+        self, db: AsyncSession, asset_id: int, month: int, year: int
+    ):
         try:
             asset = await db.get(Asset, asset_id)
-            if not asset: return Res.error("E-10034")
+            if not asset:
+                return Res.error("E-10034")
 
             file_query = await db.execute(
                 select(AssetFile).where(
@@ -3145,208 +3223,232 @@ class AnalysisService:
                 )
             )
             merged_file = file_query.scalars().first()
-            if not merged_file: return Res.error("E-10100")
+            if not merged_file:
+                return Res.error("E-10100")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
 
-            df['hour'] = pd.to_datetime(df['Timestamp']).dt.hour
+            df["hour"] = pd.to_datetime(df["Timestamp"]).dt.hour
             services = ["SFFR", "DCL", "DCH", "DML", "DMH", "DRL", "DRH"]
-            
+
             hourly_revenue = []
             for h in range(24):
-                hour_df = df[df['hour'] == h]
+                hour_df = df[df["hour"] == h]
                 service_list = []
                 for s in services:
                     col = f"{s} revenues"
                     rev = float(hour_df[col].sum()) * 0.95 if col in hour_df else 0.0
                     service_list.append({"service": s, "revenue": round(rev, 2)})
                 hourly_revenue.append({"hour": h, "services": service_list})
-            
-            return Res.success("S-10069", data={
-                "asset_id": asset_id, "month": month, "year": year,
-                "hourly_revenue": hourly_revenue
-            })
+
+            return Res.success(
+                "S-10069",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "hourly_revenue": hourly_revenue,
+                },
+            )
         except Exception:
             traceback.print_exc()
             return Res.error("E-10167")
 
     async def get_daily_imbalance_breakdown(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            current_user: dict
-        ):
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034")
-            
+
             file_query = await db.execute(
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.month == month,
-                    AssetFile.year == year
+                    AssetFile.year == year,
                 )
             )
             merged_file = file_query.scalars().first()
             if not merged_file:
                 return Res.error("E-10100")
-            
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
             if df.empty:
                 return Res.success(
                     "S-10071",
-                    data={"asset_id": asset_id, "month": month, "year": year, "daily_breakdown": []})
-            
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        "daily_breakdown": [],
+                    },
+                )
+
             if "Timestamp" not in df.columns:
                 return Res.error("E-10163")
             if "Imbalance Revenue" not in df.columns:
                 return Res.error("E-10168")
             if "Imbalance Charge" not in df.columns:
                 return Res.error("E-10169")
-            
+
             df["Timestamp"] = pd.to_datetime(df["Timestamp"])
-            df["adj_revenue"] = (df["Imbalance Revenue"] * 0.95)
-            df["adj_charge"] = (df["Imbalance Charge"] * 0.95)
-            df["calendar_date"] = (df["Timestamp"].dt.date)
-            daily_df = (df.groupby("calendar_date").agg(
-                {
-                    "adj_revenue": "sum",
-                    "adj_charge": "sum"
-                }
-            ).reset_index())
-            
-            daily_df["daily_net_imbalance"] = (daily_df["adj_revenue"] - daily_df["adj_charge"])
+            df["adj_revenue"] = df["Imbalance Revenue"] * 0.95
+            df["adj_charge"] = df["Imbalance Charge"] * 0.95
+            df["calendar_date"] = df["Timestamp"].dt.date
+            daily_df = (
+                df.groupby("calendar_date")
+                .agg({"adj_revenue": "sum", "adj_charge": "sum"})
+                .reset_index()
+            )
+
+            daily_df["daily_net_imbalance"] = (
+                daily_df["adj_revenue"] - daily_df["adj_charge"]
+            )
             daily_breakdown = []
-            
+
             for _, row in daily_df.iterrows():
                 daily_breakdown.append(
                     {
                         "date": str(row["calendar_date"]),
                         "daily_revenue": round(float(row["adj_revenue"]), 2),
                         "daily_charges": round(float(row["adj_charge"]), 2),
-                        "daily_net_imbalance": round(float(row["daily_net_imbalance"]), 2)
+                        "daily_net_imbalance": round(
+                            float(row["daily_net_imbalance"]), 2
+                        ),
                     }
                 )
-            return Res.success("S-10071",
-                    data={
-                        "asset_id": asset_id,
-                        "month": month,
-                        "year": year,
-                        "daily_breakdown": daily_breakdown
-                    }
-                )
+            return Res.success(
+                "S-10071",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "daily_breakdown": daily_breakdown,
+                },
+            )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10171", message="Daily imbalance breakdown calculation failed")
-        
+            return Res.error(
+                "E-10171", message="Daily imbalance breakdown calculation failed"
+            )
+
     async def get_top_5_worst_imbalance_days(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            current_user: dict
-        ):
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034")
-            
+
             file_query = await db.execute(
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.month == month,
-                    AssetFile.year == year
+                    AssetFile.year == year,
                 )
             )
             merged_file = file_query.scalars().first()
             if not merged_file:
                 return Res.error("E-10100")
-            
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
             if df.empty:
                 return Res.success(
                     "S-10072",
-                    data={"asset_id": asset_id, "month": month, "year": year, "worst_days": []})
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        "worst_days": [],
+                    },
+                )
             if "Timestamp" not in df.columns:
                 return Res.error("E-10163")
             if "Imbalance Revenue" not in df.columns:
                 return Res.error("E-10168")
             if "Imbalance Charge" not in df.columns:
                 return Res.error("E-10169")
-            
+
             df["Timestamp"] = pd.to_datetime(df["Timestamp"])
-            df["adj_revenue"] = (df["Imbalance Revenue"] * 0.95)
-            df["adj_charge"] = (df["Imbalance Charge"] * 0.95)
-            df["calendar_date"] = (df["Timestamp"].dt.date)
-            
-            daily_df = (df.groupby("calendar_date").agg(
-                {
-                    "adj_revenue": "sum",
-                    "adj_charge": "sum"
-                }
-            ).reset_index())
-            
-            daily_df["net_imbalance"] = (daily_df["adj_revenue"] - daily_df["adj_charge"])
-            
-            worst_days_df = (daily_df.sort_values(by="net_imbalance", ascending=True).head(5))
-            
+            df["adj_revenue"] = df["Imbalance Revenue"] * 0.95
+            df["adj_charge"] = df["Imbalance Charge"] * 0.95
+            df["calendar_date"] = df["Timestamp"].dt.date
+
+            daily_df = (
+                df.groupby("calendar_date")
+                .agg({"adj_revenue": "sum", "adj_charge": "sum"})
+                .reset_index()
+            )
+
+            daily_df["net_imbalance"] = daily_df["adj_revenue"] - daily_df["adj_charge"]
+
+            worst_days_df = daily_df.sort_values(
+                by="net_imbalance", ascending=True
+            ).head(5)
+
             worst_days = []
-            
+
             for _, row in worst_days_df.iterrows():
                 worst_days.append(
                     {
                         "date": str(row["calendar_date"]),
                         "revenue": round(float(row["adj_revenue"]), 2),
                         "charges": round(float(row["adj_charge"]), 2),
-                        "net_imbalance": round(float(row["net_imbalance"]), 2)
+                        "net_imbalance": round(float(row["net_imbalance"]), 2),
                     }
                 )
-            return Res.success("S-10072",
-                    data={
-                        "asset_id": asset_id,
-                        "month": month,
-                        "year": year,
-                        "worst_days": worst_days
-                    }
-                )
-        
+            return Res.success(
+                "S-10072",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "worst_days": worst_days,
+                },
+            )
+
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10172", message="Top 5 worst imbalance days calculation failed")
-        
+            return Res.error(
+                "E-10172", message="Top 5 worst imbalance days calculation failed"
+            )
+
     async def export_top_5_worst_imbalance_days(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            current_user: dict
-        ):
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         try:
-            result = await self.get_top_5_worst_imbalance_days(db=db, asset_id=asset_id, month=month, year=year, current_user=current_user)
-            
-            res_body = (json.loads(result.body.decode())
-                if hasattr(result, "body")
-                else result
+            result = await self.get_top_5_worst_imbalance_days(
+                db=db,
+                asset_id=asset_id,
+                month=month,
+                year=year,
+                current_user=current_user,
+            )
+
+            res_body = (
+                json.loads(result.body.decode()) if hasattr(result, "body") else result
             )
             if res_body.get("status") == "error":
                 return result
-            
+
             data = res_body["data"]
             worst_days = data["worst_days"]
             output = StringIO()
             output.write("\ufeff")
             writer = csv.writer(output)
-            
+
             writer.writerow(["Top 5 Worst Imbalance Days Report"])
             writer.writerow(
                 [
@@ -3364,7 +3466,7 @@ class AnalysisService:
                     "Net Imbalance (£)",
                 ]
             )
-            
+
             for day in worst_days:
                 writer.writerow(
                     [
@@ -3376,25 +3478,29 @@ class AnalysisService:
                 )
             output.seek(0)
             asset = await db.get(Asset, asset_id)
-            asset_str = (asset.asset_id if asset else str(asset_id))
-            
-            file_name = (f"top_5_worst_imbalance_days_" f"{asset_str}_{month}_{year}.csv")
-            
+            asset_str = asset.asset_id if asset else str(asset_id)
+
+            file_name = f"top_5_worst_imbalance_days_" f"{asset_str}_{month}_{year}.csv"
+
             return StreamingResponse(
                 BytesIO(output.getvalue().encode()),
                 media_type="text/csv",
-                headers={"Content-Disposition": f"attachment; filename={file_name}"}
+                headers={"Content-Disposition": f"attachment; filename={file_name}"},
             )
-        
+
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10174", message="Top 5 worst imbalance days export generation failed")
-    
+            return Res.error(
+                "E-10174", message="Top 5 worst imbalance days export generation failed"
+            )
 
-    async def get_imbalance_summary(self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict):
+    async def get_imbalance_summary(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         try:
             asset = await db.get(Asset, asset_id)
-            if not asset: return Res.error("E-10034")
+            if not asset:
+                return Res.error("E-10034")
 
             file_query = await db.execute(
                 select(AssetFile).where(
@@ -3405,47 +3511,62 @@ class AnalysisService:
                 )
             )
             merged_file = file_query.scalars().first()
-            if not merged_file: return Res.error("E-10100")
+            if not merged_file:
+                return Res.error("E-10100")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
 
             # Apply 5% deduction
-            df['rev_adj'] = df['Imbalance Revenue'] * 0.95
-            df['chg_adj'] = df['Imbalance Charge'] * 0.95
-            
+            df["rev_adj"] = df["Imbalance Revenue"] * 0.95
+            df["chg_adj"] = df["Imbalance Charge"] * 0.95
+
             # KPI Calculations
-            rev_kpi = float(df['rev_adj'].sum())
-            chg_kpi = float(df['chg_adj'].sum())
+            rev_kpi = float(df["rev_adj"].sum())
+            chg_kpi = float(df["chg_adj"].sum())
             net_imbalance = rev_kpi - chg_kpi
-            
-            rev_periods = int((df['rev_adj'] > 0).sum())
-            chg_periods = int((df['chg_adj'] > 0).sum())
+
+            rev_periods = int((df["rev_adj"] > 0).sum())
+            chg_periods = int((df["chg_adj"] > 0).sum())
             total_periods = len(df)
             pct = (chg_periods / total_periods * 100) if total_periods > 0 else 0
-            
-            status = "Profit" if net_imbalance > 0 else ("Loss" if net_imbalance < 0 else "Neutral")
 
-            return Res.success("S-10070", data={
-                "asset_id": asset_id, "month": month, "year": year,
-                "summary": {
-                    "imbalance_revenue": round(rev_kpi, 2),
-                    "revenue_periods": rev_periods,
-                    "imbalance_charges": round(chg_kpi, 2),
-                    "charge_periods": chg_periods,
-                    "net_imbalance": round(net_imbalance, 2),
-                    "status": status,
-                    "percentage_of_periods_with_charges": round(pct, 2)
-                }
-            })
+            status = (
+                "Profit"
+                if net_imbalance > 0
+                else ("Loss" if net_imbalance < 0 else "Neutral")
+            )
+
+            return Res.success(
+                "S-10070",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "summary": {
+                        "imbalance_revenue": round(rev_kpi, 2),
+                        "revenue_periods": rev_periods,
+                        "imbalance_charges": round(chg_kpi, 2),
+                        "charge_periods": chg_periods,
+                        "net_imbalance": round(net_imbalance, 2),
+                        "status": status,
+                        "percentage_of_periods_with_charges": round(pct, 2),
+                    },
+                },
+            )
         except Exception:
             traceback.print_exc()
             return Res.error("E-10170")
 
-    async def get_imbalance_hourly_charges(self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict):
+    async def get_imbalance_hourly_charges(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         try:
             asset = await db.get(Asset, asset_id)
-            if not asset: return Res.error("E-10034")
+            if not asset:
+                return Res.error("E-10034")
 
             file_query = await db.execute(
                 select(AssetFile).where(
@@ -3456,39 +3577,47 @@ class AnalysisService:
                 )
             )
             merged_file = file_query.scalars().first()
-            if not merged_file: return Res.error("E-10100")
+            if not merged_file:
+                return Res.error("E-10100")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             df = pd.read_excel(BytesIO(file_obj))
 
             # Apply 5% deduction
-            df['chg_adj'] = df['Imbalance Charge'] * 0.95
-            df['hour'] = pd.to_datetime(df['Timestamp']).dt.hour
-            
-            hourly = df.groupby('hour')['chg_adj'].sum().reindex(range(24), fill_value=0.0)
-            
+            df["chg_adj"] = df["Imbalance Charge"] * 0.95
+            df["hour"] = pd.to_datetime(df["Timestamp"]).dt.hour
+
+            hourly = (
+                df.groupby("hour")["chg_adj"].sum().reindex(range(24), fill_value=0.0)
+            )
+
             # Peak Hour: Max Absolute Value
             peak_hour_idx = hourly.abs().idxmax()
             peak_charges = float(hourly[peak_hour_idx])
-            
-            breakdown = [{"hour": f"{h:02d}:00", "total_charges": round(float(v), 2)} 
-                         for h, v in hourly.items()]
 
-            return Res.success("S-10073", data={
-                "peak_imbalance_hour": {"hour": f"{peak_hour_idx:02d}:00", "total_charges": round(peak_charges, 2)},
-                "hourly_breakdown": breakdown
-            })
+            breakdown = [
+                {"hour": f"{h:02d}:00", "total_charges": round(float(v), 2)}
+                for h, v in hourly.items()
+            ]
+
+            return Res.success(
+                "S-10073",
+                data={
+                    "peak_imbalance_hour": {
+                        "hour": f"{peak_hour_idx:02d}:00",
+                        "total_charges": round(peak_charges, 2),
+                    },
+                    "hourly_breakdown": breakdown,
+                },
+            )
         except Exception:
             traceback.print_exc()
             return Res.error("E-10173")
 
     async def get_battery_health_analysis(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
             asset = await db.get(Asset, asset_id)
@@ -3503,7 +3632,7 @@ class AnalysisService:
                     AssetFile.year == year,
                 )
             )
-        
+
             merged_file = merged_query.scalars().first()
             if not merged_file:
                 return Res.error("E-10100")
@@ -3516,17 +3645,21 @@ class AnalysisService:
                     AssetFile.year == year,
                 )
             )
-        
+
             optimized_file = optimized_query.scalars().first()
             if not optimized_file:
                 return Res.error("E-10154")
 
-            merged_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            merged_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
             merged_df = pd.read_excel(BytesIO(merged_obj))
 
-            optimized_obj, _ = FileStorageManager.get_file_object(optimized_file.key, storage_type=optimized_file.storage_server)
+            optimized_obj, _ = FileStorageManager.get_file_object(
+                optimized_file.key, storage_type=optimized_file.storage_server
+            )
             optimized_df = pd.read_csv(BytesIO(optimized_obj))
-       
+
             if "Power_MW" not in merged_df.columns:
                 return Res.error("E-10175")
 
@@ -3544,17 +3677,18 @@ class AnalysisService:
             optimized_discharge_energy = float(
                 optimized_df.loc[
                     optimized_df["Optimised_Net_MWh_Multi"] > 0,
-                    "Optimised_Net_MWh_Multi"
-                ].sum()
-            )
-
-            optimized_charge_energy = abs(float(
-                optimized_df.loc[
-                    optimized_df["Optimised_Net_MWh_Multi"] < 0,
                     "Optimised_Net_MWh_Multi",
                 ].sum()
             )
-        )
+
+            optimized_charge_energy = abs(
+                float(
+                    optimized_df.loc[
+                        optimized_df["Optimised_Net_MWh_Multi"] < 0,
+                        "Optimised_Net_MWh_Multi",
+                    ].sum()
+                )
+            )
 
             return Res.success(
                 "S-10075",
@@ -3564,138 +3698,253 @@ class AnalysisService:
                     "year": year,
                     "battery_health": {
                         "actual_discharge_energy": round(actual_discharge_energy, 2),
-                        "optimized_multi_market_discharge_energy": round(optimized_discharge_energy, 2),
+                        "optimized_multi_market_discharge_energy": round(
+                            optimized_discharge_energy, 2
+                        ),
                         "actual_charge_energy": round(actual_charge_energy, 2),
-                        "optimized_multi_market_charge_energy": round(optimized_charge_energy, 2),
+                        "optimized_multi_market_charge_energy": round(
+                            optimized_charge_energy, 2
+                        ),
                     },
                 },
             )
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10178", message = "Battery health analysis calculation failed")
-        
-    async def get_cycle_comparison(self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict):
+            return Res.error(
+                "E-10178", message="Battery health analysis calculation failed"
+            )
+
+    async def get_cycle_comparison(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
         asset = await db.get(Asset, asset_id)
-        if not asset: return Res.error("E-10034")
+        if not asset:
+
+            return Res.error("E-10034")
 
         asset_opt = await db.execute(
-            select(AssetOptimizationParameter)
-            .where(AssetOptimizationParameter.asset_id == asset_id)
+            select(AssetOptimizationParameter).where(
+                AssetOptimizationParameter.asset_id == asset_id
+            )
         )
 
         asset_opt = asset_opt.scalars().first()
         if not asset_opt:
-            return Res.error('E-10001', message="asset optmization parameter not found", http_status_code=404)
+            return Res.error(
+                "E-10001",
+                message="asset optmization parameter not found",
+                http_status_code=404,
+            )
 
         cap = asset_opt.usable_capacity_mwh
-        if cap is None or cap <= 0: return Res.error("E-10179" if cap is None else "E-10180")
+        if cap is None or cap <= 0:
+            return Res.error("E-10179" if cap is None else "E-10180")
 
         # Fetch Files
-        agg_query = await db.execute(select(AssetFile).where(AssetFile.asset_id == asset_id, AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value, AssetFile.month == month, AssetFile.year == year))
+        agg_query = await db.execute(
+            select(AssetFile).where(
+                AssetFile.asset_id == asset_id,
+                AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                AssetFile.month == month,
+                AssetFile.year == year,
+            )
+        )
         agg_file = agg_query.scalars().first()
-        
-        opt_query = await db.execute(select(AssetFile).where(AssetFile.asset_id == asset_id, AssetFile.type == AssetFileType.OPTIMIZED_DATASET.value, AssetFile.month == month, AssetFile.year == year))
+
+        opt_query = await db.execute(
+            select(AssetFile).where(
+                AssetFile.asset_id == asset_id,
+                AssetFile.type == AssetFileType.OPTIMIZED_DATASET.value,
+                AssetFile.month == month,
+                AssetFile.year == year,
+            )
+        )
         opt_file = opt_query.scalars().first()
-        
-        if not agg_file: return Res.error("E-10100")
-        if not opt_file: return Res.error("E-10154")
 
-        df_agg = pd.read_excel(BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]), engine="openpyxl")
-        df_opt = pd.read_csv(BytesIO(FileStorageManager.get_file_object(opt_file.key)[0]))
+        if not agg_file:
+            return Res.error("E-10100")
+        if not opt_file:
+            return Res.error("E-10154")
 
-        if "Power_MW" not in df_agg.columns: return Res.error("E-10177")
-        if "Optimised_Net_MWh_Multi" not in df_opt.columns: return Res.error("E-10178")
+        df_agg = pd.read_excel(
+            BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]),
+            engine="openpyxl",
+        )
+        df_opt = pd.read_csv(
+            BytesIO(FileStorageManager.get_file_object(opt_file.key)[0])
+        )
+
+        if "Power_MW" not in df_agg.columns:
+            return Res.error("E-10177")
+        if "Optimised_Net_MWh_Multi" not in df_opt.columns:
+            return Res.error("E-10178")
 
         act_discharge = df_agg[df_agg["Power_MW"] > 0]["Power_MW"].sum() * 0.5
         act_charge = abs(df_agg[df_agg["Power_MW"] < 0]["Power_MW"].sum()) * 0.5
-        mm_discharge = df_opt[df_opt["Optimised_Net_MWh_Multi"] > 0]["Optimised_Net_MWh_Multi"].sum()
-        mm_charge = abs(df_opt[df_opt["Optimised_Net_MWh_Multi"] < 0]["Optimised_Net_MWh_Multi"].sum())
+        mm_discharge = df_opt[df_opt["Optimised_Net_MWh_Multi"] > 0][
+            "Optimised_Net_MWh_Multi"
+        ].sum()
+        mm_charge = abs(
+            df_opt[df_opt["Optimised_Net_MWh_Multi"] < 0][
+                "Optimised_Net_MWh_Multi"
+            ].sum()
+        )
 
         days = calendar.monthrange(year, month)[1]
 
         results = []
-        for method, name in [("discharge-only", "discharge-only"), ("full-equivalent", "full-equivalent"), ("throughput-based", "throughput-based")]:
+        for method, name in [
+            ("discharge-only", "discharge-only"),
+            ("full-equivalent", "full-equivalent"),
+            ("throughput-based", "throughput-based"),
+        ]:
             if method == "discharge-only":
                 act_cyc, mm_cyc = act_discharge / cap, mm_discharge / cap
             elif method == "full-equivalent":
-                act_cyc, mm_cyc = (act_discharge + act_charge) / 2 / cap, (mm_discharge + mm_charge) / 2 / cap
+                act_cyc, mm_cyc = (act_discharge + act_charge) / 2 / cap, (
+                    mm_discharge + mm_charge
+                ) / 2 / cap
             else:
-                act_cyc, mm_cyc = (act_discharge + act_charge) / (2 * cap), (mm_discharge + mm_charge) / (2 * cap)
-            
-            results.append({
-                "method_key": method[0], "method_name": name,
-                "actual_total_cycles": round(act_cyc, 2), "multi_market_total_cycles": round(mm_cyc, 2),
-                "actual_daily_avg": round(act_cyc / days, 3), "multi_market_daily_avg": round(mm_cyc / days, 3)
-            })
+                act_cyc, mm_cyc = (act_discharge + act_charge) / (2 * cap), (
+                    mm_discharge + mm_charge
+                ) / (2 * cap)
 
-        return Res.success("S-10076", data={"asset_id": asset_id, "month": month, "year": year, "cycle_comparison": results})
+            results.append(
+                {
+                    "method_key": method[0],
+                    "method_name": name,
+                    "actual_total_cycles": round(act_cyc, 2),
+                    "multi_market_total_cycles": round(mm_cyc, 2),
+                    "actual_daily_avg": round(act_cyc / days, 3),
+                    "multi_market_daily_avg": round(mm_cyc / days, 3),
+                }
+            )
 
-    async def   get_strategy_cycling_comparison(self, db: AsyncSession, asset_id: int, month: int, year: int, cycle_method: str = "discharge-only",current_user: dict=None):
+        return Res.success(
+            "S-10076",
+            data={
+                "asset_id": asset_id,
+                "month": month,
+                "year": year,
+                "cycle_comparison": results,
+            },
+        )
+
+    async def get_strategy_cycling_comparison(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        cycle_method: str = "discharge-only",
+        current_user: dict = None,
+    ):
         asset = await db.get(Asset, asset_id)
-        if not asset: return Res.error("E-10034")
-        
+        if not asset:
+            return Res.error("E-10034")
+
         asset_opt = await db.execute(
-            select(AssetOptimizationParameter)
-            .where(AssetOptimizationParameter.asset_id == asset_id)
+            select(AssetOptimizationParameter).where(
+                AssetOptimizationParameter.asset_id == asset_id
+            )
         )
 
         asset_opt = asset_opt.scalars().first()
         if not asset_opt:
-            return Res.error('E-10001', message="Asset optimization parameter not found", http_status_code=404)
+            return Res.error(
+                "E-10001",
+                message="Asset optimization parameter not found",
+                http_status_code=404,
+            )
         cap = asset_opt.usable_capacity_mwh
-        if cap is None or cap <= 0: return Res.error("E-10179" if cap is None else "E-10180")
-        
-        agg_query = await db.execute(select(AssetFile).where(AssetFile.asset_id == asset_id, AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value, AssetFile.month == month, AssetFile.year == year))
-        agg_file = agg_query.scalars().first()
-        opt_query = await db.execute(select(AssetFile).where(AssetFile.asset_id == asset_id, AssetFile.type == AssetFileType.OPTIMIZED_DATASET.value, AssetFile.month == month, AssetFile.year == year))
-        opt_file = opt_query.scalars().first()
-        
-        if not agg_file: return Res.error("E-10100")
-        if not opt_file: return Res.error("E-10154")
+        if cap is None or cap <= 0:
+            return Res.error("E-10179" if cap is None else "E-10180")
 
-        df_agg = pd.read_excel(BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]), engine="openpyxl")
-        df_opt = pd.read_csv(BytesIO(FileStorageManager.get_file_object(opt_file.key)[0]))
+        agg_query = await db.execute(
+            select(AssetFile).where(
+                AssetFile.asset_id == asset_id,
+                AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                AssetFile.month == month,
+                AssetFile.year == year,
+            )
+        )
+        agg_file = agg_query.scalars().first()
+        opt_query = await db.execute(
+            select(AssetFile).where(
+                AssetFile.asset_id == asset_id,
+                AssetFile.type == AssetFileType.OPTIMIZED_DATASET.value,
+                AssetFile.month == month,
+                AssetFile.year == year,
+            )
+        )
+        opt_file = opt_query.scalars().first()
+
+        if not agg_file:
+            return Res.error("E-10100")
+        if not opt_file:
+            return Res.error("E-10154")
+
+        df_agg = pd.read_excel(
+            BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]),
+            engine="openpyxl",
+        )
+        df_opt = pd.read_csv(
+            BytesIO(FileStorageManager.get_file_object(opt_file.key)[0])
+        )
 
         strategies = [
             {"name": "actual", "col": "Power_MW", "is_opt": False},
             {"name": "epex_daily", "col": "Optimised_Net_MWh_Daily", "is_opt": True},
             {"name": "epex_efa", "col": "Optimised_Net_MWh_EFA", "is_opt": True},
-            {"name": "multi", "col": "Optimised_Net_MWh_Multi", "is_opt": True}
+            {"name": "multi", "col": "Optimised_Net_MWh_Multi", "is_opt": True},
         ]
 
         results, days = [], calendar.monthrange(year, month)[1]
         for s in strategies:
             df = df_agg if not s["is_opt"] else df_opt
-            discharge = df[df[s["col"]] > 0][s["col"]].sum() * (0.5 if not s["is_opt"] else 1)
-            charge = abs(df[df[s["col"]] < 0][s["col"]].sum()) * (0.5 if not s["is_opt"] else 1)
+            discharge = df[df[s["col"]] > 0][s["col"]].sum() * (
+                0.5 if not s["is_opt"] else 1
+            )
+            charge = abs(df[df[s["col"]] < 0][s["col"]].sum()) * (
+                0.5 if not s["is_opt"] else 1
+            )
 
-            if cycle_method == "discharge-only": total = discharge / cap
-            elif cycle_method == "full-equivalent": total = (discharge + charge) / 2 / cap
-            else: total = (discharge + charge) / (2 * cap)
+            if cycle_method == "discharge-only":
+                total = discharge / cap
+            elif cycle_method == "full-equivalent":
+                total = (discharge + charge) / 2 / cap
+            else:
+                total = (discharge + charge) / (2 * cap)
 
             daily = total / days
-            results.append({
-                "strategy": s["name"],
-                "total_discharge_mwh": round(discharge, 2), 
-                "total_charge": round(charge, 2) if cycle_method != "discharge-only" else None,
-                "total_cycle": round(total, 2), 
-                "daily_cycle": round(daily, 3),
-                "degradation_percent": round(total * ASSET_DEGRADATION_PER_CYCLE_PERCENTAGE, 4),
-                "is_warranty_exceeded": bool(daily > 1.5)
-            })
+            results.append(
+                {
+                    "strategy": s["name"],
+                    "total_discharge_mwh": round(discharge, 2),
+                    "total_charge": (
+                        round(charge, 2) if cycle_method != "discharge-only" else None
+                    ),
+                    "total_cycle": round(total, 2),
+                    "daily_cycle": round(daily, 3),
+                    "degradation_percent": round(
+                        total * ASSET_DEGRADATION_PER_CYCLE_PERCENTAGE, 4
+                    ),
+                    "is_warranty_exceeded": bool(daily > 1.5),
+                }
+            )
 
         return Res.success("S-10077", data={"strategy_cycling_comparison": results})
 
     async def get_annual_projection_report(
-            self,
-            db: AsyncSession,
-            asset_id: int,
-            month: int,
-            year: int,
-            cycle_method: str,
-            current_user: dict
-        ):
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+        cycle_method: str,
+        current_user: dict,
+    ):
         try:
             VALID_METHODS = ["discharge-only", "full-equivalent", "throughput-based"]
 
@@ -3713,7 +3962,7 @@ class AnalysisService:
                 month=month,
                 year=year,
                 cycle_method=cycle_method,
-                current_user=current_user
+                current_user=current_user,
             )
 
             strategy_body = (
@@ -3746,28 +3995,37 @@ class AnalysisService:
                     return Res.error("E-10186")
 
                 projected_annual_cycles = float(daily_cycle) * 365
-                projected_annual_degradation = projected_annual_cycles * degradation_per_cycle
+                projected_annual_degradation = (
+                    projected_annual_cycles * degradation_per_cycle
+                )
                 if projected_annual_degradation < 0:
                     return Res.error("E-10190")
 
                 estimated_battery_lifespan = (
-                    None if projected_annual_degradation == 0
+                    None
+                    if projected_annual_degradation == 0
                     else round(20 / projected_annual_degradation, 2)
                 )
 
                 STRATEGY_KEY_MAP = {
                     "Actual Operation": "actual",
-                    "EPEX-Only Daily":  "epex_daily",
-                    "EPEX-Only EFA":    "epex_efa",
-                    "Multi-Market":     "multi"
+                    "EPEX-Only Daily": "epex_daily",
+                    "EPEX-Only EFA": "epex_efa",
+                    "Multi-Market": "multi",
                 }
 
-                annual_projection_report.append({
-                    "strategy": STRATEGY_KEY_MAP.get(row["strategy"], row["strategy"]),
-                    "projected_annual_cycles": round(projected_annual_cycles, 2),
-                    "projected_annual_degradation": round(projected_annual_degradation, 4),
-                    "estimated_battery_lifespan": estimated_battery_lifespan
-                })
+                annual_projection_report.append(
+                    {
+                        "strategy": STRATEGY_KEY_MAP.get(
+                            row["strategy"], row["strategy"]
+                        ),
+                        "projected_annual_cycles": round(projected_annual_cycles, 2),
+                        "projected_annual_degradation": round(
+                            projected_annual_degradation, 4
+                        ),
+                        "estimated_battery_lifespan": estimated_battery_lifespan,
+                    }
+                )
 
             return Res.success(
                 "S-10078",
@@ -3779,22 +4037,18 @@ class AnalysisService:
                     "annual_degradation_limit": annual_degradation_limit,
                     "warranty_limit": warranty_limit,
                     "degradation_per_cycle": round(degradation_per_cycle, 6),
-                    "annual_projection_report": annual_projection_report
-                }
+                    "annual_projection_report": annual_projection_report,
+                },
             )
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10191", message="Annual projection report calculation failed")
-    
+            return Res.error(
+                "E-10191", message="Annual projection report calculation failed"
+            )
 
     async def get_tb_spread_summary(
-        self,
-        db: AsyncSession,
-        asset_id: int,
-        month: int,
-        year: int,
-        current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
             asset = await db.get(Asset, asset_id)
@@ -3806,16 +4060,18 @@ class AnalysisService:
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.month == month,
-                    AssetFile.year == year
+                    AssetFile.year == year,
                 )
             )
-            
+
             merged_file = file_query.scalars().first()
 
             if not merged_file:
                 return Res.error("E-10100")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
 
             df = pd.read_excel(BytesIO(file_obj))
             print(df.columns.tolist())
@@ -3830,21 +4086,19 @@ class AnalysisService:
                 "EPEX DA Revenues",
                 "EPEX 30 DA Revenue",
                 "IDA1 Revenue",
-                "IDC Revenue"
+                "IDC Revenue",
             ]
 
             missing_revenue_cols = [
-                col for col in revenue_cols
-                if col not in df.columns
+                col for col in revenue_cols if col not in df.columns
             ]
 
             if missing_revenue_cols:
                 return Res.error("E-10192")
 
-
             optimization_query = await db.execute(
                 select(AssetOptimizationParameter).where(
-                AssetOptimizationParameter.asset_id == asset_id
+                    AssetOptimizationParameter.asset_id == asset_id
                 )
             )
 
@@ -3885,12 +4139,7 @@ class AnalysisService:
 
                 tb3 = sum(prices[-3:]) - sum(prices[:3])
 
-                daily_tb.append({
-                    "date": date,
-                    "tb1": tb1,
-                    "tb2": tb2,
-                    "tb3": tb3
-                })
+                daily_tb.append({"date": date, "tb1": tb1, "tb2": tb2, "tb3": tb3})
 
             tb_df = pd.DataFrame(daily_tb)
 
@@ -3913,22 +4162,22 @@ class AnalysisService:
             num_days = len(tb_df)
 
             avg_arbitrage_revenue = (
-                total_arbitrage_revenue / num_days
-                if num_days > 0 else 0
+                total_arbitrage_revenue / num_days if num_days > 0 else 0
             )
 
             theoretical_max = avg_tb2 * usable_capacity
 
             tb2_capture_rate = (
                 (avg_arbitrage_revenue / theoretical_max) * 100
-                if theoretical_max > 0 else 0
+                if theoretical_max > 0
+                else 0
             )
 
             benchmark_query = await db.execute(
                 select(MonthlyHardcodedValue).where(
-                MonthlyHardcodedValue.metric_id == AssetMetrics.TB_SPREAD_REVENUE,
-                MonthlyHardcodedValue.month == month,
-                MonthlyHardcodedValue.year == year
+                    MonthlyHardcodedValue.metric_id == AssetMetrics.TB_SPREAD_REVENUE,
+                    MonthlyHardcodedValue.month == month,
+                    MonthlyHardcodedValue.year == year,
                 )
             )
 
@@ -3953,21 +4202,17 @@ class AnalysisService:
                     "tb2_capture_rate": round(tb2_capture_rate, 2),
                     "tb_spread_benchmark": round(tb_spread_benchmark, 2),
                     "benchmark_gap": round(benchmark_gap, 2),
-                }
+                },
             )
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10195", message="Time-based spread summary calculation failed")
-    
+            return Res.error(
+                "E-10195", message="Time-based spread summary calculation failed"
+            )
 
     async def get_tb_spread_details(
-        self,
-        db: AsyncSession,
-        asset_id: int,
-        month: int,
-        year: int,
-        current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
 
@@ -3981,7 +4226,7 @@ class AnalysisService:
                     AssetFile.asset_id == asset_id,
                     AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
                     AssetFile.month == month,
-                    AssetFile.year == year
+                    AssetFile.year == year,
                 )
             )
 
@@ -3990,7 +4235,9 @@ class AnalysisService:
             if not merged_file:
                 return Res.error("E-10195")
 
-            file_obj, _ = FileStorageManager.get_file_object(merged_file.key, storage_type=merged_file.storage_server)
+            file_obj, _ = FileStorageManager.get_file_object(
+                merged_file.key, storage_type=merged_file.storage_server
+            )
 
             df = pd.read_excel(BytesIO(file_obj))
 
@@ -4004,35 +4251,21 @@ class AnalysisService:
                 "EPEX DA Revenues",
                 "EPEX 30 DA Revenue",
                 "IDA1 Revenue",
-                "IDC Revenue"
+                "IDC Revenue",
             ]
 
             missing_revenue_cols = [
-                col for col in revenue_cols
-                if col not in df.columns
+                col for col in revenue_cols if col not in df.columns
             ]
 
             if missing_revenue_cols:
                 return Res.error("E-10192")
 
-            optimization_query = await db.execute(
-                select(AssetOptimizationParameter).where(
-                    AssetOptimizationParameter.asset_id == asset_id
-                )
-            )
-
-            optimization = optimization_query.scalars().first()
-
-            if not optimization:
-                return Res.error("E-10193")
-
-            usable_capacity = optimization.usable_capacity_mwh
-
             benchmark_query = await db.execute(
                 select(MonthlyHardcodedValue).where(
                     MonthlyHardcodedValue.metric_id == AssetMetrics.TB_SPREAD_REVENUE,
                     MonthlyHardcodedValue.month == month,
-                    MonthlyHardcodedValue.year == year
+                    MonthlyHardcodedValue.year == year,
                 )
             )
 
@@ -4048,7 +4281,8 @@ class AnalysisService:
             df["hour"] = df["Timestamp"].dt.hour
 
             hourly_df = (
-                df.groupby(["date", "hour"])["Day Ahead Price (EPEX)"].mean()
+                df.groupby(["date", "hour"])["Day Ahead Price (EPEX)"]
+                .mean()
                 .reset_index(name="hourly_price")
             )
 
@@ -4063,9 +4297,9 @@ class AnalysisService:
 
                 tb1 = max(prices) - min(prices)
 
-                tb2 = (sum(prices[-2:]) - sum(prices[:2]))
+                tb2 = sum(prices[-2:]) - sum(prices[:2])
 
-                tb3 = (sum(prices[-3:]) - sum(prices[:3]))
+                tb3 = sum(prices[-3:]) - sum(prices[:3])
 
                 day_df = df[df["date"] == date]
                 if day_df.empty:
@@ -4078,21 +4312,15 @@ class AnalysisService:
                     + day_df["IDC Revenue"].sum()
                 )
 
-                theoretical_max = tb2 * usable_capacity
-            
-                capture_rate = (
-                    (arbitrage_revenue / theoretical_max) * 100
-                    if theoretical_max > 0 else 0
+                daily_rows.append(
+                    {
+                        "date": str(date),
+                        "tb1": round(float(tb1), 2),
+                        "tb2": round(float(tb2), 2),
+                        "tb3": round(float(tb3), 2),
+                        "arbitrage_revenue": round(float(arbitrage_revenue), 2),
+                    }
                 )
-
-                daily_rows.append({
-                    "date": str(date),
-                    "tb1": round(float(tb1), 2),
-                    "tb2": round(float(tb2), 2),
-                    "tb3": round(float(tb3), 2),
-                    "arbitrage_revenue": round(float(arbitrage_revenue), 2),
-                    "capture_rate": round(float(capture_rate), 2)
-                })
             if not daily_rows:
                 return Res.error("E-10197")
 
@@ -4103,22 +4331,18 @@ class AnalysisService:
                     "month": month,
                     "year": year,
                     "tb_spread_benchmark": round(tb_spread_benchmark, 2),
-                    "tb_spread": daily_rows
-                }
+                    "tb_spread": daily_rows,
+                },
             )
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10197", message="Time-based spread details calculation failed")
-    
+            return Res.error(
+                "E-10197", message="Time-based spread details calculation failed"
+            )
 
     async def export_tb_spread_details(
-        self,
-        db: AsyncSession,
-        asset_id: int,
-        month: int,
-        year: int,
-        current_user: dict
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
         try:
 
@@ -4127,13 +4351,11 @@ class AnalysisService:
                 asset_id=asset_id,
                 month=month,
                 year=year,
-                current_user=current_user
+                current_user=current_user,
             )
 
             res_body = (
-                json.loads(result.body.decode())
-                if hasattr(result, "body")
-                else result
+                json.loads(result.body.decode()) if hasattr(result, "body") else result
             )
 
             if res_body.get("status") == "error":
@@ -4166,10 +4388,8 @@ class AnalysisService:
                     "TB2 (£/MWh)",
                     "TB3 (£/MWh)",
                     "Arbitrage Revenue (£)",
-                    "Capture Rate (%)",
                 ]
             )
-        
 
             for row in tb_spread_rows:
                 writer.writerow(
@@ -4179,30 +4399,24 @@ class AnalysisService:
                         f'{float(row["tb2"]):,.2f}',
                         f'{float(row["tb3"]):,.2f}',
                         f'{float(row["arbitrage_revenue"]):,.2f}',
-                        f'{float(row["capture_rate"]):,.2f}',
                     ]
                 )
 
             output.seek(0)
 
-            asset = await db.get(Asset, asset_id)
-
-            asset_str = (asset.asset_id if asset else str(asset_id))
-
-            file_name = (f"tb_spread_details_{asset_id}_{month}_{year}.csv")
+            file_name = f"tb_spread_details_{asset_id}_{month}_{year}.csv"
 
             return StreamingResponse(
                 BytesIO(output.getvalue().encode()),
                 media_type="text/csv",
-                headers={
-                    "Content-Disposition":
-                    f"attachment; filename={file_name}"
-                }
+                headers={"Content-Disposition": f"attachment; filename={file_name}"},
             )
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10199", message="TB Spread Details export generation failed")
+            return Res.error(
+                "E-10199", message="TB Spread Details export generation failed"
+            )
 
     async def get_daily_cycles(
         self,
@@ -4217,25 +4431,29 @@ class AnalysisService:
             VALID_METHODS = ["discharge-only", "full-equivalent", "throughput-based"]
             if cycle_method not in VALID_METHODS:
                 return Res.error("E-10183")
-    
+
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034")
-    
+
             # Fetch optimization parameters for battery capacity
             asset_opt_query = await db.execute(
-                select(AssetOptimizationParameter)
-                .where(AssetOptimizationParameter.asset_id == asset_id)
+                select(AssetOptimizationParameter).where(
+                    AssetOptimizationParameter.asset_id == asset_id
+                )
             )
             asset_opt = asset_opt_query.scalars().first()
             if not asset_opt:
-                return Res.error("E-10001", message="Asset optimization parameter not found", http_status_code=404)
-    
+                return Res.error(
+                    "E-10001",
+                    message="Asset optimization parameter not found",
+                    http_status_code=404,
+                )
+
             cap = asset_opt.usable_capacity_mwh
-            print("CAPACITY =", cap)
             if cap is None or cap <= 0:
                 return Res.error("E-10179" if cap is None else "E-10180")
-    
+
             # Fetch merged and optimized files
             agg_query = await db.execute(
                 select(AssetFile).where(
@@ -4246,7 +4464,7 @@ class AnalysisService:
                 )
             )
             agg_file = agg_query.scalars().first()
-    
+
             opt_query = await db.execute(
                 select(AssetFile).where(
                     AssetFile.asset_id == asset_id,
@@ -4256,114 +4474,802 @@ class AnalysisService:
                 )
             )
             opt_file = opt_query.scalars().first()
-    
-            if not agg_file: return Res.error("E-10100")
-            if not opt_file: return Res.error("E-10154")
-    
+
+            if not agg_file:
+                return Res.error("E-10100")
+            if not opt_file:
+                return Res.error("E-10154")
+
             # Load dataframes
-            df_agg = pd.read_excel(BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]), engine="openpyxl")
-            df_opt = pd.read_csv(BytesIO(FileStorageManager.get_file_object(opt_file.key)[0]))
-    
+            df_agg = pd.read_excel(
+                BytesIO(FileStorageManager.get_file_object(agg_file.key)[0]),
+                engine="openpyxl",
+            )
+            df_opt = pd.read_csv(
+                BytesIO(FileStorageManager.get_file_object(opt_file.key)[0])
+            )
+
             if "Power_MW" not in df_agg.columns:
                 return Res.error("E-10177")
             if "Optimised_Net_MWh_Multi" not in df_opt.columns:
                 return Res.error("E-10178")
-    
+
             # Parse timestamps
             df_agg["Timestamp"] = pd.to_datetime(df_agg["Timestamp"], errors="coerce")
             df_opt["Timestamp"] = pd.to_datetime(df_opt["Timestamp"], errors="coerce")
-    
+
             df_agg = df_agg.dropna(subset=["Timestamp"])
             df_opt = df_opt.dropna(subset=["Timestamp"])
-    
+
             # Fill missing energy values with 0
-            df_agg["Power_MW"] = pd.to_numeric(df_agg["Power_MW"], errors="coerce").fillna(0)
-            df_opt["Optimised_Net_MWh_Multi"] = pd.to_numeric(df_opt["Optimised_Net_MWh_Multi"], errors="coerce").fillna(0)
-    
+            df_agg["Power_MW"] = pd.to_numeric(
+                df_agg["Power_MW"], errors="coerce"
+            ).fillna(0)
+            df_opt["Optimised_Net_MWh_Multi"] = pd.to_numeric(
+                df_opt["Optimised_Net_MWh_Multi"], errors="coerce"
+            ).fillna(0)
+
             # Actual interval energy: Power_MW × 0.5 (30-min intervals)
             df_agg["interval_energy"] = df_agg["Power_MW"] * 0.5
             # Multi-market energy: use directly (already MWh)
             df_opt["interval_energy"] = df_opt["Optimised_Net_MWh_Multi"]
-    
+
             # Group by date
             df_agg["date"] = df_agg["Timestamp"].dt.date
             df_opt["date"] = df_opt["Timestamp"].dt.date
-    
+
             def calc_daily_cycles(group_energy, method, capacity):
                 discharge = group_energy[group_energy > 0].sum()
-                charge    = group_energy[group_energy < 0].abs().sum()
+                charge = group_energy[group_energy < 0].abs().sum()
                 if method == "discharge-only":
                     return discharge / capacity
-                elif method == "full-equivalent":
-                    return (discharge + charge) / 2 / capacity
-                elif method == "throughput-based":
+                else:  # full-equivalent and throughput-based are identical
                     return (discharge + charge) / (2 * capacity)
-    
+
             # Calculate daily cycles per date
             agg_grouped = df_agg.groupby("date")["interval_energy"]
             opt_grouped = df_opt.groupby("date")["interval_energy"]
-    
+
             all_dates = sorted(
                 set(df_agg["date"].unique()) | set(df_opt["date"].unique())
             )
-    
+
             daily_cycles = []
-            actual_cycles_list   = []
-            multi_cycles_list    = []
-    
+            actual_cycles_list = []
+            multi_cycles_list = []
+
             for date in all_dates:
-                actual_energy = agg_grouped.get_group(date) if date in agg_grouped.groups else pd.Series([], dtype=float)
-                multi_energy  = opt_grouped.get_group(date)  if date in opt_grouped.groups  else pd.Series([], dtype=float)
-    
+                actual_energy = (
+                    agg_grouped.get_group(date)
+                    if date in agg_grouped.groups
+                    else pd.Series([], dtype=float)
+                )
+                multi_energy = (
+                    opt_grouped.get_group(date)
+                    if date in opt_grouped.groups
+                    else pd.Series([], dtype=float)
+                )
+
                 actual_dc = calc_daily_cycles(actual_energy, cycle_method, cap)
-                multi_dc  = calc_daily_cycles(multi_energy,  cycle_method, cap)
-    
+                multi_dc = calc_daily_cycles(multi_energy, cycle_method, cap)
+
                 actual_dc = round(actual_dc, 3)
-                multi_dc  = round(multi_dc,  3)
-    
+                multi_dc = round(multi_dc, 3)
+
                 actual_cycles_list.append(actual_dc)
                 multi_cycles_list.append(multi_dc)
-    
-                daily_cycles.append({
-                    "date":                       date.strftime("%d-%m-%Y"),
-                    "actual_daily_cycles":        actual_dc,
-                    "multi_market_daily_cycles":  multi_dc,
-                })
-    
+
+                daily_cycles.append(
+                    {
+                        "date": date.strftime("%d-%m-%Y"),
+                        "actual_daily_cycles": actual_dc,
+                        "multi_market_daily_cycles": multi_dc,
+                    }
+                )
+
             # Summary stats
             def summary(cycles_list, dates):
                 if not cycles_list:
-                    return {"avg_cycles": 0.0, "max_cycles": 0.0, "max_cycles_date": None}
-                max_val  = max(cycles_list)
+                    return {
+                        "avg_cycles": 0.0,
+                        "max_cycles": 0.0,
+                        "max_cycles_date": None,
+                    }
+                max_val = max(cycles_list)
                 max_date = dates[cycles_list.index(max_val)].strftime("%d-%m-%Y")
-                avg_val  = round(sum(cycles_list) / len(cycles_list), 3)
+                avg_val = round(sum(cycles_list) / len(cycles_list), 3)
                 return {
-                    "avg_cycles":      avg_val,
-                    "max_cycles":      round(max_val, 3),
+                    "avg_cycles": avg_val,
+                    "max_cycles": round(max_val, 3),
                     "max_cycles_date": max_date,
                 }
-    
+
             warranty_limit = 1.5
-    
+
             return Res.success(
                 "S-10083",
                 data={
-                    "asset_id":       asset_id,
-                    "month":          month,
-                    "year":           year,
-                    "cycle_method":   cycle_method,
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "cycle_method": cycle_method,
                     "warranty_limit": warranty_limit,
-                    "actual":         summary(actual_cycles_list, all_dates),
-                    "multi_market":   summary(multi_cycles_list,  all_dates),
-                    "daily_cycles":   daily_cycles,
+                    "actual": summary(actual_cycles_list, all_dates),
+                    "multi_market": summary(multi_cycles_list, all_dates),
+                    "daily_cycles": daily_cycles,
                 },
             )
-    
+
         except Exception:
             traceback.print_exc()
             return Res.error("E-10001")
-    
-    
+
+    async def get_monthly_revenue_comparison(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        month: int,
+        current_user: dict,
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error("E-10034")
+
+            # Fetch all merged files for the selected year
+            merged_query = await db.execute(
+                select(AssetFile)
+                .where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                    AssetFile.year == year,
+                    AssetFile.is_active.is_(True),
+                )
+                .order_by(AssetFile.month)
+            )
+            merged_files = merged_query.scalars().all()
+
+            if not merged_files:
+                return Res.error(
+                    "E-10219",
+                    message="No analysis data is available for the selected year.",
+                )
+
+            # If month filter provided, apply it
+            if month is not None:
+                merged_files = [f for f in merged_files if f.month == month]
+                if not merged_files:
+                    return Res.error(
+                        "E-10220",
+                        message="No analysis data is available for the selected month.",
+                    )
+
+            # Fetch all optimized files for the year in one query
+            months_available = [f.month for f in merged_files]
+            opt_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.OPTIMIZED_DATASET.value,
+                    AssetFile.year == year,
+                    AssetFile.month.in_(months_available),
+                    AssetFile.is_active.is_(True),
+                )
+            )
+            opt_files = {f.month: f for f in opt_query.scalars().all()}
+
+            # Fetch all hardcoded values
+            hardcoded_stmt = select(MonthlyHardcodedValue).where(
+                MonthlyHardcodedValue.year == year
+            )
+            hardcoded_res = await db.execute(hardcoded_stmt)
+            hardcoded_data = hardcoded_res.scalars().all()
+
+            hardcoded_map = {}
+            for item in hardcoded_data:
+                hardcoded_map[(item.year, item.month, item.metric_id)] = item.value
+
+            monthly_comparison = []
+
+            for merged_file in merged_files:
+                m = merged_file.month
+                y = merged_file.year
+
+                # Load merged dataset
+                file_obj, _ = FileStorageManager.get_file_object(
+                    merged_file.key, storage_type=merged_file.storage_server
+                )
+                df = pd.read_excel(BytesIO(file_obj))
+
+                # Revenue stream calculations from merged dataset
+                sffr_revenue = float(df["SFFR revenues"].sum())
+                epex_revenue = float(
+                    df["EPEX DA Revenues"].sum() + df["EPEX 30 DA Revenue"].sum()
+                )
+                ida1_revenue = float(df["IDA1 Revenue"].sum())
+                idc_revenue = float(df["IDC Revenue"].sum())
+                imbalance_net = float(
+                    df["Imbalance Revenue"].sum() - df["Imbalance Charge"].sum()
+                )
+
+                # Raw actual revenue = sum of all market streams
+                raw_actual = (
+                    sffr_revenue
+                    + epex_revenue
+                    + ida1_revenue
+                    + idc_revenue
+                    + imbalance_net
+                )
+
+                # Apply 5% GridBeyond share adjustment
+                actual_revenue = raw_actual * 0.95
+                imbalance = imbalance_net * 0.95
+
+                # Settings values
+                capacity_market = hardcoded_map.get(
+                    (y, m, AssetMetrics.CAPACITY_MARKET.value), None
+                )
+                duos_credit = hardcoded_map.get(
+                    (y, m, AssetMetrics.DUOS_CREDIT.value), None
+                )
+                duos_fixed = hardcoded_map.get(
+                    (y, m, AssetMetrics.DUOS_FIXED_CHARGES.value), None
+                )
+
+                duos_net_credit = (
+                    float(duos_credit) - float(duos_fixed)
+                    if duos_credit is not None and duos_fixed is not None
+                    else None
+                )
+
+                total_revenue = actual_revenue
+                if capacity_market is not None:
+                    total_revenue += float(capacity_market)
+                if duos_net_credit is not None:
+                    total_revenue += duos_net_credit
+
+                # Optimal revenue from optimized dataset
+                optimal_revenue = None
+                opt_file = opt_files.get(m)
+                if opt_file:
+                    opt_obj, _ = FileStorageManager.get_file_object(
+                        opt_file.key, storage_type=opt_file.storage_server
+                    )
+                    df_opt = pd.read_csv(BytesIO(opt_obj))
+                    if "Optimised_Revenue_Multi" in df_opt.columns:
+                        optimal_revenue = (
+                            float(df_opt["Optimised_Revenue_Multi"].sum()) * 0.95
+                        )
+
+                # Revenue Gap and Capture Rate
+                revenue_gap = None
+                capture_rate = None
+                if optimal_revenue is not None:
+                    revenue_gap = round(optimal_revenue - actual_revenue, 2)
+                    capture_rate = (
+                        round((actual_revenue / optimal_revenue * 100), 2)
+                        if optimal_revenue != 0
+                        else None
+                    )
+
+                monthly_comparison.append(
+                    {
+                        "month": m,
+                        "actual_revenue": round(actual_revenue, 2),
+                        "capacity_market": (
+                            round(float(capacity_market), 2)
+                            if capacity_market is not None
+                            else None
+                        ),
+                        "duos_net_credit": (
+                            round(duos_net_credit, 2)
+                            if duos_net_credit is not None
+                            else None
+                        ),
+                        "total_revenue": round(total_revenue, 2),
+                        "optimized_revenue": (
+                            round(optimal_revenue, 2)
+                            if optimal_revenue is not None
+                            else None
+                        ),
+                        "net_imbalance": round(imbalance, 2),
+                        "revenue_gap": revenue_gap,
+                        "capture_rate": capture_rate,
+                    }
+                )
+
+            return Res.success(
+                "S-10086",
+                data={
+                    "asset_id": asset_id,
+                    "year": year,
+                    "monthly_comparison": monthly_comparison,
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def export_monthly_revenue_comparison(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        months: list,
+        current_user: dict,
+    ):
+        try:
+            result = await self.get_monthly_revenue_comparison(
+                db=db,
+                asset_id=asset_id,
+                year=year,
+                month=None,
+                current_user=current_user,
+            )
+
+            res_body = (
+                json.loads(result.body.decode()) if hasattr(result, "body") else result
+            )
+            if res_body.get("status") == "error":
+                return result
+
+            monthly_comparison = res_body["data"]["monthly_comparison"]
+            year = res_body["data"]["year"]
+
+            # month filter if provided
+            if months:
+                monthly_comparison = [
+                    r for r in monthly_comparison if r["month"] in months
+                ]
+
+            output = StringIO()
+            output.write("\ufeff")  # BOM for Excel UTF-8
+            writer = csv.writer(output)
+
+            writer.writerow(["Monthly Revenue Comparison Report"])
+            writer.writerow([f"Asset ID: {asset_id}", f"Year: {year}"])
+            writer.writerow([])
+
+            writer.writerow(
+                [
+                    "Month",
+                    "Year",
+                    "Actual Revenue (£)",
+                    "Capacity Market (£)",
+                    "DUoS Net Credit (£)",
+                    "Total Revenue (£)",
+                    "Optimal Revenue (£)",
+                    "Imbalance (£)",
+                    "Revenue Gap (£)",
+                    "Capture Rate (%)",
+                ]
+            )
+
+            for row in monthly_comparison:
+                writer.writerow(
+                    [
+                        row["month"],
+                        year,
+                        f'{row["actual_revenue"]:,.2f}',
+                        (
+                            f'{row["capacity_market"]:,.2f}'
+                            if row["capacity_market"] is not None
+                            else "–"
+                        ),
+                        (
+                            f'{row["duos_net_credit"]:,.2f}'
+                            if row["duos_net_credit"] is not None
+                            else "–"
+                        ),
+                        f'{row["total_revenue"]:,.2f}',
+                        (
+                            f'{row["optimized_revenue"]:,.2f}'
+                            if row["optimized_revenue"] is not None
+                            else "–"
+                        ),
+                        f'{row["net_imbalance"]:,.2f}',
+                        (
+                            f'{row["revenue_gap"]:,.2f}'
+                            if row["revenue_gap"] is not None
+                            else "–"
+                        ),
+                        (
+                            f'{row["capture_rate"]:,.2f}%'
+                            if row["capture_rate"] is not None
+                            else "–"
+                        ),
+                    ]
+                )
+
+            output.seek(0)
+
+            asset = await db.get(Asset, asset_id)
+            asset_str = asset.asset_id if asset else str(asset_id)
+            file_name = f"monthly_revenue_comparison_{asset_str}_{year}.csv"
+
+            return StreamingResponse(
+                BytesIO(output.getvalue().encode()),
+                media_type="text/csv",
+                headers={"Content-Disposition": f"attachment; filename={file_name}"},
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def get_revenue_by_stream_analysis(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        months: List[int],
+        year: int,
+        current_user: dict,
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+
+            if not asset:
+                return Res.error("E-10034")
+
+            files_stmt = (
+                select(AssetFile)
+                .where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                    AssetFile.year == year,
+                    AssetFile.is_active.is_(True),
+                )
+                .order_by(AssetFile.month)
+            )
+
+            files_res = await db.execute(files_stmt)
+            merged_files = files_res.scalars().all()
+
+            if not merged_files:
+                return Res.error("E-10216")
+
+            hardcoded_stmt = select(MonthlyHardcodedValue).where(
+                MonthlyHardcodedValue.year == year
+            )
+            hardcoded_res = await db.execute(hardcoded_stmt)
+            hardcoded_data = hardcoded_res.scalars().all()
+            hardcoded_map = {}
+
+            for item in hardcoded_data:
+                hardcoded_map[(item.year, item.month, item.metric_id)] = item.value
+
+            monthly_comparison = []
+
+            files_to_process = merged_files
+            if months:
+                files_to_process = [f for f in merged_files if f.month in months]
+                if not files_to_process:
+                    return Res.error("E-10217")
+
+            for merged_file in files_to_process:
+
+                m = merged_file.month
+
+                obj, _ = FileStorageManager.get_file_object(
+                    merged_file.key, storage_type=merged_file.storage_server
+                )
+
+                mdf = pd.read_excel(BytesIO(obj))
+                mdf.columns = [str(c).strip().lower() for c in mdf.columns]
+                required_cols = [
+                    "sffr revenues",
+                    "epex 30 da revenue",
+                    "epex da revenues",
+                    "ida1 revenue",
+                    "idc revenue",
+                    "imbalance revenue",
+                    "imbalance charge",
+                ]
+
+                missing = [c for c in required_cols if c not in mdf.columns]
+                if missing:
+                    return Res.error("E-10218")
+
+                for col in required_cols:
+                    mdf[col] = pd.to_numeric(mdf[col], errors="coerce").fillna(0)
+
+                sffr_m = float(mdf["sffr revenues"].sum()) * 0.95
+
+                epex_m = (
+                    float(mdf["epex 30 da revenue"].sum())
+                    + float(mdf["epex da revenues"].sum())
+                ) * 0.95
+
+                ida1_m = float(mdf["ida1 revenue"].sum()) * 0.95
+
+                idc_m = float(mdf["idc revenue"].sum()) * 0.95
+
+                imbalance_m = (
+                    float(mdf["imbalance revenue"].sum())
+                    - float(mdf["imbalance charge"].sum())
+                ) * 0.95
+
+                asset_sub_total_m = sffr_m + epex_m + ida1_m + idc_m + imbalance_m
+                capacity_market = hardcoded_map.get(
+                    (year, m, AssetMetrics.CAPACITY_MARKET.value), None
+                )
+                duos_credit = hardcoded_map.get(
+                    (year, m, AssetMetrics.DUOS_CREDIT.value), None
+                )
+                duos_fixed = hardcoded_map.get(
+                    (year, m, AssetMetrics.DUOS_FIXED_CHARGES.value), None
+                )
+                duos_net_credit = (
+                    float(duos_credit) - float(duos_fixed)
+                    if duos_credit is not None and duos_fixed is not None
+                    else None
+                )
+                total_revenue = asset_sub_total_m
+                if capacity_market is not None:
+                    total_revenue += float(capacity_market)
+
+                if duos_net_credit is not None:
+                    total_revenue += duos_net_credit
+
+                monthly_comparison.append(
+                    {
+                        "month": int(m),
+                        "sffr": float(round(sffr_m, 2)),
+                        "epex": float(round(epex_m, 2)),
+                        "ida1": float(round(ida1_m, 2)),
+                        "idc": float(round(idc_m, 2)),
+                        "imbalance": float(round(imbalance_m, 2)),
+                        "asset_sub_total": float(round(asset_sub_total_m, 2)),
+                        "capacity_market": (
+                            round(float(capacity_market), 2)
+                            if capacity_market is not None
+                            else None
+                        ),
+                        "duos_net_credit": (
+                            round(float(duos_net_credit), 2)
+                            if duos_net_credit is not None
+                            else None
+                        ),
+                        "total_revenue": float(round(total_revenue, 2)),
+                    }
+                )
+
+            return Res.success(
+                "S-10086",
+                data={
+                    "asset_id": asset_id,
+                    "year": year,
+                    "monthly_comparison": monthly_comparison,
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def export_revenue_by_stream_analysis(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        months: List[int],
+        current_user: dict,
+    ):
+        try:
+            response = await self.get_revenue_by_stream_analysis(
+                db=db,
+                asset_id=asset_id,
+                months=months,
+                year=year,
+                current_user=current_user,
+            )
+
+            response_body = (
+                json.loads(response.body.decode())
+                if hasattr(response, "body")
+                else response
+            )
+
+            if response_body.get("status") == "error":
+                return response
+
+            monthly_data = response_body["data"]["monthly_comparison"]
+
+            output = StringIO()
+
+            writer = csv.writer(output)
+
+            writer.writerow(
+                [
+                    "Month",
+                    "Year",
+                    "SFFR",
+                    "EPEX",
+                    "IDA1",
+                    "IDC",
+                    "Imbalance",
+                    "Asset Sub Total",
+                    "Capacity Market",
+                    "DUoS Net Credit",
+                    "Total Revenue",
+                ]
+            )
+
+            for row in monthly_data:
+                writer.writerow(
+                    [
+                        row["month"],
+                        year,
+                        row["sffr"],
+                        row["epex"],
+                        row["ida1"],
+                        row["idc"],
+                        row["imbalance"],
+                        row["asset_sub_total"],
+                        row["capacity_market"],
+                        row["duos_net_credit"],
+                        row["total_revenue"],
+                    ]
+                )
+
+            output.seek(0)
+
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f'attachment; filename="revenue_stream_comparison_{asset_id}_{year}.csv"'
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def get_executive_summary(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        current_user: dict,
+    ):
+        try:
+
+            response = await self.get_monthly_revenue_comparison(
+                db=db,
+                asset_id=asset_id,
+                year=year,
+                month=None,
+                current_user=current_user,
+            )
+
+            response_body = (
+                json.loads(response.body.decode())
+                if hasattr(response, "body")
+                else response
+            )
+
+            if response_body.get("status") == "error":
+                return response
+
+            monthly_data = response_body["data"]["monthly_comparison"]
+
+            if len(monthly_data) <= 1:
+                return Res.success(
+                    "S-10085",
+                    data={
+                        "asset_id": asset_id,
+                        "year": year,
+                        "strongest_month": None,
+                        "weakest_month": None,
+                    },
+                )
+
+            strongest_month = max(monthly_data, key=lambda x: x["capture_rate"])
+
+            weakest_month = min(monthly_data, key=lambda x: x["capture_rate"])
+
+            return Res.success(
+                "S-10085",
+                data={
+                    "asset_id": asset_id,
+                    "year": year,
+                    "strongest_month": {
+                        "month": strongest_month["month"],
+                        "capture_rate": strongest_month["capture_rate"],
+                        "revenue_gap": strongest_month["revenue_gap"],
+                        "imbalance": strongest_month["net_imbalance"],
+                    },
+                    "weakest_month": {
+                        "month": weakest_month["month"],
+                        "capture_rate": weakest_month["capture_rate"],
+                        "revenue_gap": weakest_month["revenue_gap"],
+                        "imbalance": weakest_month["net_imbalance"],
+                    },
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def export_executive_summary(
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        current_user: dict,
+    ):
+        try:
+
+            response = await self.get_executive_summary(
+                db=db,
+                asset_id=asset_id,
+                year=year,
+                current_user=current_user,
+            )
+
+            response_body = (
+                json.loads(response.body.decode())
+                if hasattr(response, "body")
+                else response
+            )
+
+            if response_body.get("status") == "error":
+                return response
+
+            strongest = response_body["data"]["strongest_month"]
+            weakest = response_body["data"]["weakest_month"]
+
+            if strongest is None or weakest is None:
+                return Res.error(
+                    "E-10216",
+                    message="Executive summary is not available for a single month.",
+                )
+
+            output = StringIO()
+
+            writer = csv.writer(output)
+
+            writer.writerow(
+                ["Type", "Month", "Capture Rate", "Revenue Gap", "Imbalance"]
+            )
+
+            writer.writerow(
+                [
+                    "Strongest Month",
+                    strongest["month"],
+                    strongest["capture_rate"],
+                    strongest["revenue_gap"],
+                    strongest["imbalance"],
+                ]
+            )
+
+            writer.writerow(
+                [
+                    "Weakest Month",
+                    weakest["month"],
+                    weakest["capture_rate"],
+                    weakest["revenue_gap"],
+                    weakest["imbalance"],
+                ]
+            )
+
+            output.seek(0)
+
+            return StreamingResponse(
+                iter([output.getvalue()]),
+                media_type="text/csv",
+                headers={
+                    "Content-Disposition": f'attachment; filename="executive_summary_{asset_id}_{year}.csv"'
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
     async def get_warranty_limit_exceedance(
         self,
         db: AsyncSession,
@@ -4371,7 +5277,7 @@ class AnalysisService:
         month: int,
         year: int,
         cycle_method: str,
-        current_user: dict
+        current_user: dict,
     ):
         try:
 
@@ -4381,7 +5287,7 @@ class AnalysisService:
                 month=month,
                 year=year,
                 cycle_method=cycle_method,
-                current_user=current_user
+                current_user=current_user,
             )
 
             response_body = (
@@ -4409,24 +5315,26 @@ class AnalysisService:
 
                 if actual_cycles > warranty_limit:
 
-                    actual_exceedance.append({
-                        "date": datetime.strptime(
-                            row["date"],
-                            "%d-%m-%Y"
-                        ).strftime("%d-%m-%Y"),
-                        "daily_cycles": round(actual_cycles, 2),
-                        "over_limit": round(actual_cycles - warranty_limit, 2)
-                    })
+                    actual_exceedance.append(
+                        {
+                            "date": datetime.strptime(row["date"], "%d-%m-%Y").strftime(
+                                "%d-%m-%Y"
+                            ),
+                            "daily_cycles": round(actual_cycles, 2),
+                            "over_limit": round(actual_cycles - warranty_limit, 2),
+                        }
+                    )
 
                 if multi_cycles > warranty_limit:
-                    multi_market_exceedance.append({
-                        "date": datetime.strptime(
-                            row["date"],
-                            "%d-%m-%Y"
-                        ).strftime("%d-%m-%Y"),
-                        "daily_cycles": round(multi_cycles, 2),
-                        "over_limit": round(multi_cycles - warranty_limit, 2)
-                    })
+                    multi_market_exceedance.append(
+                        {
+                            "date": datetime.strptime(row["date"], "%d-%m-%Y").strftime(
+                                "%d-%m-%Y"
+                            ),
+                            "daily_cycles": round(multi_cycles, 2),
+                            "over_limit": round(multi_cycles - warranty_limit, 2),
+                        }
+                    )
 
             return Res.success(
                 "S-10084",
@@ -4438,9 +5346,9 @@ class AnalysisService:
                     "warranty_limit": warranty_limit,
                     "warranty_exceedance": {
                         "actual": actual_exceedance,
-                        "multi_market": multi_market_exceedance
-                    }
-                }
+                        "multi_market": multi_market_exceedance,
+                    },
+                },
             )
 
         except Exception:

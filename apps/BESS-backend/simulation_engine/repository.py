@@ -1,9 +1,11 @@
 from typing import List, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import desc, insert, select
+from sqlalchemy import desc, insert, select, update
 from constants.enums import SimulationSetupProgress
 from models import SimulationHourlyResult
 from models.simulation_model import (
+    GreenEnergySizingSimulationResult,
+    GreenSimulationHourlyResult,
     MultiYearSimulationJob,
     MultiYearSimulationResult,
     Simulation,
@@ -56,6 +58,18 @@ async def batch_insert_multi_year_projection(
     await db.commit()
 
 
+async def batch_insert_green_sizing_data(
+    db: AsyncSession, results: List[Dict[str, Any]]
+):
+    if not results:
+        print("no results")
+        return
+
+    stmt = insert(GreenEnergySizingSimulationResult)
+    await db.execute(stmt, results)
+    await db.commit()
+
+
 async def handle_simulation_termination(current_sim_id: int, db: AsyncSession):
     sim_job_result = await db.execute(
         select(SimulationJob)
@@ -76,6 +90,18 @@ async def batch_insert_hourly_data(db: AsyncSession, results: List[Dict[str, Any
         return
 
     stmt = insert(SimulationHourlyResult)
+    await db.execute(stmt, results)
+    await db.commit()
+
+
+async def batch_insert_green_hourly_data(
+    db: AsyncSession, results: List[Dict[str, Any]]
+):
+    if not results:
+        print("no results")
+        return
+
+    stmt = insert(GreenSimulationHourlyResult)
     await db.execute(stmt, results)
     await db.commit()
 

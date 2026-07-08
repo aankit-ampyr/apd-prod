@@ -3,7 +3,13 @@ import {useChartsActionV2, useToast} from '@/hooks';
 import type {DataTableColumn, MultiYearProjectionResults as ApiMultiYearProjectionResult, SortType} from '@/interface';
 import {getMultiYearResultsExport} from '@/services/api';
 import {allProjectsData} from '@/services/redux/selectors';
-import {initiateSimulationData, multiYearResults, multiYearResultsLoading, projectSimulationData, simulationProject} from '@/services/redux/selectors/simulationWizardSelector';
+import {
+  initiateSimulationData,
+  multiYearResults,
+  multiYearResultsLoading,
+  projectSimulationData,
+  simulationProject,
+} from '@/services/redux/selectors/simulationWizardSelector';
 import {multiYearProjectionResultsRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {Icon, Skeleton, Sort, Text} from '@/ui-kits';
 import {cn, getErrorMessage} from '@/utils';
@@ -45,6 +51,7 @@ interface ProjectionAnalysisRow {
   deliveryMetMWh: number;
   chargingLoss: number;
   dischargingLoss: number;
+  unmetEnergy: number;
   finalSocPct: number;
   capacity: number;
   loadSolar: number;
@@ -237,7 +244,7 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
 
   const project_id = proSimulData?.project_id;
   const simulation_id = initSimulData?.id ?? proSimulData?.id;
-  const projectName = currentProject?.name || allProjects?.find((p:any) => p.id === project_id)?.name || '';
+  const projectName = currentProject?.name || allProjects?.find((p: any) => p.id === project_id)?.name || '';
   const simulationName = proSimulData?.name || '';
 
   useEffect(() => {
@@ -326,6 +333,7 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
       deliveryMetMWh: Number(item.delivery_met_mwh ?? 0),
       chargingLoss: Number(item.charging_loss ?? 0),
       dischargingLoss: Number(item.discharging_loss ?? 0),
+      unmetEnergy: Number(item.unserved_mwh ?? 0),
       finalSocPct: Number(item.final_soc_pct ?? 0),
       capacity: Number(item.bess_mwh ?? 0),
       loadSolar: Number(item.solar_gen_during_load ?? 0),
@@ -444,7 +452,13 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
     },
     {
       name: 'loadWastagePercent',
-      title: <ColumnHeader label="Load Wastage %" sort={getSortDirection('load_solar_wastage_pct')} onSortChange={() => handleSortChange('load_solar_wastage_pct')} />,
+      title: (
+        <ColumnHeader
+          label="Load Wastage %"
+          sort={getSortDirection('load_solar_wastage_pct')}
+          onSortChange={() => handleSortChange('load_solar_wastage_pct')}
+        />
+      ),
       width: {minWidth: '150px'},
       align: 'center',
       render: row => renderCell(row.loadWastagePercent),
@@ -527,6 +541,13 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
       render: row => renderCell(row.dischargingLoss),
     },
     {
+      name: 'unmetEnergy',
+      title: <ColumnHeader label="Unmet Energy (MWh)" sort={getSortDirection('unserved_mwh')} onSortChange={() => handleSortChange('unserved_mwh')} />,
+      width: {minWidth: '130px'},
+      align: 'center',
+      render: row => renderCell(row.unmetEnergy),
+    },
+    {
       name: 'finalSocPct',
       title: <ColumnHeader label="Final SOC Pct" sort={getSortDirection('final_soc_pct')} onSortChange={() => handleSortChange('final_soc_pct')} />,
       width: {minWidth: '130px'},
@@ -535,14 +556,22 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
     },
     {
       name: 'loadSolar',
-      title: <ColumnHeader label="Load Solar" sort={getSortDirection('solar_gen_during_load')} onSortChange={() => handleSortChange('solar_gen_during_load')} />,
+      title: (
+        <ColumnHeader label="Load Solar" sort={getSortDirection('solar_gen_during_load')} onSortChange={() => handleSortChange('solar_gen_during_load')} />
+      ),
       width: {minWidth: '120px'},
       align: 'center',
       render: row => renderCell(row.loadSolar),
     },
     {
       name: 'loadCurtailed',
-      title: <ColumnHeader label="Load Curtailed" sort={getSortDirection('solar_curtailed_during_load')} onSortChange={() => handleSortChange('solar_curtailed_during_load')} />,
+      title: (
+        <ColumnHeader
+          label="Load Curtailed"
+          sort={getSortDirection('solar_curtailed_during_load')}
+          onSortChange={() => handleSortChange('solar_curtailed_during_load')}
+        />
+      ),
       width: {minWidth: '140px'},
       align: 'center',
       render: row => renderCell(row.loadCurtailed),
@@ -585,7 +614,7 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
 
       <div className={`flex w-full items-center ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
         {!isFullScreen && (
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-nowrap items-center gap-3">
             {YEAR_FILTERS.map(filter => {
               const isActive = activeYearRange === filter.value;
 
@@ -601,7 +630,12 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
                     'h-8 min-w-27 rounded-full border px-6 text-center transition-colors cursor-pointer',
                     isActive ? 'border-primary bg-primary text-white' : 'border-border bg-white font-InterRegular! text-text-secondary hover:border-primary',
                   )}>
-                  <Text variant="caption" className={cn('font-InterRegular', isActive ? 'text-white! font-InterSemiBold!' : 'text-text-secondary! font-InterRegular!')}>
+                  <Text
+                    variant="caption"
+                    className={cn(
+                      'font-InterRegular whitespace-nowrap',
+                      isActive ? 'text-white! font-InterSemiBold!' : 'text-text-secondary! font-InterRegular!',
+                    )}>
                     {filter.label}
                   </Text>
                 </button>
@@ -609,13 +643,23 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
             })}
           </div>
         )}
-        <div className="flex items-center gap-5 pt-1">
-          <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
-          {isFullScreen ? (
-            <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
-          ) : (
-            <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+        <div className={`flex  ${isFullScreen ? 'justify-between' : 'justify-end'} gap-5 pt-1 w-full`}>
+          {isFullScreen && (
+            <div className="flex flex-col">
+              <Text variant="h3">Projection in Years</Text>
+              <Text variant="14R" className="text-text-secondary! my-1.5">
+                Delivery and green energy breakdown by year
+              </Text>
+            </div>
           )}
+          <div className="flex items-center gap-5">
+            <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
+            {isFullScreen ? (
+              <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
+            ) : (
+              <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+            )}
+          </div>
         </div>
       </div>
 
@@ -629,7 +673,8 @@ export const ViewDetailedAnalysis = (props: ViewDetailedAnalysisProps) => {
           onPageChange={setCurrentPage}
           pageSize={PAGE_SIZE}
           stickyHeader
-          showFooter = {false}
+          persistHorizontalScrollKey={simulation_id ? `bess-projection-detailed-${simulation_id}` : undefined}
+          showFooter={false}
         />
       </div>
     </div>

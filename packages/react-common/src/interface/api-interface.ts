@@ -8,6 +8,11 @@ export interface APIResponse<T = unknown> {
   data?: T;
 }
 
+export interface StreamingAPIResponse<T = unknown> {
+  status: string;
+  data?: T;
+}
+
 // =============================== Auth Slice ===============================
 export interface LoginRequest {
   payload: {
@@ -36,4 +41,8 @@ export interface VerifyOtpRequest {
   error_response: APIResponse<{
     otp_attempts: number,
   }>;
+}
+
+export interface LogoutRequest {
+  response: APIResponse;
 }

@@ -12,11 +12,15 @@ from .digest_router import DigestRouter
 from .audit_router import AuditRouter
 from .metric_router import MetricRouter
 from .asset_analysis_router import AnalysisRouter
+from .invoice_router import PdfInvoiceRouter,InvoiceAnalysisRouter
 
 
 class BaseRouter:
     def __init__(self):
         self.router = APIRouter()
+
+        pdf_invoice_router = PdfInvoiceRouter()
+
 
         # create routes
         self.routers = [
@@ -27,7 +31,9 @@ class BaseRouter:
             DigestRouter(),
             AuditRouter(),
             MetricRouter(),
-            AnalysisRouter()
+            AnalysisRouter(),
+            PdfInvoiceRouter(),
+            InvoiceAnalysisRouter(pdf_invoice_controller=pdf_invoice_router.controller)
         ]
 
         # register routes

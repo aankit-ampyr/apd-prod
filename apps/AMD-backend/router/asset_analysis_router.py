@@ -67,3 +67,12 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/tb-spread/summary")(self.controller.get_tb_spread_summary)
         self.router.get("/{asset_id}/analysis/tb-spread/details")(self.controller.get_tb_spread_details)
         self.router.get("/{asset_id}/analysis/tb-spread/details/export")(self.controller.export_tb_spread_details)
+
+        #Executive Analysis
+        self.router.get("/{asset_id}/analysis/executive-comparison/monthly-revenue-comparison")(self.controller.get_monthly_revenue_comparison)
+        self.router.get("/{asset_id}/analysis/executive-comparison/monthly-revenue-comparison/export")(self.controller.export_monthly_revenue_comparison)
+        self.router.get("/{asset_id}/analysis/executive-comparison/revenue-by-stream")(self.controller.get_revenue_by_stream_analysis)
+        self.router.get("/{asset_id}/analysis/executive-comparison/revenue-by-stream/export")(self.controller.export_revenue_by_stream_analysis)
+        self.router.get("/{asset_id}/analysis/executive-comparison/summary")(self.controller.get_executive_summary)
+        self.router.get("/{asset_id}/analysis/executive-comparison/executive-summary/export")(self.controller.export_executive_summary)
+ 

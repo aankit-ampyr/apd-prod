@@ -1,18 +1,21 @@
+import { cn } from "../../utils";
+
 type SortValue = 'asc' | 'desc' | null;
 
 interface SortProps {
   sort: SortValue;
   onSortChange: (sort: SortValue) => void;
+  className?: string;
 }
 
-export function Sort({ sort, onSortChange }: SortProps) {
+export function Sort({ sort, onSortChange, className }: SortProps) {
   const handleClick = (clicked: 'asc' | 'desc') => {
     // Toggle off if already active, otherwise set new sort
     onSortChange(sort === clicked ? null : clicked);
   };
 
   return (
-    <div className="flex flex-col items-center justify-center gap-1.5 w-8 h-12">
+    <div className={cn(`flex flex-col items-center justify-center gap-1.5 w-8 h-12`, className)}>
       {/* Up triangle = desc */}
       <button
         onClick={() => handleClick('desc')}

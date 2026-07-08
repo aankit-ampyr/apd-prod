@@ -35,6 +35,9 @@ export const API: ApiConfigInterface = {
     verifyOtp: 'api/v1/auth/login/verify-otp',
   },
   authUrls: {
+    // auth related APIs
+    logout: 'api/v1/auth/logout',
+
     // users related APIs
     users: 'api/v1/users/',
     user_id: (id: number) => `api/v1/users/${id}`,
@@ -145,6 +148,18 @@ export const API: ApiConfigInterface = {
     asset_analysis_market_hourly_price_patterns: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/market/hourly-price-patterns`,
 
+    // executive analysis related APIs
+    asset_executive_analysis_monthly_revenue_comparison: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/executive-comparison/monthly-revenue-comparison`,
+    asset_executive_analysis_monthly_revenue_comparison_export: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/executive-comparison/monthly-revenue-comparison/export`,
+    asset_executive_analysis_revenue_by_stream: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/executive-comparison/revenue-by-stream`,
+    asset_executive_analysis_revenue_by_stream_export: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/executive-comparison/revenue-by-stream/export`,
+    asset_executive_analysis_summary: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/executive-comparison/summary`,
+
     // settings related APIs
     metrics_benchmarks: '/api/v1/metrics/benchmarks',
     metrics_monthly_values: '/api/v1/metrics/monthly-values',
@@ -156,5 +171,26 @@ export const API: ApiConfigInterface = {
     // digest related APIs
     digests: 'api/v1/digests/',
     digest_id: (digestId: string) => `api/v1/digests/${digestId}`,
+
+    // assets invoices slice
+    asset_invoices: (assetId: number) => `api/v1/assets/${assetId}/invoices/`,
+    asset_invoices_summary: (assetId: number) => `api/v1/assets/${assetId}/invoices/summary`,
+    asset_invoices_id: (assetId: number, invoiceId: number) => `api/v1/assets/${assetId}/invoices/${invoiceId}`,
+    asset_invoices_id_preview: (assetId: number, invoiceId: number) =>
+      `api/v1/assets/${assetId}/invoices/${invoiceId}/preview`,
+    asset_invoices_id_export: (assetId: number, invoiceId: number) =>
+      `api/v1/assets/${assetId}/invoices/${invoiceId}/export`,
+    asset_invoices_export: (assetId: number) => `api/v1/assets/${assetId}/invoices/export`,
+
+    asset_invoices_settlement: (assetId: number) => `api/v1/assets/${assetId}/invoices/settlement`,
+    asset_invoices_settlement_id: (assetId: number, settlementId: number) =>
+      `api/v1/assets/${assetId}/invoices/settlement/${settlementId}`,
+    asset_invoices_settlement_id_export: (assetId: number, settlementId: number) =>
+      `api/v1/assets/${assetId}/invoices/settlement/${settlementId}/export`,
+
+    asset_invoice_analysis_capacity_market: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/capacity-market`,
+    asset_invoice_analysis_capacity_market_export: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/capacity-market/export`,
   },
 };

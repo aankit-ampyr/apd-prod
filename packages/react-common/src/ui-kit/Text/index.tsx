@@ -24,20 +24,25 @@ export const TextVariants = {
   btnSmall: 'text-btn-small leading-btn-small font-InterSemiBold',
 
   // special variants
-  "18B": "text-large-body leading-large-body font-InterBold",
-  "18M": "text-large-body leading-large-body font-InterMedium",
-  "18R": "text-large-body leading-large-body font-InterRegular",
+  "16B": "text-body-1 leading-body font-InterBold",
   "16SB": "text-body-1 leading-body font-InterSemiBold",
   "16M": "text-body-1 leading-body font-InterMedium",
   "16R": "text-body-1 leading-body font-InterRegular",
+  
+  "14L": "text-caption leading-caption font-InterLight",
+  "14R": "text-caption leading-caption font-InterRegular",
   "14M": "text-caption leading-caption font-InterMedium",
   "14SB": "text-caption leading-caption font-InterSemiBold",
-  "18SB" : "text-large-body leading-large-body font-InterSemiBold",
   "14B": "text-caption leading-caption font-InterBold",
-  "14R": "text-caption leading-caption font-InterRegular",
-  "12SB": "text-small leading-small font-InterSemiBold",
-  "12M": "text-small leading-small font-InterMedium",
+  
+  "18R": "text-large-body leading-large-body font-InterRegular",
+  "18M": "text-large-body leading-large-body font-InterMedium",
+  "18SB" : "text-large-body leading-large-body font-InterSemiBold",
+  "18B": "text-large-body leading-large-body font-InterBold",
+  
   "12R": "text-small leading-small font-InterRegular",
+  "12M": "text-small leading-small font-InterMedium",
+  "12SB": "text-small leading-small font-InterSemiBold",
 
   // otp out of variants
   free: ""

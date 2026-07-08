@@ -7,6 +7,8 @@ from constants.enums import UserRole, Month
 from db.dependencies import allowed_roles, get_bess_db
 from services import (
     RunSizingSimulationService,
+    RunGreenEnergySimulationService,
+    RunDetailedGreenSimulationService,
 )
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,19 +23,14 @@ class RunSimulationController(SimulationSetupController):
         self.run_sizing_sim_service = RunSizingSimulationService()
         self.run_single_sim_service = RunSingleSimulationService()
         self.run_multi_year_sim_service = RunMultiYearSimulationService()
+        self.run_green_energy_sim_service = RunGreenEnergySimulationService()
+        self.run_detailed_green_sim_service = RunDetailedGreenSimulationService()
 
     async def run_sizing_simulation(
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        current_user: dict = Depends(
-            allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
-            )
-        ),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_sizing_sim_service.run_sizing_simulation(
@@ -48,14 +45,7 @@ class RunSimulationController(SimulationSetupController):
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         redis=Depends(get_redis_conn),
-        current_user: dict = Depends(
-            allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
-            )
-        ),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_sizing_sim_service.stop_simulation(
@@ -89,10 +79,7 @@ class RunSimulationController(SimulationSetupController):
         sort: Optional[List[str]] = Query(None),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
             )
         ),
         resource_id: str = Depends(get_resource_id),
@@ -139,14 +126,7 @@ class RunSimulationController(SimulationSetupController):
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        current_user: dict = Depends(
-            allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
-            )
-        ),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_single_sim_service.run_simulation(
@@ -167,10 +147,7 @@ class RunSimulationController(SimulationSetupController):
         sort: Optional[List[str]] = Query(None),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
             )
         ),
         resource_id: str = Depends(get_resource_id),
@@ -208,6 +185,12 @@ class RunSimulationController(SimulationSetupController):
         start_time: Optional[datetime] = Query(None),
         end_time: Optional[datetime] = Query(None),
         sort: Optional[List[str]] = Query(None),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_single_sim_service.export_simulation_results(
             simulation_id=simulation_id,
@@ -215,6 +198,8 @@ class RunSimulationController(SimulationSetupController):
             start_time=start_time,
             end_time=end_time,
             sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
         )
 
     async def get_single_simulation_results(
@@ -223,10 +208,7 @@ class RunSimulationController(SimulationSetupController):
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
             )
         ),
         resource_id: str = Depends(get_resource_id),
@@ -245,8 +227,6 @@ class RunSimulationController(SimulationSetupController):
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -267,8 +247,6 @@ class RunSimulationController(SimulationSetupController):
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
                 UserRole.ANALYST,
             )
         ),
@@ -290,10 +268,7 @@ class RunSimulationController(SimulationSetupController):
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(
             allowed_roles(
-                UserRole.ADMIN,
-                UserRole.MANAGEMENT,
-                UserRole.SUPER_ADMIN,
-                UserRole.ANALYST,
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.MANAGEMENT, UserRole.VIEWER
             )
         ),
         resource_id: str = Depends(get_resource_id),
@@ -322,12 +297,20 @@ class RunSimulationController(SimulationSetupController):
         until_year: int = Query(20),
         sort: Optional[List[str]] = Query(None),
         bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_multi_year_sim_service.export_simulation_results(
             simulation_id=simulation_id,
             bess_db=bess_db,
             until_year=until_year,
             sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
         )
 
     async def get_monthly_simulation_result(
@@ -336,9 +319,20 @@ class RunSimulationController(SimulationSetupController):
         month: Optional[List[Month]] = Query(None),
         sort: Optional[str] = Query(None),
         bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_single_sim_service.get_monthly_simulation_result(
-            simulation_id=simulation_id, months=month, bess_db=bess_db, sort=sort
+            simulation_id=simulation_id,
+            months=month,
+            bess_db=bess_db,
+            sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
         )
 
     async def export_monthly_simulation_results(
@@ -347,7 +341,220 @@ class RunSimulationController(SimulationSetupController):
         month: Optional[List[Month]] = Query(None),
         sort: Optional[str] = Query(None),
         bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
     ):
         return await self.run_single_sim_service.export_monthly_simulation_results(
-            simulation_id=simulation_id, months=month, bess_db=bess_db, sort=sort
+            simulation_id=simulation_id,
+            months=month,
+            bess_db=bess_db,
+            sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def run_green_energy_simulation(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN,
+                UserRole.ANALYST,
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_green_energy_sim_service.run_sizing_simulation(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def stop_green_energy_simulation(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        redis=Depends(get_redis_conn),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN,
+                UserRole.ANALYST,
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_green_energy_sim_service.stop_simulation(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            redis=redis,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def get_green_energy_simulation_progress(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+    ):
+        return await self.run_green_energy_sim_service.get_simulation_progress(
+            simulation_id=simulation_id, bess_db=bess_db
+        )
+
+    async def get_green_energy_simulation_results(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        page: int = Query(1, ge=1),
+        limit: int = Query(100, ge=1),
+        solar_capacity: Optional[List[float]] = Query(None),
+        dg_capacity: Optional[List[float]] = Query(None),
+        bess_capacity: Optional[List[float]] = Query(None),
+        duration_hr: Optional[List[float]] = Query(None),
+        viable_only: bool = False,
+        delivery_100_only: bool = False,
+        zero_dg_hours_only: bool = False,
+        sort: Optional[List[str]] = Query(None),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_green_energy_sim_service.get_simulation_results(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            page=page,
+            limit=limit,
+            solar_capacity=solar_capacity,
+            dg_capacity=dg_capacity,
+            bess_capacity=bess_capacity,
+            duration_hr=duration_hr,
+            sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
+            viable_only=viable_only,
+            delivery_100_only=delivery_100_only,
+            zero_dg_hours_only=zero_dg_hours_only,
+        )
+
+    async def export_green_energy_simulation_results(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        solar_capacity: Optional[List[float]] = Query(None),
+        dg_capacity: Optional[List[float]] = Query(None),
+        bess_capacity: Optional[List[float]] = Query(None),
+        duration_hr: Optional[List[float]] = Query(None),
+        viable_only: bool = False,
+        delivery_100_only: bool = False,
+        zero_dg_hours_only: bool = False,
+        sort: Optional[List[str]] = Query(None),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.MANAGEMENT, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_green_energy_sim_service.export_simulation_results(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            solar_capacity=solar_capacity,
+            dg_capacity=dg_capacity,
+            bess_capacity=bess_capacity,
+            duration_hr=duration_hr,
+            viable_only=viable_only,
+            delivery_100_only=delivery_100_only,
+            zero_dg_hours_only=zero_dg_hours_only,
+            sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def run_detailed_green_simulation(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_detailed_green_sim_service.run_simulation(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def get_detailed_green_simulation_results(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return await self.run_detailed_green_sim_service.get_simulation_results(
+            simulation_id=simulation_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            resource_id=resource_id,
+        )
+
+    async def export_detailed_green_hourly_results(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return (
+            await self.run_detailed_green_sim_service.export_hourly_simulation_results(
+                simulation_id=simulation_id,
+                bess_db=bess_db,
+                current_user=current_user,
+                resource_id=resource_id,
+            )
+        )
+
+    async def export_detailed_green_monthly_results(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+    ):
+        return (
+            await self.run_detailed_green_sim_service.export_monthly_simulation_results(
+                simulation_id=simulation_id,
+                current_user=current_user,
+                resource_id=resource_id,
+                bess_db=bess_db,
+            )
+        )
+
+    async def get_detailed_green_simulation_progress(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+    ):
+        return await self.run_detailed_green_sim_service.get_simulation_progress(
+            simulation_id=simulation_id, bess_db=bess_db
         )

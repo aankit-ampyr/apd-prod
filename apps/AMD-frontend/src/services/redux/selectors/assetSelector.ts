@@ -67,6 +67,33 @@ export const analysisAssetsList = createSelector([(state: RootState) => state.as
   );
 });
 
+
+export const executiveAnalysisAssetsList = (type: AssetTypeEnum) => createSelector([(state: RootState) => state.asset.allAssets], allAssets => {
+  return (
+    allAssets
+      // exclude asset without analysis and solar assets
+      .filter(item => item.analysis_available && item.type !== AssetTypeEnum.Solar && item.type === type)
+      .map(
+        (
+          item,
+        ): SelectInputItem<{
+          organization_id: number;
+          organization_name: string;
+          available_periods?: MonthYear[];
+        }> => ({
+          id: item.id,
+          label: item.name,
+          subLabel: item.organization.name,
+          metadata: {
+            organization_id: item.organization.id,
+            organization_name: item.organization.name,
+            available_periods: item.available_periods,
+          },
+        }),
+      )
+  );
+});
+
 // current selected asset selector for details page and edit page
 export const currentSelectedAsset = (state: RootState) => state.asset.currentSelectedAsset;
 export const currentSelectedAssetFiles = (state: RootState) => state.asset.currentAssetFiles;
@@ -326,3 +353,50 @@ export const assetBenchmarkMultiMarketOptimizedVsActualLoading = (state: RootSta
   state.asset.benchmarkLoading.multiMarketOptmization;
 export const assetBenchmarkMultiMarketOptimizedVsActualError = (state: RootState) =>
   state.asset.benchmarkError.multiMarketOptmization;
+
+
+// ================================ Executive Analysis selectors ================================
+// monthly revenue comparison
+export const assetExecutiveMonthlyRevenueComparisonResult = (state: RootState) => state.asset.executiveAnalysis?.monthly_revenue_comparison;
+export const assetExecutiveMonthlyRevenueComparisonLoading = (state: RootState) =>
+  state.asset.executiveAnalysisLoading?.monthly_revenue_comparison ?? false;
+export const assetExecutiveMonthlyRevenueComparisonError = (state: RootState) =>
+  state.asset.executiveAnalysisError?.monthly_revenue_comparison ?? false;
+
+// revenue by stream
+export const assetExecutiveRevenueByStreamResult = (state: RootState) => state.asset.executiveAnalysis?.revenue_by_stream;
+export const assetExecutiveRevenueByStreamLoading = (state: RootState) =>
+  state.asset.executiveAnalysisLoading?.revenue_by_stream ?? false;
+export const assetExecutiveRevenueByStreamError = (state: RootState) =>
+  state.asset.executiveAnalysisError?.revenue_by_stream ?? false;
+
+
+// revenue by stream
+export const assetExecutiveSummaryResult = (state: RootState) => state.asset.executiveAnalysis?.summary;
+export const assetExecutiveSummaryLoading = (state: RootState) =>
+  state.asset.executiveAnalysisLoading?.summary ?? false;
+export const assetExecutiveSummaryError = (state: RootState) =>
+  state.asset.executiveAnalysisError?.summary ?? false;
+
+
+// Invoice Upload Selectors
+export const assetInvoiceUploadLoading = (state: RootState) => state.asset.uploadInvoice.loading;
+export const assetInvoiceUploadError = (state: RootState) => state.asset.uploadInvoice.error;
+export const assetInvoiceUploadSuccess = (state: RootState) => state.asset.uploadInvoice.success;
+export const assetInvoiceUploadErrorMessage = (state: RootState) => state.asset.invoiceUploadError;
+
+// Invoice Delete Selectors
+export const invoiceDeleteLoading = (state: RootState) => state.asset.deleteInvoice.loading;
+export const invoiceDeleteError = (state: RootState) => state.asset.deleteInvoice.error;
+export const invoiceDeleteSuccess = (state: RootState) => state.asset.deleteInvoice.success;
+
+// Invoice Settlement Upload Selectors
+export const assetInvoiceSettlementUploadLoading = (state: RootState) => state.asset.uploadInvoiceSettlement.loading;
+export const assetInvoiceSettlementUploadError = (state: RootState) => state.asset.uploadInvoiceSettlement.error;
+export const assetInvoiceSettlementUploadSuccess = (state: RootState) => state.asset.uploadInvoiceSettlement.success;
+export const assetInvoiceSettlementUploadErrorMessage = (state: RootState) => state.asset.invoiceSettlementUploadError;
+
+// Invoice Settlement Delete Selectors
+export const assetInvoiceSettlementDeleteLoading = (state: RootState) => state.asset.deleteInvoiceSettlement.loading;
+export const assetInvoiceSettlementDeleteError = (state: RootState) => state.asset.deleteInvoiceSettlement.error;
+export const assetInvoiceSettlementDeleteSuccess = (state: RootState) => state.asset.deleteInvoiceSettlement.success;

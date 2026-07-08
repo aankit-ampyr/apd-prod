@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends
-from context.dependency import verify_simulation_active
+from context.dependency import validate_simulation_access
 from controller import RunSimulationController, SimulationSetupController
 
 
 class SimulationRouter:
     def __init__(self):
-        self.router = APIRouter(dependencies=[Depends(verify_simulation_active)])
+        self.router = APIRouter(dependencies=[Depends(validate_simulation_access)])
         self.endpoint = "/simulation"
         self.controller = SimulationSetupController()
         self.run_controller = RunSimulationController()
@@ -132,4 +132,46 @@ class SimulationRouter:
         )
         self.router.get("/{simulation_id}/green-energy-analysis")(
             self.controller.get_green_energy_config
+        )
+
+        # Run Green Energy Simulation endpoints
+        self.router.post("/{simulation_id}/green-energy-analysis/run")(
+            self.run_controller.run_green_energy_simulation
+        )
+        self.router.post("/{simulation_id}/green-energy-analysis/stop")(
+            self.run_controller.stop_green_energy_simulation
+        )
+        self.router.get("/{simulation_id}/green-energy-analysis/progress")(
+            self.run_controller.get_green_energy_simulation_progress
+        )
+        self.router.get("/{simulation_id}/green-energy-analysis/results")(
+            self.run_controller.get_green_energy_simulation_results
+        )
+        self.router.get("/{simulation_id}/green-energy-analysis/results/export")(
+            self.run_controller.export_green_energy_simulation_results
+        )
+
+        # Detail green configuration endpoints
+        self.router.post("/{simulation_id}/detailed-green-energy")(
+            self.controller.upsert_detail_green_config
+        )
+        self.router.get("/{simulation_id}/detailed-green-energy")(
+            self.controller.get_detail_green_config
+        )
+
+        # Detailed green simulation run/results endpoints
+        self.router.post("/{simulation_id}/detailed-green-energy/run")(
+            self.run_controller.run_detailed_green_simulation
+        )
+        self.router.get("/{simulation_id}/detailed-green-energy/result")(
+            self.run_controller.get_detailed_green_simulation_results
+        )
+        self.router.get("/{simulation_id}/detailed-green-energy/hourly/export")(
+            self.run_controller.export_detailed_green_hourly_results
+        )
+        self.router.get("/{simulation_id}/detailed-green-energy/monthly/export")(
+            self.run_controller.export_detailed_green_monthly_results
+        )
+        self.router.get("/{simulation_id}/detailed-green-energy/progress")(
+            self.run_controller.get_detailed_green_simulation_progress
         )

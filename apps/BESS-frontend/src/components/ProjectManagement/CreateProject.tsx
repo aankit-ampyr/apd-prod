@@ -183,8 +183,8 @@ function CreateProject({open, onClose, editData, variant: propVariant}: Readonly
   const allUsers = useSelector((state: RootState) => state.user.allUsers);
 
   const responsibleUserRole = allUsers.find(user => user.id === values.responsibleUser)?.role;
-
   const filteredAnalystUsersOptions = analystUsersOptions.filter(user => !(responsibleUserRole === UserRole.Analyst && user.id === values.responsibleUser));
+  const originalResponsibleUser = editData?.owned_by?.id;
 
   // only keep this one as as useDropdownValues hook sice this is will trigger
   // the data fetching, and rest above 4 will just filter the fetched data
@@ -193,7 +193,28 @@ function CreateProject({open, onClose, editData, variant: propVariant}: Readonly
     fetchAction: getAllUsersListRequest,
   });
 
-  const originalResponsibleUser = editData?.owned_by?.id;
+  const hideAdminResponsibleUsers = variant === 'edit';
+  const creatorResponsibleUserOption =
+    variant === 'edit' &&
+    editData?.created_by &&
+    [UserRole.Admin, UserRole.SuperAdmin].includes(editData.created_by.role)
+      ? {
+          id: editData.created_by.id,
+          label: editData.created_by.name,
+          subLabel: editData.created_by.email,
+        }
+      : null;
+  const filteredResponsibleUserOptions = hideAdminResponsibleUsers
+    ? responsibleUserOptions.filter(option => {
+        const user = allUsers.find(item => item.id === option.id);
+        return user?.role !== UserRole.Admin && user?.role !== UserRole.SuperAdmin;
+      })
+    : responsibleUserOptions;
+  const visibleResponsibleUserOptions = creatorResponsibleUserOption
+    ? [creatorResponsibleUserOption, ...filteredResponsibleUserOptions.filter(option => option.id !== creatorResponsibleUserOption.id)]
+    : filteredResponsibleUserOptions;
+  const selectedResponsibleUserLabel =
+    values.responsibleUser === originalResponsibleUser ? editData?.owned_by?.name : undefined;
 
   useEffect(() => {
     if (!values.responsibleUser || !responsibleUserRole) return;
@@ -252,8 +273,13 @@ function CreateProject({open, onClose, editData, variant: propVariant}: Readonly
             label="Responsible User"
             placeholder="Select user"
             required
-            options={[...(authData ? [{id: authData?.id, label: authData?.name}] : []), ...responsibleUserOptions]}
+            options={
+              hideAdminResponsibleUsers
+                ? visibleResponsibleUserOptions
+                : [...(authData ? [{id: authData?.id, label: authData?.name}] : []), ...responsibleUserOptions]
+            }
             value={values.responsibleUser}
+            selectedDisplayLabel={selectedResponsibleUserLabel}
             onChange={handleResponsibleUserChange}
             onBlur={handleBlur('responsibleUser')}
             touched={touched.responsibleUser}

@@ -18,7 +18,7 @@ const PAGE_SIZE = 100;
 /**
  * Role options for dropdown
  */
-const ROLE_OPTIONS = BESS_USER_ROLES;
+const ROLE_OPTIONS = BESS_USER_ROLES.filter(role => role.id !== UserRole.Admin);
 
 /**
  * Module options for dropdown - Only Project Management and Simulation for BESS
@@ -129,7 +129,7 @@ export function AuditLog() {
 
   const formatAuditData = (data?: string | object | null): {label: string; tooltip?: ReactNode} => {
     if (!data) return {label: NA};
-    
+
     // If it's a string, return as-is
     if (typeof data === 'string') {
       let formatted = data;
@@ -147,17 +147,17 @@ export function AuditLog() {
       formatted = formatted.replace(/,\s*(Admin:|Analyst:|Viewer:|Management:)/g, '\n$1');
       return {label: formatted};
     }
-    
+
     // If it's an object
     if (typeof data === 'object') {
       // Check if empty object
       if (Object.keys(data).length === 0) return {label: NA};
-      
+
       // Get the first key as the label (e.g., "SIZING CONFIGURATION", "SYSTEM SETUP", etc.)
       const keys = Object.keys(data);
       const firstKey = keys[0];
       const innerData = (data as Record<string, unknown>)[firstKey];
-      
+
       // Format the value for display
       const formatDisplayValue = (value: unknown): string => {
         if (value === null) return 'N/A';
@@ -165,7 +165,7 @@ export function AuditLog() {
         if (typeof value === 'boolean') return value ? 'Yes' : 'No';
         return String(value);
       };
-      
+
       // Build styled tooltip content
       let tooltipContent: ReactNode = null;
       if (typeof innerData === 'object' && innerData !== null) {
@@ -174,21 +174,27 @@ export function AuditLog() {
           <div className="flex flex-col gap-1">
             {entries.map(([key, value], index) => (
               <div key={index} className="flex items-center gap-1">
-                <Text variant='small' className="text-text-secondary!">{key}:</Text>
-                <Text variant='small' className="font-InterSemiBold! text-text-secondary!">{formatDisplayValue(value)}</Text>
+                <Text variant="small" className="text-text-secondary!">
+                  {key}:
+                </Text>
+                <Text variant="small" className="font-InterSemiBold! text-text-secondary!">
+                  {formatDisplayValue(value)}
+                </Text>
               </div>
             ))}
           </div>
         );
       } else {
         tooltipContent = (
-          <Text variant='small' className="text-small! font-InterSemiBold! text-text-secondary!">{formatDisplayValue(innerData)}</Text>
+          <Text variant="small" className="text-small! font-InterSemiBold! text-text-secondary!">
+            {formatDisplayValue(innerData)}
+          </Text>
         );
       }
-      
+
       return {label: firstKey, tooltip: tooltipContent};
     }
-    
+
     return {label: String(data)};
   };
 
@@ -277,7 +283,7 @@ export function AuditLog() {
             <Text variant="caption" className="text-text-secondary! whitespace-pre-wrap cursor-default">
               {label}
             </Text>
-            {tooltip && <Tooltip message={tooltip} position="top" portal className='border-[#9ECBC5]! border-2!' />}
+            {tooltip && <Tooltip message={tooltip} position="top" portal className="border-[#9ECBC5]! border-2!" />}
           </div>
         );
       },
@@ -294,7 +300,7 @@ export function AuditLog() {
             <Text variant="caption" className="text-text-secondary! whitespace-pre-wrap cursor-default">
               {label}
             </Text>
-            {tooltip && <Tooltip message={tooltip} position="top" portal className='border-[#9ECBC5]! border!'/>}
+            {tooltip && <Tooltip message={tooltip} position="top" portal className="border-[#9ECBC5]! border!" />}
           </div>
         );
       },
@@ -392,16 +398,16 @@ export function AuditLog() {
           {
             key: 'module',
             placeholder: 'Select Module',
-            type: 'select',
+            type: 'searchable-select',
             options: MODULE_OPTIONS,
             props: {className: 'min-w-37.25'},
           },
           {
             key: 'action',
             placeholder: 'Select Action',
-            type: 'select',
+            type: 'searchable-select',
             options: ACTION_OPTIONS,
-            props: {className: 'min-w-56'},
+            props: {className: 'w-48!'},
           },
           // {
           //   key: 'start_date',

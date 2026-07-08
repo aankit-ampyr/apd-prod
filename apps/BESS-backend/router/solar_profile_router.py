@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends
 
 from controller.solar_profile_controller import SolarProfileController
-from context.dependency import verify_simulation_active
+from context.dependency import validate_simulation_access
 
 
 class SolarProfileRouter:
     def __init__(self):
-        self.router = APIRouter(dependencies=[Depends(verify_simulation_active)])
+        self.router = APIRouter(dependencies=[Depends(validate_simulation_access)])
         self.endpoint = "/simulation"
         self.controller = SolarProfileController()
         self.tags = ["Solar Profile"]

@@ -28,6 +28,10 @@ const badgeStyles = tv({
       },
     },
     color: {
+      link: {
+        text: "text-link!",
+        base: "bg-[#EFF6FF]",
+      },
       gray: {
         text: "text-secondary!",
         base: "bg-[#F5F5F5]",
@@ -91,7 +95,23 @@ const badgeStyles = tv({
       brown_gray: {
         text: "text-[#444638]!",
         base: "bg-[#F8FFCF]!",
-      }
+      },
+      yellow: {
+        text: "text-[#EE9908]!",
+        base: "bg-[#FFF9DF]!",
+      },
+      aqua: {
+        text: "text-[#04ABC8]!",
+        base: "bg-[#ECFEFF]!",
+      },
+      pink: {
+        text: "text-[#EC4899]!",
+        base: "bg-[#FFEFF7]!",
+      },
+      sun: {
+        text: "text-[#F97316]!",
+        base: "bg-[#FFF7ED]",
+      },
     },
   },
   defaultVariants: {
@@ -108,13 +128,14 @@ interface BadgeProps {
   icon?: IconTypes;
   size?: BadgeVariants["size"];
   color?: BadgeVariants["color"];
+  style?: React.CSSProperties;
   textStyle?: React.CSSProperties;
 }
 export const Badge: React.FC<BadgeProps> = (props) => {
-  const { message, icon, size = "md", color = "gray", className, textClassName, textStyle } = props;
+  const { message, icon, size = "md", color = "gray", className, textClassName, style, textStyle } = props;
   const { base, text } = badgeStyles({ size, color });
   return (
-    <span className={cn(base(), className)}>
+    <span style={style} className={cn(base(), className)}>
       {icon && <Icon name={icon} className={cn(text(), "size-3")}/>}
       <Text style={textStyle} className={cn(text(), textClassName)}>{message}</Text>
     </span>

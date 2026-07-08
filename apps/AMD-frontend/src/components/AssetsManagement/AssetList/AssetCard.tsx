@@ -20,13 +20,13 @@ export const AssetCard: React.FC<AssetCardProp> = props => {
   return (
     <div
       className={cn(
-        'border border-bg-card shadow-lg rounded-lg p-4 border-l-4 flex flex-col w-full gap-3 cursor-pointer',
+        'border border-bg-card shadow-lg rounded-lg p-2 xl:p-4 border-l-4 flex flex-col w-full gap-3 cursor-pointer',
         asset.type === AssetType.Solar && 'border-l-accent-yellow',
         asset.type === AssetType.BESS && 'border-l-blue-tint',
         asset.type === AssetType['Solar + BESS'] && 'border-l-violet-tint',
       )}>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
-        <Text variant="h4" className="leading-tight break-words">
+      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 pt-[2px]">
+        <Text variant="h4" className="leading-tight break-words text-[18px]!">
           {asset.name}
         </Text>
         <Badge
@@ -38,7 +38,7 @@ export const AssetCard: React.FC<AssetCardProp> = props => {
       <Text variant="small" className="text-text-secondary!">
         {asset.asset_id}
       </Text>
-      <div className="grid grid-cols-2 mt-1 gap-x-4 gap-y-4">
+      <div className="grid grid-cols-2 mt-1 gap-x-2 gap-y-2">
         <div className="flex items-start gap-2">
           <Icon name="charge-circle" className="mt-0.5 text-text-secondary/70" />
           <Text variant="caption" className="text-secondary! font-InterMedium!">
@@ -74,11 +74,11 @@ export const AssetCard: React.FC<AssetCardProp> = props => {
 
       <div className="grid grid-cols-2 gap-2">
         <WithRole roles={[UserRole.Admin]} fallback={<div />}>
-          <Button variant="secondary" className="w-full justify-center" onClick={() => onReassign(asset)}>
+          <Button variant="secondary" className="w-full justify-center px-2 text-xs xl:px-4 xl:text-base" onClick={() => onReassign(asset)}>
             Reassign
           </Button>
         </WithRole>
-        <Button variant="primary" className="w-full justify-center" onClick={() => onView?.(asset)}>
+        <Button variant="primary" className="w-full justify-center px-2 text-xs xl:px-4 xl:text-base" onClick={() => onView?.(asset)}>
           View Details
         </Button>
       </div>

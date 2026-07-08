@@ -48,6 +48,10 @@ def allowed_roles(*allowed_roles: int):
         if not user:
             raise UserNotAuthorized("User not authenticated")
 
+        # by default allow all
+        if len(allowed_roles) == 0:
+            return user
+
         user_role = user.get("role")
         if user_role is None:
             raise UserNotAuthorized("User role not found")

@@ -6,6 +6,19 @@ import {Sort, Text, Tooltip, Icon, MultiMonthYearPicker, Skeleton} from '@/ui-ki
 import {customMonthlySimulationResultsRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {getCustomMonthlySimulationResultsExport} from '@/services/api';
 import {
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  LabelList,
+  Line,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+  type LabelProps,
+  type TooltipContentProps,
+} from 'recharts';
+import {
   customMonthlySimulationResults,
   customConfigData,
   customSimulationSuccess,
@@ -16,6 +29,7 @@ import {
 import {allProjectsData} from '@/services/redux/selectors';
 import type {RootState} from '@/services/redux/rootReducer';
 import {useChartsActionV2} from '@/hooks';
+import {downloadElementAsImage} from '@/utils';
 
 interface MonthlyPerformanceRow {
   month: string;
@@ -30,10 +44,124 @@ interface MonthlyPerformanceRow {
   curtailed: number;
 }
 
+interface MonthlyPerformanceChartRow extends MonthlyPerformanceRow {
+  axisMonth: string;
+  tooltipMonth: string;
+}
+
 // Ghost loader for table
 const ghostTableRows = Array.from({length: 8}, (_, i) => ({id: `ghost-row-${i}`}));
 
 const PAGE_SIZE = 100;
+
+const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+const chartColors = {
+  wastedEnergy: '#FF646A',
+  loadMet: '#12A9E8',
+  activeLoadMet: '#0A87BD',
+  greenHours: '#009F4D',
+  labelBg: 'bg-[linear-gradient(180deg,#BEFFD9_0%,#DFFFEC_100%)]!',
+  axis: '#CBD5E1',
+  grid: '#E2E8F0',
+  text: '#111827',
+  tick: '#475569',
+};
+
+const formatPercent = (value: number | string | boolean | null | undefined) => {
+  const numericValue = Number(value ?? 0);
+  if (!Number.isFinite(numericValue)) return '0%';
+
+  return `${Number.isInteger(numericValue) ? numericValue.toFixed(0) : numericValue.toFixed(1)}%`;
+};
+
+const getMonthMeta = (month: string, fallbackYear?: number | string) => {
+  const normalizedMonth = String(month ?? '').trim();
+  const numericMonth = Number(normalizedMonth);
+  const monthIndex =
+    Number.isInteger(numericMonth) && numericMonth >= 1 && numericMonth <= 12
+      ? numericMonth - 1
+      : MONTH_NAMES.findIndex(name => normalizedMonth.toLowerCase().includes(name.toLowerCase()));
+  const axisMonth = monthIndex >= 0 ? MONTH_LABELS[monthIndex] : normalizedMonth.slice(0, 3) || '-';
+  const fullMonth = monthIndex >= 0 ? MONTH_NAMES[monthIndex] : normalizedMonth;
+  const yearMatch = normalizedMonth.match(/\b(19|20)\d{2}\b/);
+  const year = yearMatch?.[0] ?? fallbackYear;
+
+  return {
+    axisMonth,
+    tooltipMonth: year ? `${fullMonth}, ${year}` : fullMonth,
+  };
+};
+
+const MonthlyPerformanceLegend = () => (
+  <div className="mb-8 flex justify-end">
+    <div className="flex flex-wrap items-center justify-end gap-8 text-small font-InterMedium text-[#0F172A]">
+      <div className="flex items-center gap-2">
+        <div className="w-4.25 h-3.5 rounded-xs bg-[linear-gradient(180deg,#FF6767_6.98%,#FF808E_126.16%)]"></div>
+        <span>Wasted Energy (%)</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <div className="w-4.25 h-3.5 rounded-xs bg-[linear-gradient(180deg,#00A8FA_0%,#7EC9EE_161.91%)]"></div>
+        <span>Load Met (%)</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="relative h-4 w-8">
+          <span className="absolute left-0 right-0 top-1/2 h-0.5 -translate-y-1/2" style={{backgroundColor: chartColors.greenHours}} />
+
+          <span
+            className="absolute left-1/2 top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white border-[3px]"
+            style={{borderColor: chartColors.greenHours}}
+          />
+        </span>
+
+        <span>Green Hours (%)</span>
+      </div>
+    </div>
+  </div>
+);
+
+const MonthlyPerformanceTooltip = ({active, payload}: TooltipContentProps<any, any>) => {
+  if (!active || !payload?.length) return null;
+
+  const row = payload[0]?.payload as MonthlyPerformanceChartRow | undefined;
+  if (!row) return null;
+
+  return (
+    <div className="min-w-45 rounded-md border border-[#E5E7EB] bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.14)]">
+      <p className="mb-3 text-sm font-InterSemiBold text-[#111827]">{row.tooltipMonth}</p>
+      <div className="space-y-2 text-small font-InterMedium">
+        <p style={{color: chartColors.loadMet}}>
+          Load met : <span className="font-InterSemiBold">{formatPercent(row.loadMet)}</span>
+        </p>
+        <p style={{color: chartColors.greenHours}}>
+          Green Hours : <span className="font-InterSemiBold">{formatPercent(row.greenEnergy)}</span>
+        </p>
+        <p style={{color: '#FF1F2D'}}>
+          Wasted Energy : <span className="font-InterSemiBold">{formatPercent(row.wastedEnergy)}</span>
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const GreenHoursLabel = ({x, y, value}: LabelProps) => {
+  if (x === undefined || y === undefined || value === undefined) return null;
+
+  const label = formatPercent(value);
+  const width = Math.max(28, label.length * 7 + 10);
+  const numericX = Number(x);
+  const numericY = Number(y);
+
+  return (
+    <g transform={`translate(${numericX - width / 2}, ${numericY - 30})`}>
+      <rect width={width} height={22} rx={6} fill="url(#labelGradient)" />
+      <text x={width / 2} y={14} textAnchor="middle" fill="#0F172A" fontSize={10} fontFamily="Inter, sans-serif" fontWeight={600}>
+        {label}
+      </text>
+    </g>
+  );
+};
 
 function MonthlyPerformanceTableGhostLoader() {
   return (
@@ -131,6 +259,7 @@ interface MonthlyDataTableProps {
   readonly onAppliedMonthsChange?: (months: MonthYear[]) => void;
   readonly sortDirection?: 'asc' | 'desc' | null;
   readonly onSortDirectionChange?: (direction: 'asc' | 'desc' | null) => void;
+  showChart?: boolean;
 }
 
 export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
@@ -143,6 +272,7 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
     onAppliedMonthsChange,
     sortDirection: controlledSortDirection,
     onSortDirectionChange,
+    showChart = true,
   } = props;
   const dispatch = useDispatch();
   const monthlyData = useSelector(customMonthlySimulationResults);
@@ -184,6 +314,7 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
       <MonthlyPerformanceTable
         {...props}
         isFullScreen
+        showChart={false}
         pendingMonths={pendingMonths}
         appliedMonths={appliedMonths}
         onPendingMonthsChange={setPendingMonths}
@@ -193,6 +324,19 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
       />
     ),
   });
+
+  const {
+    chartRef,
+    onMaximize: onChartMaximize,
+    onMinimize: onChartMinimize,
+  } = useChartsActionV2({
+    downloadFileName: '',
+    renderFullScreen: () => <MonthlyPerformanceChartSection chartRows={chartRows} isFullScreen onMinimize={onChartMinimize} />,
+  });
+
+  const handleDownloadGraph = useCallback(async () => {
+    await downloadElementAsImage(chartRef.current, 'monthly_dispatch_chart.png');
+  }, []);
 
   const simulation_id = customConfig?.simulation_id ?? simulData?.id ?? proSimulData?.id;
 
@@ -261,6 +405,10 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
 
   // Get API year for MonthYearPicker
   const apiYear = monthlyData?.year;
+  const chartRows: MonthlyPerformanceChartRow[] = resultRows.map(row => ({
+    ...row,
+    ...getMonthMeta(row.month, apiYear),
+  }));
 
   // Handle month selection change (from Done button)
   const handleMonthsChange = (months: MonthYear[]) => {
@@ -332,7 +480,7 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
     },
     {
       name: 'greenEnergy',
-      title: <ColumnHeader label="Green Energy (%)" tooltip="Percentage of energy from renewable sources" />,
+      title: <ColumnHeader label="Green Hours (%)" tooltip="Percentage of energy from renewable sources" />,
       width: {minWidth: '140px'},
       align: 'center',
       render: row => renderCell(row.greenEnergy),
@@ -396,7 +544,7 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
   }
 
   return (
-    <div ref={tableRef} className="bg-white">
+    <div className="bg-white">
       <div className={`flex w-full ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
         {!isFullScreen && (
           <div className="flex justify-between w-full">
@@ -417,50 +565,203 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
           </div>
         )}
       </div>
-
-      <div className={`flex w-full items-center ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
-        {!isFullScreen && (
-          <div className="mb-4 flex items-center gap-4">
-            <MultiMonthYearPicker
-              label=""
-              value={pendingMonths}
-              onChange={handleMonthsChange}
-              className="min-w-60"
-              placeholder="Select Months"
-              defaultYear={apiYear}
-              doneText="Apply"
-              lockYear
-            />
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleClearFilters}
-                className="border-primary cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
-                <Icon name="cross" className="text-text-secondary size-3" />
-                <Text variant="caption">Clear Filters</Text>
-              </button>
-            )}
-          </div>
-        )}
-        <div className="flex items-center gap-5 pt-1">
-          <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
-          {isFullScreen ? (
-            <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
-          ) : (
-            <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+      {showChart && (
+        <div ref={chartRef}>
+          <MonthlyPerformanceChartSection
+            chartRows={chartRows}
+            isFullScreen={false}
+            onMaximize={onChartMaximize}
+            onMinimize={onChartMinimize}
+            onDownload={handleDownloadGraph}
+          />
+        </div>
+      )}
+      <div ref={tableRef}>
+        <div className={`flex w-full items-center ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
+          {!isFullScreen && (
+            <div className="flex items-center gap-4">
+              <MultiMonthYearPicker
+                label=""
+                value={pendingMonths}
+                onChange={handleMonthsChange}
+                className="min-w-60"
+                placeholder="Select Months"
+                defaultYear={apiYear}
+                doneText="Apply"
+                lockYear
+              />
+              {hasActiveFilters && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="border-primary cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+                  <Icon name="cross" className="text-text-secondary size-3" />
+                  <Text variant="caption">Clear Filters</Text>
+                </button>
+              )}
+            </div>
           )}
+          <div className={`flex ${isFullScreen ? 'justify-between' : 'justify-end'} w-full gap-5`}>
+            {isFullScreen && (
+              <div className="flex flex-col">
+                <Text variant="h3">Monthly Performance</Text>
+                <Text variant="14R" className="text-text-secondary! my-1.5">
+                  Delivery and green energy breakdown by month
+                </Text>
+              </div>
+            )}
+            <div className="flex items-center gap-5">
+              <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
+              {isFullScreen ? (
+                <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
+              ) : (
+                <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+              )}
+            </div>
+          </div>
+        </div>
+        <DataTable
+          data={resultRows}
+          columns={columns}
+          totalPages={monthlyData?.total_pages ?? 1}
+          currentPage={monthlyData?.current_page ?? 1}
+          totalResult={resultRows.length}
+          onPageChange={setCurrentPage}
+          pageSize={PAGE_SIZE}
+          stickyHeader
+          persistHorizontalScrollKey={simulation_id ? `bess-monthly-results-${simulation_id}` : undefined}
+        />
+      </div>
+    </div>
+  );
+};
+
+const MonthlyPerformanceChartSection = ({chartRows, isFullScreen, onMaximize, onMinimize, onDownload}: any) => {
+  return (
+    <>
+      <div className="flex items-start gap-3 mb-4 mt-1.3">
+        <div className="bg-[#C8FFF8] size-8.75 rounded-sm flex justify-center items-center">
+          <Icon name="difference" className="text-secondary! size-4.75" />{' '}
+        </div>
+        <div>
+          <Text variant={'subtitle1'} className="text-secondary! font-InterSemiBold!">
+            Monthly breakdown
+          </Text>
+          <Text variant={'12R'} className="text-text-secondary!">
+            Bars compare monthly Delivery and Wastage, while the line shows Green Energy percentage achieved for each month.
+          </Text>
         </div>
       </div>
-      <DataTable
-        data={resultRows}
-        columns={columns}
-        totalPages={monthlyData?.total_pages ?? 1}
-        currentPage={monthlyData?.current_page ?? 1}
-        totalResult={resultRows.length}
-        onPageChange={setCurrentPage}
-        pageSize={PAGE_SIZE}
-        stickyHeader
-      />
-    </div>
+
+      <div className="mb-8 rounded-xl border border-[#E2E8F0] bg-white px-5 pb-5 pt-5">
+        <div className="mb-8 flex justify-end">
+          <div className="flex items-center gap-5 no-export">
+            <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={onDownload} />
+            {isFullScreen ? (
+              <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMinimize} />
+            ) : (
+              <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={onMaximize} />
+            )}
+          </div>
+        </div>
+
+        <MonthlyPerformanceLegend />
+
+        {chartRows.length ? (
+          <ResponsiveContainer width="100%" height={310}>
+            <ComposedChart reverseStackOrder={false} data={chartRows} margin={{top: 8, right: 14, left: 8, bottom: 30}} barCategoryGap="18%" barGap={8}>
+              <defs>
+                <defs>
+                  <linearGradient id="labelGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#BEFFD9" />
+                    <stop offset="100%" stopColor="#DFFFEC" />
+                  </linearGradient>
+                </defs>
+                <linearGradient id="loadMetGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#00A8FA" />
+                  <stop offset="100%" stopColor="#7EC9EE" />
+                </linearGradient>
+
+                <linearGradient id="wastedEnergyGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#FF6767" />
+                  <stop offset="100%" stopColor="#FF808E" />
+                </linearGradient>
+
+                <linearGradient id="loadMetHoverGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#047CB7" />
+                  <stop offset="100%" stopColor="#1FA2E4" />
+                </linearGradient>
+
+                <linearGradient id="wastedEnergyHoverGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="6.98%" stopColor="#BD1010" />
+                  <stop offset="100%" stopColor="#FD465B" />
+                </linearGradient>
+              </defs>
+              <CartesianGrid stroke={chartColors.grid} strokeDasharray="4 4" vertical={false} />
+              <XAxis
+                dataKey="axisMonth"
+                axisLine={{stroke: chartColors.axis}}
+                tickLine={false}
+                tick={{fontSize: 12, fill: chartColors.tick, fontFamily: 'Inter, sans-serif'}}
+                tickMargin={12}
+                label={{
+                  value: 'Months',
+                  position: 'insideBottom',
+                  offset: -22,
+                  style: {fill: chartColors.text, fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
+                }}
+              />
+              <YAxis
+                domain={[0, 100]}
+                ticks={[0, 25, 50, 75, 100]}
+                axisLine={{stroke: chartColors.axis}}
+                tickLine={false}
+                tick={{fontSize: 12, fill: chartColors.tick, fontFamily: 'Inter, sans-serif'}}
+                label={{
+                  value: 'Percentage (%)',
+                  angle: -90,
+                  position: 'insideLeft',
+                  offset: -2,
+                  style: {fill: chartColors.text, fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
+                }}
+              />
+              <RechartsTooltip content={props => <MonthlyPerformanceTooltip {...props} />} cursor={{fill: 'transparent'}} />
+              <Bar
+                dataKey="wastedEnergy"
+                name="Wasted Energy (%)"
+                fill="url(#wastedEnergyGradient)"
+                activeBar={{fill: 'url(#wastedEnergyHoverGradient)'}}
+                radius={[4, 4, 0, 0]}
+                barSize={16}
+              />
+              <Bar
+                dataKey="loadMet"
+                name="Load Met (%)"
+                fill="url(#loadMetGradient)"
+                activeBar={{fill: 'url(#loadMetHoverGradient)'}}
+                radius={[4, 4, 0, 0]}
+                barSize={16}
+              />
+              <Line
+                type="monotone"
+                dataKey="greenEnergy"
+                name="Green Hours (%)"
+                stroke={chartColors.greenHours}
+                strokeWidth={2}
+                dot={{r: 4, fill: '#FFFFFF', stroke: chartColors.greenHours, strokeWidth: 2}}
+                activeDot={{r: 5, fill: '#FFFFFF', stroke: chartColors.greenHours, strokeWidth: 2}}>
+                <LabelList dataKey="greenEnergy" content={props => <GreenHoursLabel {...props} />} />
+              </Line>
+            </ComposedChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="flex h-72 items-center justify-center rounded-sm border border-dashed border-border bg-bg-card/40">
+            <Text variant="14R" className="text-text-secondary!">
+              No monthly performance data available.
+            </Text>
+          </div>
+        )}
+      </div>
+    </>
   );
 };

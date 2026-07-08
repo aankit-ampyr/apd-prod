@@ -12,8 +12,11 @@ const sections: SideNavSection[] = [
 export function SideNav() {
   const location = useLocation();
   const pathname = getNormalizedRoute(location.pathname);
-
   return (
-    <SideNavBar sections={sections} platformLabel="Super Admin" isRouteActive={route => isAppRouteActive(pathname, {check: route})} />
+    <SideNavBar
+      sections={sections}
+      platformLabel="Super Admin"
+      isRouteActive={route => isAppRouteActive(pathname, {check: route})}
+    />
   );
 }

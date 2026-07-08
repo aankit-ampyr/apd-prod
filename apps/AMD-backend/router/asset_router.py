@@ -29,7 +29,7 @@ class AssetRouter:
 
         # files
         self.router.get("/{asset_id}/files")(self.controller.get_file_history)
-        self.router.get("/{asset_id}/files/{file_id}/export")(self.controller.download_file_history)
+        self.router.get("/{asset_id}/files/{file_id}/export")(self.controller.download_file)
         self.router.delete("/{asset_id}/files/{file_id}")(self.controller.delete_asset_file)
 
     

@@ -12,8 +12,6 @@ import React, {
 import { ConfirmModal } from "../components/ConfirmModal";
 
 export type ConfirmRenderProps = {
-  confirm: () => void;
-  cancel: () => void;
   onConfirm: () => void;
   onCancel: () => void;
 };

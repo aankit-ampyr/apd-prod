@@ -79,6 +79,8 @@ interface SelectInputProps extends Omit<
   labelClassName?: string;
   info?: boolean;
   infoMessage?: string;
+  valueLabelFormatter?: (item: SelectInputItem) => string;
+  selectedDisplayLabel?: string;
 }
 
 export const SelectInput: React.FC<SelectInputProps> = (props) => {
@@ -110,8 +112,9 @@ export const SelectInput: React.FC<SelectInputProps> = (props) => {
     readonly,
     labelClassName,
     dropdownItemRenderer,
+    valueLabelFormatter = (v) => v.label,
+    selectedDisplayLabel,
   } = props;
-
   const [isFocused, setIsFocused] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -139,6 +142,8 @@ export const SelectInput: React.FC<SelectInputProps> = (props) => {
     () => options?.find((option) => option.id === value) ?? null,
     [options, value],
   );
+  const displayLabel = selectedOption ? valueLabelFormatter(selectedOption) : selectedDisplayLabel;
+  const hasSelectedValue = Boolean(selectedOption || selectedDisplayLabel);
 
   const handleToggle = () => {
     if (disabled) return;
@@ -249,12 +254,12 @@ export const SelectInput: React.FC<SelectInputProps> = (props) => {
             variant="caption"
             className={cn(
               "grow text-start mt-1 truncate",
-              selectedOption ? "text-text-primary!" : "text-text-placeholder!",
+              hasSelectedValue ? "text-text-primary!" : "text-text-placeholder!",
               disabled && "text-disabled",
               textClassName,
             )}
           >
-            {selectedOption?.label || placeholder}
+            {displayLabel ?? placeholder}
           </Text>
 
           {!hideDropdown && (

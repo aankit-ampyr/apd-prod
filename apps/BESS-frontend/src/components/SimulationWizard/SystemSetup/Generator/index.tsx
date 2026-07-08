@@ -338,12 +338,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
             </div>
             <div className="bg-white p-4 mt-5 border-[1.4px] border-border rounded-md w-full">
               <div className="flex items-center gap-3.5">
-                <Toggle
-                  size="sm"
-                  value={status}
-                  onToggle={setGuardedStatus}
-                  disabled={isReadOnly}
-                />
+                <Toggle size="sm" value={status} onToggle={setGuardedStatus} disabled={isReadOnly} />
                 <Text variant="body2" className="text-text-primary! font-InterMedium!">
                   Include diesel/gas generator in system
                 </Text>
@@ -458,7 +453,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
                     {/* Only show advanced fuel curve table and fields if Variable mode and advancedFuelCurve is true */}
                     {!isBinary && advancedFuelCurve ? (
                       <>
-                        <div className="flex items-center gap-96">
+                        <div className="flex items-center gap-86">
                           <NumberStepperInput
                             label="F0 (No-load coeff, L/hr/kW)"
                             value={noLoadCoeff}

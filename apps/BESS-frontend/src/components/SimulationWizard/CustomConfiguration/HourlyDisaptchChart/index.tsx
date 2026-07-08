@@ -266,7 +266,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
 
   const cards = [
     {
-      title: 'Delivery',
+      title: 'Delivery Hours',
       value: hourData?.total_delivery_hours ?? '-',
       icon: <Icon name="truck" className="text-primary! size-4.75!" />,
     },
@@ -312,7 +312,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
       {!isFullScreen && (
         <div className="flex items-center justify-between gap-4">
           <div className="flex flex-col">
-            <Text variant="h3">Hourly Dispatch Chart</Text>
+            <Text variant="h3">Hourly Dispatch Graph</Text>
             <Text variant="14R" className="text-text-secondary! my-1.5">
               Delivery and green energy breakdown by hour. Hover the graph for hourly values.
             </Text>

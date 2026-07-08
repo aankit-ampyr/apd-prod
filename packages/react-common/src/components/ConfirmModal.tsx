@@ -46,7 +46,7 @@ const DefaultConfirmBody = ({
         {title ? (
           <Text
             variant="h3"
-            className={cn("text-text-primary! font-SpaceGroteskBold!", classNames?.title)}
+            className={cn("font-InterBold!", classNames?.title)}
             style={styles?.title}
           >
             {title}
@@ -122,8 +122,6 @@ export const ConfirmModal = ({
   }
 
   const renderProps: ConfirmRenderProps = {
-    confirm: onConfirm,
-    cancel: onCancel,
     onConfirm,
     onCancel,
   };

@@ -21,3 +21,7 @@
 # Local env files (use env_file in docker-compose)
 **/.env.local
 **/.env.*.local
+
+docker-compose.yml
+Dockerfile
+.env

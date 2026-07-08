@@ -1,7 +1,38 @@
-import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import type { APIResponse, CustomConfig, CustomHourlyChartResult, CustomHourlyResult, CustomMonthlyResult, DGSizing, DispatchRule, GeneratorDg, GeneratorDgFuelCurve, GetCustomConfig, GetCustomSimulationResult, GetDGSizing, GetDispatchRule, GetGeneratorDg, GetMultiYearProgress, GetMultiYearProjection, GetSimulationProgress, InitiateSimulation, MultiYearProjection, MultiYearProjectionRequest, RunSimulationRequest, SimulationListRequest, SimulationResultRequest, SolarProfileSourceListRequest, UpdateSimulationRequest } from '@/interface/api-interface';
-import { Simulation, SolarProfileSource } from '@/interface/common-interface';
-
+import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
+import type {
+  APIResponse,
+  CustomConfig,
+  CustomHourlyChartResult,
+  CustomHourlyResult,
+  CustomMonthlyResult,
+  DetailedGreenAnalysis,
+  DGSizing,
+  DispatchRule,
+  GeneratorDg,
+  GeneratorDgFuelCurve,
+  GetCustomConfig,
+  GetCustomSimulationResult,
+  GetDetailedGreenAnalysis,
+  GetDetailedGreenAnalysisSimulationResult,
+  GetDGSizing,
+  GetDispatchRule,
+  GetGeneratorDg,
+  GetGreenAnalysis,
+  GetMultiYearProgress,
+  GetMultiYearProjection,
+  GetSimulationProgress,
+  GreenAnalysis,
+  GreenAnalysisResultRequest,
+  InitiateSimulation,
+  MultiYearProjection,
+  MultiYearProjectionRequest,
+  RunSimulationRequest,
+  SimulationListRequest,
+  SimulationResultRequest,
+  SolarProfileSourceListRequest,
+  UpdateSimulationRequest,
+} from '@/interface/api-interface';
+import {Simulation, SolarProfileSource} from '@/interface/common-interface';
 
 export interface LoadProfileRequest {
   simulation_id: number;
@@ -198,6 +229,10 @@ interface SimulationWizardState {
   solarProfileSuccess: string | false;
   solarProfileData: SolarProfileData | null;
 
+  solarProfileFetchLoading: boolean;
+  solarProfileFetchSuccess: string | false;
+  solarProfileFetchError: string | false;
+
   // upload solar CSV
   uploadSolarCSVLoading: boolean;
   uploadSolarCSVError: string | false;
@@ -237,6 +272,10 @@ interface SimulationWizardState {
   dgSizingLoading: boolean;
   dgSizingError: string | false;
   dgSizingSuccess: string | false;
+
+  getDgSizingLoading: boolean;
+  getDgSizingError: string | false;
+  getDgSizingSuccess: string | false;
   dgSizingData: GetDGSizing['response']['data'] | null;
 
   simulationListLoading: boolean;
@@ -281,6 +320,10 @@ interface SimulationWizardState {
   customConfigLoading: boolean;
   customConfigError: string | false;
   customConfigSuccess: string | false;
+
+  getCustomConfigLoading: boolean;
+  getCustomConfigError: string | false;
+  getCustomConfigSuccess: string | false;
   customConfigData: CustomConfig['response']['data'] | null;
 
   runCustomSimulationLoading: boolean;
@@ -334,7 +377,6 @@ interface SimulationWizardState {
   stopMultiYearProjectionSuccess: string | false;
   stopMultiYearProjectionError: string | false;
 
-
   multiYearProjectionResultsLoading: boolean;
   multiYearProjectionResultsSuccess: string | false;
   multiYearProjectionResultsError: string | false;
@@ -344,6 +386,62 @@ interface SimulationWizardState {
   multiYearProjectionProgressSuccess: string | false;
   multiYearProjectionProgressError: string | false;
   multiYearProjectionProgressData: GetMultiYearProgress['response']['data'] | null;
+
+  greenAnalysisLoading: boolean;
+  greenAnalysisSuccess: string | false;
+  greenAnalysisError: string | false;
+
+  greenAnalysisDataLoading: boolean;
+  greenAnalysisDataSuccess: string | false;
+  greenAnalysisDataError: string | false;
+  greenAnalysisData: GetGreenAnalysis['response']['data'] | null;
+
+  showGreenAnalysisResults: boolean;
+
+  runGreenAnalysisLoading: boolean;
+  runGreenAnalysisSuccess: string | false;
+  runGreenAnalysisError: string | false;
+  runGreenAnalysisData: RunSimulationRequest['response']['data'] | null;
+
+  stopGreenAnalysisLoading: boolean;
+  stopGreenAnalysisSuccess: string | false;
+  stopGreenAnalysisError: string | false;
+
+  greenAnalysisResultsLoading: boolean;
+  greenAnalysisResultsError: string | false;
+  greenAnalysisResultsSuccess: string | false;
+  greenAnalysisResultsData: GreenAnalysisResultRequest['response']['data'] | null;
+
+  greenAnalysisProgressLoading: boolean;
+  greenAnalysisProgressError: string | false;
+  greenAnalysisProgressSuccess: string | false;
+  greenAnalysisProgressData: GetSimulationProgress['response']['data'] | null;
+
+  showDetailedGreenAnalysis: boolean;
+
+  detailedGreenAnalysisLoading: boolean;
+  detailedGreenAnalysisSuccess: string | false;
+  detailedGreenAnalysisError: string | false;
+
+  detailedGreenAnalysisDataLoading: boolean;
+  detailedGreenAnalysisDataSuccess: string | false;
+  detailedGreenAnalysisDataError: string | false;
+  detailedGreenAnalysisData: GetDetailedGreenAnalysis['response']['data'] | null;
+
+  runDetailedGreenAnalysisLoading: boolean;
+  runDetailedGreenAnalysisSuccess: string | false;
+  runDetailedGreenAnalysisError: string | false;
+  runDetailedGreenAnalysisData: RunSimulationRequest['response']['data'] | null;
+
+  detailedGreenAnalysisProgressLoading: boolean;
+  detailedGreenAnalysisProgressSuccess: string | false;
+  detailedGreenAnalysisProgressError: string | false;
+  detailedGreenAnalysisProgressData: GetMultiYearProgress['response']['data'] | null;
+
+  detailedGreenAnalysisResultLoading: boolean;
+  detailedGreenAnalysisResultError: string | false;
+  detailedGreenAnalysisResultSuccess: string | false;
+  detailedGreenAnalysisResultData: GetDetailedGreenAnalysisSimulationResult['response']['data'] | null;
 }
 
 const initialState: SimulationWizardState = {
@@ -367,6 +465,10 @@ const initialState: SimulationWizardState = {
   solarProfileError: false,
   solarProfileSuccess: false,
   solarProfileData: null,
+
+  solarProfileFetchLoading: false,
+  solarProfileFetchSuccess: false,
+  solarProfileFetchError: false,
 
   // upload solar CSV
   uploadSolarCSVLoading: false,
@@ -407,6 +509,10 @@ const initialState: SimulationWizardState = {
   dgSizingLoading: false,
   dgSizingError: false,
   dgSizingSuccess: false,
+
+  getDgSizingLoading: false,
+  getDgSizingError: false,
+  getDgSizingSuccess: false,
   dgSizingData: null,
 
   simulationListLoading: false,
@@ -451,6 +557,10 @@ const initialState: SimulationWizardState = {
   customConfigLoading: false,
   customConfigError: false,
   customConfigSuccess: false,
+
+  getCustomConfigLoading: false,
+  getCustomConfigError: false,
+  getCustomConfigSuccess: false,
   customConfigData: null,
   showDetailedAnalysis: false,
 
@@ -514,6 +624,62 @@ const initialState: SimulationWizardState = {
   multiYearProjectionProgressSuccess: false,
   multiYearProjectionProgressError: false,
   multiYearProjectionProgressData: null,
+
+  greenAnalysisLoading: false,
+  greenAnalysisSuccess: false,
+  greenAnalysisError: false,
+
+  greenAnalysisDataLoading: false,
+  greenAnalysisDataSuccess: false,
+  greenAnalysisDataError: false,
+  greenAnalysisData: null,
+
+  showGreenAnalysisResults: false,
+
+  runGreenAnalysisLoading: false,
+  runGreenAnalysisSuccess: false,
+  runGreenAnalysisError: false,
+  runGreenAnalysisData: null,
+
+  stopGreenAnalysisLoading: false,
+  stopGreenAnalysisSuccess: false,
+  stopGreenAnalysisError: false,
+
+  greenAnalysisResultsLoading: false,
+  greenAnalysisResultsError: false,
+  greenAnalysisResultsSuccess: false,
+  greenAnalysisResultsData: null,
+
+  greenAnalysisProgressLoading: false,
+  greenAnalysisProgressError: false,
+  greenAnalysisProgressSuccess: false,
+  greenAnalysisProgressData: null,
+
+  showDetailedGreenAnalysis: false,
+
+  detailedGreenAnalysisLoading: false,
+  detailedGreenAnalysisSuccess: false,
+  detailedGreenAnalysisError: false,
+
+  detailedGreenAnalysisDataLoading: false,
+  detailedGreenAnalysisDataSuccess: false,
+  detailedGreenAnalysisDataError: false,
+  detailedGreenAnalysisData: null,
+
+  runDetailedGreenAnalysisLoading: false,
+  runDetailedGreenAnalysisSuccess: false,
+  runDetailedGreenAnalysisError: false,
+  runDetailedGreenAnalysisData: null,
+
+  detailedGreenAnalysisProgressLoading: false,
+  detailedGreenAnalysisProgressSuccess: false,
+  detailedGreenAnalysisProgressError: false,
+  detailedGreenAnalysisProgressData: null,
+
+  detailedGreenAnalysisResultLoading: false,
+  detailedGreenAnalysisResultError: false,
+  detailedGreenAnalysisResultSuccess: false,
+  detailedGreenAnalysisResultData: null,
 };
 
 // ==============================
@@ -524,23 +690,16 @@ const simulationWizardSlice = createSlice({
   name: 'simulationWizard',
   initialState,
   reducers: {
-
     // ======================================
     // load profile calculation (PREVIEW)
     // ======================================
-    loadProfileRequest: (
-      state,
-      action: PayloadAction<LoadProfileRequest>
-    ) => {
+    loadProfileRequest: (state, action: PayloadAction<LoadProfileRequest>) => {
       state.loadProfileLoading = true;
       state.loadProfileError = false;
       state.loadProfileSuccess = false;
     },
 
-    loadProfileSuccess: (
-      state,
-      action: PayloadAction<LoadProfileResponse>
-    ) => {
+    loadProfileSuccess: (state, action: PayloadAction<LoadProfileResponse>) => {
       state.loadProfileLoading = false;
       state.loadProfileSuccess = action.payload.status_code;
 
@@ -549,10 +708,7 @@ const simulationWizardSlice = createSlice({
       }
     },
 
-    loadProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    loadProfileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.loadProfileLoading = false;
       state.loadProfileError = action.payload.status_code;
 
@@ -587,10 +743,7 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // initiate / fetch simulation
     // ======================================
-    initiateSimulationRequest: (
-      state,
-      action: PayloadAction<InitiateSimulationRequest>
-    ) => {
+    initiateSimulationRequest: (state, action: PayloadAction<InitiateSimulationRequest>) => {
       state.simulationLoading = true;
       state.simulationError = false;
       state.simulationSuccess = false;
@@ -610,12 +763,16 @@ const simulationWizardSlice = createSlice({
       state.generatorDgData = null;
       state.dispatchRuleData = null;
       state.dgSizingData = null;
+      state.greenAnalysisData = null;
+      state.greenAnalysisProgressData = null;
+      state.greenAnalysisResultsData = null;
+      state.showGreenAnalysisResults = false;
+      state.greenAnalysisDataLoading = false;
+      state.greenAnalysisProgressLoading = false;
+      state.greenAnalysisResultsLoading = false;
     },
 
-    initiateSimulationSuccess: (
-      state,
-      action: PayloadAction<{ data: InitiateSimulationResponse, project_name?: string }>
-    ) => {
+    initiateSimulationSuccess: (state, action: PayloadAction<{data: InitiateSimulationResponse; project_name?: string}>) => {
       state.simulationLoading = false;
       state.simulationSuccess = action.payload.data.status_code;
 
@@ -624,14 +781,11 @@ const simulationWizardSlice = createSlice({
         state.currentSelectedProject = {
           id: action.payload.data.data.project_id,
           name: action.payload.project_name || '',
-        }
+        };
       }
     },
 
-    initiateSimulationFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    initiateSimulationFailure: (state, action: PayloadAction<APIResponse>) => {
       state.simulationLoading = false;
       state.simulationError = action.payload.status_code;
     },
@@ -647,19 +801,13 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // SAVE LOAD PROFILE (persist)
     // ======================================
-    saveLoadProfileRequest: (
-      state,
-      action: PayloadAction<LoadProfileRequest>
-    ) => {
+    saveLoadProfileRequest: (state, action: PayloadAction<LoadProfileRequest>) => {
       state.loadProfileLoading = true;
       state.loadProfileError = false;
       state.loadProfileSuccess = false;
     },
 
-    saveLoadProfileSuccess: (
-      state,
-      action: PayloadAction<LoadProfileResponse>
-    ) => {
+    saveLoadProfileSuccess: (state, action: PayloadAction<LoadProfileResponse>) => {
       state.loadProfileLoading = false;
       state.loadProfileSuccess = action.payload.status_code;
       state.loadProfileSaved = action.payload.status_code;
@@ -670,10 +818,7 @@ const simulationWizardSlice = createSlice({
       }
     },
 
-    saveLoadProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    saveLoadProfileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.loadProfileLoading = false;
       state.loadProfileError = action.payload.status_code;
     },
@@ -686,17 +831,14 @@ const simulationWizardSlice = createSlice({
       action: PayloadAction<{
         simulation_id: number;
         params?: Record<string, unknown>;
-      }>
+      }>,
     ) => {
       state.loadProfileLoading = true;
       state.loadProfileError = false;
       state.loadProfileSuccess = false;
     },
 
-    getLoadProfileSuccess: (
-      state,
-      action: PayloadAction<LoadProfileResponse>
-    ) => {
+    getLoadProfileSuccess: (state, action: PayloadAction<LoadProfileResponse>) => {
       state.loadProfileLoading = false;
 
       if (action.payload.data) {
@@ -709,14 +851,11 @@ const simulationWizardSlice = createSlice({
     },
 
     // Clear the load profile saved flag when user starts editing
-    clearLoadProfileSaved: (state) => {
+    clearLoadProfileSaved: state => {
       state.loadProfileSaved = false;
     },
 
-    getLoadProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    getLoadProfileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.loadProfileLoading = false;
       state.loadProfileError = action.payload.status_code;
 
@@ -729,33 +868,26 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // SOLAR PROFILE
     // ======================================
-    solarProfileRequest: (
-      state,
-      action: PayloadAction<SolarProfileRequest>
-    ) => {
-      state.solarProfileLoading = true;
+    solarProfileRequest: (state, action: PayloadAction<SolarProfileRequest>) => {
+      state.solarProfileFetchLoading = true;
+      state.solarProfileFetchError = false;
+      state.solarProfileFetchSuccess = false;
       state.solarProfileError = false;
       state.solarProfileSuccess = false;
     },
 
-    solarProfileSuccess: (
-      state,
-      action: PayloadAction<SolarProfileResponse>
-    ) => {
-      state.solarProfileLoading = false;
-      state.solarProfileSuccess = action.payload.status_code;
+    solarProfileSuccess: (state, action: PayloadAction<SolarProfileResponse>) => {
+      state.solarProfileFetchLoading = false;
+      state.solarProfileFetchSuccess = action.payload.status_code;
 
       if (action.payload.data) {
         state.solarProfileData = action.payload.data;
       }
     },
 
-    solarProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
-      state.solarProfileLoading = false;
-      state.solarProfileError = action.payload.status_code;
+    solarProfileFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.solarProfileFetchLoading = false;
+      state.solarProfileFetchError = action.payload.status_code;
     },
 
     // ======================================
@@ -776,40 +908,34 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // UPLOAD SOLAR PROFILE CSV
     // ======================================
-    uploadSolarCSVRequest: (
-      state,
-      action: PayloadAction<UploadSolarCSVRequest>
-    ) => {
+    uploadSolarCSVRequest: (state, action: PayloadAction<UploadSolarCSVRequest>) => {
       state.uploadSolarCSVLoading = true;
       state.uploadSolarCSVError = false;
       state.uploadSolarCSVSuccess = false;
       state.uploadSolarCSVData = null;
     },
 
-    uploadSolarCSVSuccess: (
-      state,
-      action: PayloadAction<UploadSolarCSVResponse>
-    ) => {
+    uploadSolarCSVSuccess: (state, action: PayloadAction<UploadSolarCSVResponse>) => {
       state.uploadSolarCSVLoading = false;
       state.uploadSolarCSVSuccess = action.payload.status_code;
 
       if (action.payload.data) {
         state.uploadSolarCSVData = action.payload.data;
         state.uploadSolarCSVData.created_at = new Date().toISOString();
-        state.solarProfileSourceList = [...state.solarProfileSourceList, {
-          id: String(action.payload.data.id),
-          name: action.payload.data.name,
-          size: action.payload.data.size,
-          rows: action.payload.data.rows,
-          key: action.payload.data.key,
-        }];
+        state.solarProfileSourceList = [
+          ...state.solarProfileSourceList,
+          {
+            id: String(action.payload.data.id),
+            name: action.payload.data.name,
+            size: action.payload.data.size,
+            rows: action.payload.data.rows,
+            key: action.payload.data.key,
+          },
+        ];
       }
     },
 
-    uploadSolarCSVFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    uploadSolarCSVFailure: (state, action: PayloadAction<APIResponse>) => {
       state.uploadSolarCSVLoading = false;
       state.uploadSolarCSVError = action.payload.status_code;
       state.uploadSolarCSVData = null;
@@ -833,18 +959,12 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // SAVE SOLAR PROFILE
     // ======================================
-    saveSolarProfileRequest: (
-      state,
-      action: PayloadAction<SaveSolarProfileRequest>
-    ) => {
+    saveSolarProfileRequest: (state, action: PayloadAction<SaveSolarProfileRequest>) => {
       state.saveSolarProfileLoading = true;
       state.saveSolarProfileError = false;
     },
 
-    saveSolarProfileSuccess: (
-      state,
-      action: PayloadAction<SolarProfileResponse>
-    ) => {
+    saveSolarProfileSuccess: (state, action: PayloadAction<SolarProfileResponse>) => {
       state.saveSolarProfileLoading = false;
       state.saveSolarProfileSuccess = action.payload.status_code;
 
@@ -854,10 +974,7 @@ const simulationWizardSlice = createSlice({
       }
     },
 
-    saveSolarProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    saveSolarProfileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.saveSolarProfileLoading = false;
       state.saveSolarProfileError = action.payload.status_code;
     },
@@ -873,10 +990,7 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // GET SOLAR PROFILE (fetch saved data)
     // ======================================
-    getSolarProfileRequest: (
-      state,
-      action: PayloadAction<GetSolarProfileRequest>
-    ) => {
+    getSolarProfileRequest: (state, action: PayloadAction<GetSolarProfileRequest>) => {
       state.getSolarProfileLoading = true;
       state.getSolarProfileError = false;
       state.getSolarProfileSuccess = false;
@@ -884,10 +998,7 @@ const simulationWizardSlice = createSlice({
       state.solarProfileData = null;
     },
 
-    getSolarProfileSuccess: (
-      state,
-      action: PayloadAction<SolarProfileResponse>
-    ) => {
+    getSolarProfileSuccess: (state, action: PayloadAction<SolarProfileResponse>) => {
       state.getSolarProfileLoading = false;
       state.getSolarProfileSuccess = action.payload.status_code;
 
@@ -903,14 +1014,11 @@ const simulationWizardSlice = createSlice({
     },
 
     // Clear the solar profile saved flag when user starts editing
-    clearSolarProfileSaved: (state) => {
+    clearSolarProfileSaved: state => {
       state.saveSolarProfileSuccess = false;
     },
 
-    getSolarProfileFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    getSolarProfileFailure: (state, action: PayloadAction<APIResponse>) => {
       state.getSolarProfileLoading = false;
       state.getSolarProfileError = action.payload.status_code;
 
@@ -938,18 +1046,12 @@ const simulationWizardSlice = createSlice({
     // ======================================
     // BESS Container Config
     // ======================================
-    bessContainerConfigRequest: (
-      state,
-      action: PayloadAction<BessContainerConfigRequest>
-    ) => {
+    bessContainerConfigRequest: (state, action: PayloadAction<BessContainerConfigRequest>) => {
       state.bessContainerConfigLoading = true;
       state.bessContainerConfigError = false;
     },
 
-    bessContainerConfigSuccess: (
-      state,
-      action: PayloadAction<BessContainerConfigResponse>
-    ) => {
+    bessContainerConfigSuccess: (state, action: PayloadAction<BessContainerConfigResponse>) => {
       state.bessContainerConfigLoading = false;
       state.bessContainerConfigSuccess = action.payload.status_code;
       if (action.payload.data) {
@@ -957,10 +1059,7 @@ const simulationWizardSlice = createSlice({
       }
     },
 
-    bessContainerConfigFailure: (
-      state,
-      action: PayloadAction<APIResponse>
-    ) => {
+    bessContainerConfigFailure: (state, action: PayloadAction<APIResponse>) => {
       state.bessContainerConfigLoading = false;
       state.bessContainerConfigError = action.payload.status_code;
     },
@@ -974,7 +1073,7 @@ const simulationWizardSlice = createSlice({
       state.bessContainerConfigData = null;
     },
 
-    getBessConfigRequest: (state, action: PayloadAction<{ simulation_id: number }>) => {
+    getBessConfigRequest: (state, action: PayloadAction<{simulation_id: number}>) => {
       state.bessContainerConfigLoading = true;
       state.bessContainerConfigError = false;
     },
@@ -992,7 +1091,7 @@ const simulationWizardSlice = createSlice({
     // ==========================
     // fetch solar profile source
     // ==========================
-    getSolarProfileSourceRequest: (state) => {
+    getSolarProfileSourceRequest: state => {
       state.solarProfileLoading = true;
       state.solarProfileError = false;
       state.solarProfileSuccess = false;
@@ -1011,7 +1110,7 @@ const simulationWizardSlice = createSlice({
     },
 
     // Clear the BESS config saved flag when user starts editing
-    clearBessConfigSaved: (state) => {
+    clearBessConfigSaved: state => {
       state.bessContainerConfigSuccess = false;
     },
 
@@ -1020,19 +1119,16 @@ const simulationWizardSlice = createSlice({
       state.bessContainerConfigError = action.payload.status_code;
     },
 
-    resetCurrentSelectedProject: (state) => {
+    resetCurrentSelectedProject: state => {
       state.currentSelectedProject = null;
       state.simulationData = null;
     },
 
-    resetSimulation: (state) => {
-      return { ...initialState };
+    resetSimulation: state => {
+      return {...initialState};
     },
 
-    generatorDgRequest: (
-      state,
-      action: PayloadAction<GeneratorDg['payload']>
-    ) => {
+    generatorDgRequest: (state, action: PayloadAction<GeneratorDg['payload']>) => {
       state.generatorDgLoading = true;
       state.generatorDgError = false;
     },
@@ -1046,7 +1142,6 @@ const simulationWizardSlice = createSlice({
       state.generatorDgError = action.payload.status_code;
       state.generatorDgData = null;
     },
-
 
     // ======================================
     // get generator DG data
@@ -1073,10 +1168,7 @@ const simulationWizardSlice = createSlice({
     // generator DG fuel curve data
     // ======================================
 
-    generatorDgFuelCurveRequest: (
-      state,
-      action: PayloadAction<GeneratorDgFuelCurve['payload']>
-    ) => {
+    generatorDgFuelCurveRequest: (state, action: PayloadAction<GeneratorDgFuelCurve['payload']>) => {
       state.generatorDgLoading = true;
       state.generatorDgError = false;
     },
@@ -1097,10 +1189,7 @@ const simulationWizardSlice = createSlice({
     // dispatch rule data
     // ======================================
 
-    dispatchRuleRequest: (
-      state,
-      action: PayloadAction<DispatchRule['payload']>
-    ) => {
+    dispatchRuleRequest: (state, action: PayloadAction<DispatchRule['payload']>) => {
       state.dispatchRuleLoading = true;
       state.dispatchRuleError = false;
       state.dispatchRuleSuccess = false;
@@ -1153,10 +1242,7 @@ const simulationWizardSlice = createSlice({
     // DG Sizing
     // ======================================
 
-    dgSizingRequest: (
-      state,
-      action: PayloadAction<DGSizing['payload']>
-    ) => {
+    dgSizingRequest: (state, action: PayloadAction<DGSizing['payload']>) => {
       state.dgSizingLoading = true;
       state.dgSizingError = false;
       state.dgSizingSuccess = false;
@@ -1174,21 +1260,39 @@ const simulationWizardSlice = createSlice({
     // get DG Sizing data
     // ======================================
     getDGSizingRequest: (state, _action: PayloadAction<GetDGSizing['params']>) => {
-      state.dgSizingLoading = true;
-      state.dgSizingError = false;
-      state.dgSizingSuccess = false;
+      state.getDgSizingLoading = true;
+      state.getDgSizingError = false;
+      state.getDgSizingSuccess = false;
     },
     getDGSizingSuccess: (state, action: PayloadAction<GetDGSizing['response']>) => {
-      state.dgSizingLoading = false;
-      state.dgSizingSuccess = action.payload.status_code;
+      state.getDgSizingLoading = false;
+      state.getDgSizingSuccess = action.payload.status_code;
       if (action.payload.data) {
         state.dgSizingData = action.payload.data;
       }
     },
     getDGSizingFailure: (state, action: PayloadAction<APIResponse>) => {
-      state.dgSizingLoading = false;
-      state.dgSizingError = action.payload.status_code;
+      state.getDgSizingLoading = false;
+      state.getDgSizingError = action.payload.status_code;
       state.dgSizingData = null;
+    },
+
+    // Silent request used to synchronize configuration updates across other browser tabs/users
+    // without triggering the page-level ghost loader.
+    getDGSizingSilentRequest: (state, _action: PayloadAction<GetDGSizing['params']>) => {
+      state.getDgSizingError = false;
+      state.getDgSizingSuccess = false;
+    },
+    getDGSizingSilentSuccess: (state, action: PayloadAction<GetDGSizing['response']>) => {
+      state.getDgSizingSuccess = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.dgSizingData = action.payload.data;
+      }
+    },
+    getDGSizingSilentFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.getDgSizingError = action.payload.status_code;
+      // Keep the existing data intact if the background sync fails.
     },
 
     // ======================================
@@ -1242,7 +1346,6 @@ const simulationWizardSlice = createSlice({
       state.deleteSimulationError = action.payload.status_code;
     },
 
-
     initiateProjectSimulationRequest: (state, _action: PayloadAction<InitiateSimulation['payload']>) => {
       state.simulationLoading = true;
       state.simulationError = false;
@@ -1251,7 +1354,8 @@ const simulationWizardSlice = createSlice({
       // Reset all tab completion states when selecting a new simulation
       state.loadProfileSaved = false;
       state.saveSolarProfileSuccess = false;
-      state.solarProfileSuccess = false
+      state.solarProfileSuccess = false;
+      state.solarProfileFetchSuccess = false;
       state.bessContainerConfigSuccess = false;
       state.generatorDgSuccess = false;
       state.dispatchRuleSuccess = false;
@@ -1265,6 +1369,10 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionSuccess = false;
       state.multiYearProjectionResultsSuccess = false;
       state.runMultiYearProjectionSuccess = false;
+      state.greenAnalysisSuccess = false;
+      state.detailedGreenAnalysisResultSuccess = false;
+      state.detailedGreenAnalysisDataSuccess = false;
+      state.greenAnalysisDataSuccess = false;
 
       // Clear all wizard data when selecting a new simulation to prevent stale data
       state.loadProfileData = null;
@@ -1281,9 +1389,12 @@ const simulationWizardSlice = createSlice({
       state.runSimulationData = null;
       state.customSimulationResultData = null;
       state.hourlySimulationResultsData = null;
-      state.simulationProgressData = null
+      state.simulationProgressData = null;
       state.multiYearProjectionResultData = null;
       state.multiYearProjectionResultsData = null;
+      state.greenAnalysisData = null;
+      state.detailedGreenAnalysisResultData = null;
+      state.detailedGreenAnalysisData = null;
     },
 
     initiateProjectSimulationSuccess: (state, action: PayloadAction<InitiateSimulation['response']>) => {
@@ -1307,6 +1418,7 @@ const simulationWizardSlice = createSlice({
       // Reset all tab completion states when selecting a new project
       state.loadProfileSaved = false;
       state.saveSolarProfileSuccess = false;
+      state.solarProfileFetchSuccess = false;
       state.bessContainerConfigSuccess = false;
       state.generatorDgSuccess = false;
       state.dispatchRuleSuccess = false;
@@ -1318,6 +1430,10 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionSuccess = false;
       state.multiYearProjectionResultsSuccess = false;
       state.runMultiYearProjectionSuccess = false;
+      state.greenAnalysisSuccess = false;
+      state.detailedGreenAnalysisResultSuccess = false;
+      state.detailedGreenAnalysisDataSuccess = false;
+      state.greenAnalysisDataSuccess = false;
 
       // Clear all wizard data when selecting a new project to prevent stale data
       state.loadProfileData = null;
@@ -1334,6 +1450,9 @@ const simulationWizardSlice = createSlice({
       state.hourlySimulationResultsData = null;
       state.multiYearProjectionResultData = null;
       state.multiYearProjectionResultsData = null;
+      state.greenAnalysisData = null;
+      state.detailedGreenAnalysisResultData = null;
+      state.detailedGreenAnalysisData = null;
     },
     getProjectSimulationSuccess(state, action: PayloadAction<UpdateSimulationRequest['response']>) {
       state.projectSimulationLoading = false;
@@ -1407,7 +1526,6 @@ const simulationWizardSlice = createSlice({
       state.simulationProgressLoading = true;
       state.simulationProgressError = false;
       state.simulationProgressSuccess = false;
-      state.simulationProgressData = null;
     },
     simulationProgressSuccess(state, action: PayloadAction<GetSimulationProgress['response']>) {
       state.simulationProgressLoading = false;
@@ -1443,7 +1561,7 @@ const simulationWizardSlice = createSlice({
     // Refresh Project Simulation (without clearing wizard data)
     // Used after saving configurations to update projectSimulationData
     // ======================================
-    refreshProjectSimulationRequest(state, _action: PayloadAction<{ simulation_id: number }>) {
+    refreshProjectSimulationRequest(state, _action: PayloadAction<{simulation_id: number}>) {
       state.projectSimulationLoading = true;
       state.projectSimulationError = false;
     },
@@ -1464,10 +1582,7 @@ const simulationWizardSlice = createSlice({
       state.showDetailedAnalysis = action.payload;
     },
 
-    customConfigRequest: (
-      state,
-      action: PayloadAction<CustomConfig['payload']>
-    ) => {
+    customConfigRequest: (state, action: PayloadAction<CustomConfig['payload']>) => {
       state.customConfigLoading = true;
       state.customConfigError = false;
       state.customConfigSuccess = false;
@@ -1482,21 +1597,38 @@ const simulationWizardSlice = createSlice({
     },
 
     getCustomConfigRequest: (state, _action: PayloadAction<GetCustomConfig['params']>) => {
-      state.customConfigLoading = true;
-      state.customConfigError = false;
-      state.customConfigSuccess = false;
+      state.getCustomConfigLoading = true;
+      state.getCustomConfigError = false;
+      state.getCustomConfigSuccess = false;
     },
     getCustomConfigSuccess: (state, action: PayloadAction<GetCustomConfig['response']>) => {
-      state.customConfigLoading = false;
-      state.customConfigSuccess = action.payload.status_code;
+      state.getCustomConfigLoading = false;
+      state.getCustomConfigSuccess = action.payload.status_code;
       if (action.payload.data) {
         state.customConfigData = action.payload.data;
       }
     },
     getCustomConfigFailure: (state, action: PayloadAction<APIResponse>) => {
-      state.customConfigLoading = false;
-      state.customConfigError = action.payload.status_code;
+      state.getCustomConfigLoading = false;
+      state.getCustomConfigError = action.payload.status_code;
       state.customConfigData = null;
+    },
+
+    // Silent request used to synchronize configuration updates across other browser tabs/users
+    // without triggering the page-level ghost loader.
+    getCustomConfigSilentRequest: (state, _action: PayloadAction<GetCustomConfig['params']>) => {
+      state.getCustomConfigError = false;
+      state.getCustomConfigSuccess = false;
+    },
+
+    getCustomConfigSilentSuccess: (state, action: PayloadAction<GetCustomConfig['response']>) => {
+      state.getCustomConfigSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.customConfigData = action.payload.data;
+      }
+    },
+    getCustomConfigSilentFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.getCustomConfigError = action.payload.status_code;
     },
 
     runCustomSimulationRequest(state, _action: PayloadAction<RunSimulationRequest['payload']>) {
@@ -1595,10 +1727,7 @@ const simulationWizardSlice = createSlice({
       state.showDetailedMultiYearProjectionAnalysis = action.payload;
     },
 
-    multiYearProjectionRequest: (
-      state,
-      action: PayloadAction<MultiYearProjection['payload']>
-    ) => {
+    multiYearProjectionRequest: (state, action: PayloadAction<MultiYearProjection['payload']>) => {
       state.multiYearProjectionLoading = true;
       state.multiYearProjectionError = false;
       state.multiYearProjectionSuccess = false;
@@ -1615,10 +1744,7 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionError = action.payload.status_code;
     },
 
-    multiYearProjectionComputeRequest: (
-      state,
-      action: PayloadAction<MultiYearProjection['payload']>
-    ) => {
+    multiYearProjectionComputeRequest: (state, action: PayloadAction<MultiYearProjection['payload']>) => {
       state.multiYearProjectionComputeLoading = true;
       state.multiYearProjectionComputeError = false;
       state.multiYearProjectionComputeSuccess = false;
@@ -1650,6 +1776,19 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionResultLoading = false;
       state.multiYearProjectionResultError = action.payload.status_code;
       state.multiYearProjectionResultData = null;
+    },
+    getMultiYearSilentRequest(state, _action: PayloadAction<GetMultiYearProjection['params']>) {
+      state.multiYearProjectionResultError = false;
+      state.multiYearProjectionResultSuccess = false;
+    },
+    getMultiYearSilentSuccess(state, action: PayloadAction<GetMultiYearProjection['response']>) {
+      state.multiYearProjectionResultSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.multiYearProjectionResultData = action.payload.data;
+      }
+    },
+    getMultiYearSilentFailure(state, action: PayloadAction<APIResponse>) {
+      state.multiYearProjectionResultError = action.payload.status_code;
     },
 
     runMultiYearProjectionRequest(state, _action: PayloadAction<RunSimulationRequest['payload']>) {
@@ -1707,7 +1846,6 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionProgressLoading = true;
       state.multiYearProjectionProgressError = false;
       state.multiYearProjectionProgressSuccess = false;
-      state.multiYearProjectionProgressData = null;
     },
     multiYearProjectionProgressSuccess(state, action: PayloadAction<GetMultiYearProgress['response']>) {
       state.multiYearProjectionProgressLoading = false;
@@ -1721,8 +1859,249 @@ const simulationWizardSlice = createSlice({
       state.multiYearProjectionProgressError = action.payload.status_code;
       state.multiYearProjectionProgressData = null;
     },
+    getMultiYearProgressSilentRequest(state, _action: PayloadAction<GetMultiYearProgress['payload']>) {
+      state.multiYearProjectionProgressError = false;
+      state.multiYearProjectionProgressSuccess = false;
+    },
+    getMultiYearProgressSilentSuccess(state, action: PayloadAction<GetMultiYearProgress['response']>) {
+      state.multiYearProjectionProgressSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.multiYearProjectionProgressData = action.payload.data;
+      }
+    },
+    getMultiYearProgressSilentFailure(state, action: PayloadAction<APIResponse>) {
+      state.multiYearProjectionProgressError = action.payload.status_code;
+    },
+    clearMultiYearProjectionProgressData(state) {
+      state.multiYearProjectionProgressData = null;
+      state.multiYearProjectionProgressSuccess = false;
+      state.multiYearProjectionProgressError = false;
+    },
 
-  }
+    greenAnalysisRequest: (state, action: PayloadAction<GreenAnalysis['payload']>) => {
+      state.greenAnalysisLoading = true;
+      state.greenAnalysisError = false;
+      state.greenAnalysisSuccess = false;
+    },
+    greenAnalysisSuccess: (state, action: PayloadAction<GreenAnalysis['response']>) => {
+      state.greenAnalysisLoading = false;
+      state.greenAnalysisSuccess = action.payload.status_code;
+    },
+    greenAnalysisFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.greenAnalysisLoading = false;
+      state.greenAnalysisError = action.payload.status_code;
+    },
+
+    greenAnalysisDataRequest: (state, action: PayloadAction<GetGreenAnalysis['payload']>) => {
+      state.greenAnalysisDataLoading = true;
+      state.greenAnalysisDataError = false;
+      state.greenAnalysisDataSuccess = false;
+    },
+    greenAnalysisDataSuccess: (state, action: PayloadAction<GetGreenAnalysis['response']>) => {
+      state.greenAnalysisDataLoading = false;
+      state.greenAnalysisDataSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.greenAnalysisData = action.payload.data;
+      }
+    },
+    greenAnalysisDataFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.greenAnalysisDataLoading = false;
+      state.greenAnalysisDataError = action.payload.status_code;
+      state.greenAnalysisData = null;
+    },
+    getGreenAnalysisSilentRequest: (state, _action: PayloadAction<GetGreenAnalysis['payload']>) => {
+      state.greenAnalysisDataError = false;
+      state.greenAnalysisDataSuccess = false;
+    },
+    getGreenAnalysisSilentSuccess: (state, action: PayloadAction<GetGreenAnalysis['response']>) => {
+      state.greenAnalysisDataSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.greenAnalysisData = action.payload.data;
+      }
+    },
+    getGreenAnalysisSilentFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.greenAnalysisDataError = action.payload.status_code;
+    },
+
+    // Green Analysis - Simulation results
+    setShowGreenAnalysisResults(state, action: PayloadAction<boolean>) {
+      state.showGreenAnalysisResults = action.payload;
+    },
+
+    runGreenAnalysisRequest(state, _action: PayloadAction<RunSimulationRequest['payload']>) {
+      state.runGreenAnalysisLoading = true;
+      state.runGreenAnalysisError = false;
+      state.runGreenAnalysisSuccess = false;
+    },
+    runGreenAnalysisSuccess(state, action: PayloadAction<RunSimulationRequest['response']>) {
+      state.runGreenAnalysisLoading = false;
+      state.runGreenAnalysisSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.runGreenAnalysisData = action.payload.data;
+      }
+    },
+    runGreenAnalysisFailure(state, action: PayloadAction<APIResponse>) {
+      state.runGreenAnalysisLoading = false;
+      state.runGreenAnalysisError = action.payload.status_code;
+      state.runGreenAnalysisData = null;
+    },
+
+    stopGreenAnalysisRequest(state, _action: PayloadAction<RunSimulationRequest['payload']>) {
+      state.stopGreenAnalysisLoading = true;
+      state.stopGreenAnalysisError = false;
+      state.stopGreenAnalysisSuccess = false;
+    },
+    stopGreenAnalysisSuccess(state, action: PayloadAction<RunSimulationRequest['response']>) {
+      state.stopGreenAnalysisLoading = false;
+      state.stopGreenAnalysisSuccess = action.payload.status_code;
+    },
+    stopGreenAnalysisFailure(state, action: PayloadAction<APIResponse>) {
+      state.stopGreenAnalysisLoading = false;
+      state.stopGreenAnalysisError = action.payload.status_code;
+    },
+
+    greenAnalysisResultsRequest(state, _action: PayloadAction<GreenAnalysisResultRequest['params']>) {
+      state.greenAnalysisResultsLoading = true;
+      state.greenAnalysisResultsError = false;
+      state.greenAnalysisResultsSuccess = false;
+    },
+    greenAnalysisResultsSuccess(state, action: PayloadAction<GreenAnalysisResultRequest['response']>) {
+      state.greenAnalysisResultsLoading = false;
+      state.greenAnalysisResultsSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.greenAnalysisResultsData = action.payload.data;
+      }
+    },
+    greenAnalysisResultsFailure(state, action: PayloadAction<APIResponse>) {
+      state.greenAnalysisResultsLoading = false;
+      state.greenAnalysisResultsError = action.payload.status_code;
+      state.greenAnalysisResultsData = null;
+    },
+    greenAnalysisProgressRequest(state, _action: PayloadAction<GetSimulationProgress['payload']>) {
+      state.greenAnalysisProgressLoading = true;
+      state.greenAnalysisProgressError = false;
+      state.greenAnalysisProgressSuccess = false;
+      state.greenAnalysisProgressData = null;
+    },
+    greenAnalysisProgressSuccess(state, action: PayloadAction<GetSimulationProgress['response']>) {
+      state.greenAnalysisProgressLoading = false;
+      state.greenAnalysisProgressSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.greenAnalysisProgressData = action.payload.data;
+      }
+    },
+    greenAnalysisProgressFailure(state, action: PayloadAction<APIResponse>) {
+      state.greenAnalysisProgressLoading = false;
+      state.greenAnalysisProgressError = action.payload.status_code;
+      state.greenAnalysisProgressData = null;
+    },
+    getGreenAnalysisProgressSilentRequest(state, _action: PayloadAction<GetSimulationProgress['payload']>) {
+      state.greenAnalysisProgressError = false;
+      state.greenAnalysisProgressSuccess = false;
+    },
+    getGreenAnalysisProgressSilentSuccess(state, action: PayloadAction<GetSimulationProgress['response']>) {
+      state.greenAnalysisProgressSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.greenAnalysisProgressData = action.payload.data;
+      }
+    },
+    getGreenAnalysisProgressSilentFailure(state, action: PayloadAction<APIResponse>) {
+      state.greenAnalysisProgressError = action.payload.status_code;
+    },
+    clearGreenAnalysisProgressData(state) {
+      state.greenAnalysisProgressData = null;
+      state.greenAnalysisProgressSuccess = false;
+      state.greenAnalysisProgressError = false;
+    },
+    // Green Analysis - Detailed Results
+    setShowDetailedGreenAnalysis(state, action: PayloadAction<boolean>) {
+      state.showDetailedGreenAnalysis = action.payload;
+    },
+
+    detailedGreenAnalysisRequest: (state, action: PayloadAction<DetailedGreenAnalysis['payload']>) => {
+      state.detailedGreenAnalysisLoading = true;
+      state.detailedGreenAnalysisError = false;
+      state.detailedGreenAnalysisSuccess = false;
+    },
+    detailedGreenAnalysisSuccess: (state, action: PayloadAction<DetailedGreenAnalysis['response']>) => {
+      state.detailedGreenAnalysisLoading = false;
+      state.detailedGreenAnalysisSuccess = action.payload.status_code;
+    },
+    detailedGreenAnalysisFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.detailedGreenAnalysisLoading = false;
+      state.detailedGreenAnalysisError = action.payload.status_code;
+    },
+
+    detailedGreenAnalysisDataRequest: (state, action: PayloadAction<GetDetailedGreenAnalysis['payload']>) => {
+      state.detailedGreenAnalysisDataLoading = true;
+      state.detailedGreenAnalysisDataError = false;
+      state.detailedGreenAnalysisDataSuccess = false;
+    },
+    detailedGreenAnalysisDataSuccess: (state, action: PayloadAction<GetDetailedGreenAnalysis['response']>) => {
+      state.detailedGreenAnalysisDataLoading = false;
+      state.detailedGreenAnalysisDataSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.detailedGreenAnalysisData = action.payload.data;
+      }
+    },
+    detailedGreenAnalysisDataFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.detailedGreenAnalysisDataLoading = false;
+      state.detailedGreenAnalysisDataError = action.payload.status_code;
+      state.detailedGreenAnalysisData = null;
+    },
+    runDetailedGreenAnalysisRequest(state, _action: PayloadAction<RunSimulationRequest['payload']>) {
+      state.runDetailedGreenAnalysisLoading = true;
+      state.runDetailedGreenAnalysisError = false;
+      state.runDetailedGreenAnalysisSuccess = false;
+    },
+    runDetailedGreenAnalysisSuccess(state, action: PayloadAction<RunSimulationRequest['response']>) {
+      state.runDetailedGreenAnalysisLoading = false;
+      state.runDetailedGreenAnalysisSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.runDetailedGreenAnalysisData = action.payload.data;
+      }
+    },
+    runDetailedGreenAnalysisFailure(state, action: PayloadAction<APIResponse>) {
+      state.runDetailedGreenAnalysisLoading = false;
+      state.runDetailedGreenAnalysisError = action.payload.status_code;
+      state.runDetailedGreenAnalysisData = null;
+    },
+    detailedGreenAnalysisProgressRequest(state, _action: PayloadAction<GetMultiYearProgress['payload']>) {
+      state.detailedGreenAnalysisProgressLoading = true;
+      state.detailedGreenAnalysisProgressError = false;
+      state.detailedGreenAnalysisProgressSuccess = false;
+    },
+    detailedGreenAnalysisProgressSuccess(state, action: PayloadAction<GetMultiYearProgress['response']>) {
+      state.detailedGreenAnalysisProgressLoading = false;
+      state.detailedGreenAnalysisProgressSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.detailedGreenAnalysisProgressData = action.payload.data;
+      }
+    },
+    detailedGreenAnalysisProgressFailure(state, action: PayloadAction<APIResponse>) {
+      state.detailedGreenAnalysisProgressLoading = false;
+      state.detailedGreenAnalysisProgressError = action.payload.status_code;
+      state.detailedGreenAnalysisProgressData = null;
+    },
+
+    detailedGreenAnalysisResultRequest(state, _action: PayloadAction<GetDetailedGreenAnalysisSimulationResult['params']>) {
+      state.detailedGreenAnalysisResultLoading = true;
+      state.detailedGreenAnalysisResultError = false;
+      state.detailedGreenAnalysisResultSuccess = false;
+    },
+    detailedGreenAnalysisResultSuccess(state, action: PayloadAction<GetDetailedGreenAnalysisSimulationResult['response']>) {
+      state.detailedGreenAnalysisResultLoading = false;
+      state.detailedGreenAnalysisResultSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.detailedGreenAnalysisResultData = action.payload.data;
+      }
+    },
+    detailedGreenAnalysisResultFailure(state, action: PayloadAction<APIResponse>) {
+      state.detailedGreenAnalysisResultLoading = false;
+      state.detailedGreenAnalysisResultError = action.payload.status_code;
+      state.detailedGreenAnalysisResultData = null;
+    },
+  },
 });
 
 // ==============================
@@ -1828,6 +2207,10 @@ export const {
   getDGSizingSuccess,
   getDGSizingFailure,
 
+  getDGSizingSilentRequest,
+  getDGSizingSilentSuccess,
+  getDGSizingSilentFailure,
+
   getSimulationListRequest,
   getSimulationListSuccess,
   getSimulationListFailure,
@@ -1882,6 +2265,10 @@ export const {
   getCustomConfigSuccess,
   getCustomConfigFailure,
 
+  getCustomConfigSilentRequest,
+  getCustomConfigSilentSuccess,
+  getCustomConfigSilentFailure,
+
   runCustomSimulationRequest,
   runCustomSimulationSuccess,
   runCustomSimulationFailure,
@@ -1915,6 +2302,9 @@ export const {
   multiYearProjectionResultRequest,
   multiYearProjectionResultSuccess,
   multiYearProjectionResultFailure,
+  getMultiYearSilentRequest,
+  getMultiYearSilentSuccess,
+  getMultiYearSilentFailure,
 
   runMultiYearProjectionRequest,
   runMultiYearProjectionSuccess,
@@ -1930,7 +2320,66 @@ export const {
 
   multiYearProjectionProgressRequest,
   multiYearProjectionProgressSuccess,
-  multiYearProjectionProgressFailure
+  multiYearProjectionProgressFailure,
+  getMultiYearProgressSilentRequest,
+  getMultiYearProgressSilentSuccess,
+  getMultiYearProgressSilentFailure,
+  clearMultiYearProjectionProgressData,
+
+  greenAnalysisRequest,
+  greenAnalysisSuccess,
+  greenAnalysisFailure,
+
+  greenAnalysisDataRequest,
+  greenAnalysisDataSuccess,
+  greenAnalysisDataFailure,
+  getGreenAnalysisSilentRequest,
+  getGreenAnalysisSilentSuccess,
+  getGreenAnalysisSilentFailure,
+
+  setShowGreenAnalysisResults,
+
+  runGreenAnalysisRequest,
+  runGreenAnalysisSuccess,
+  runGreenAnalysisFailure,
+
+  stopGreenAnalysisRequest,
+  stopGreenAnalysisSuccess,
+  stopGreenAnalysisFailure,
+
+  greenAnalysisResultsRequest,
+  greenAnalysisResultsSuccess,
+  greenAnalysisResultsFailure,
+
+  greenAnalysisProgressRequest,
+  greenAnalysisProgressSuccess,
+  greenAnalysisProgressFailure,
+  getGreenAnalysisProgressSilentRequest,
+  getGreenAnalysisProgressSilentSuccess,
+  getGreenAnalysisProgressSilentFailure,
+  clearGreenAnalysisProgressData,
+
+  setShowDetailedGreenAnalysis,
+
+  detailedGreenAnalysisRequest,
+  detailedGreenAnalysisSuccess,
+  detailedGreenAnalysisFailure,
+
+  detailedGreenAnalysisDataRequest,
+  detailedGreenAnalysisDataSuccess,
+  detailedGreenAnalysisDataFailure,
+
+  runDetailedGreenAnalysisRequest,
+  runDetailedGreenAnalysisSuccess,
+  runDetailedGreenAnalysisFailure,
+
+  detailedGreenAnalysisProgressRequest,
+  detailedGreenAnalysisProgressSuccess,
+  detailedGreenAnalysisProgressFailure,
+
+  detailedGreenAnalysisResultRequest,
+  detailedGreenAnalysisResultSuccess,
+  detailedGreenAnalysisResultFailure,
 } = simulationWizardSlice.actions;
 
 export default simulationWizardSlice.reducer;

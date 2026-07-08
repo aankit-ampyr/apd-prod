@@ -1,7 +1,19 @@
-import type { AuditLogModules, AuditLogScenario, UserRole } from '@/constants';
-import type { ENV, User, Project, SolarProfileSource, Simulation, SimulationResults, CustomHourlyResults, CustomMonthlyResults, HouryChart, MultiYearProjectionResults } from './common-interface';
-import type { SortType, APIResponse, AuditLog } from '@lazarus/react-common/interface';
-export type { APIResponse, LoginRequest, VerifyOtpRequest } from '@lazarus/react-common/interface/api-interface';
+import type {AuditLogModules, AuditLogScenario, UserRole} from '@/constants';
+import type {
+  ENV,
+  User,
+  Project,
+  SolarProfileSource,
+  Simulation,
+  SimulationResults,
+  CustomHourlyResults,
+  CustomMonthlyResults,
+  HouryChart,
+  MultiYearProjectionResults,
+  GreenAnalysisResults,
+} from './common-interface';
+import type {SortType, APIResponse, AuditLog} from '@lazarus/react-common/interface';
+export type {APIResponse, LoginRequest, VerifyOtpRequest} from '@lazarus/react-common/interface/api-interface';
 
 export interface ApiConfigInterface {
   currentEnv: string | undefined;
@@ -13,6 +25,7 @@ export interface ApiConfigInterface {
     verifyOtp: string;
   };
   authUrls: {
+    logout: string;
     users: string;
     projects: string;
     loadProfile: string;
@@ -33,6 +46,8 @@ export interface ApiConfigInterface {
     runSimulation: string;
     multiYearProjection: string;
     multiYearProjectionRun: string;
+    greenAnalysis: string;
+    detailedGreenEnergy: string;
 
     // websocket
     ws_token: string;
@@ -390,7 +405,6 @@ export interface GetWsTokenRequest {
   }>;
 }
 
-
 // =============================== Audit Log Slice ===============================
 export interface AuditLogListRequest {
   params: {
@@ -607,37 +621,37 @@ export interface MultiYearProjectionRequest {
     simulation_id: number;
     sort?: string[];
     until_year?: number;
-    bess_mwh? : number;
-    capacity_percent? : number;
-    delivery_hours? : number;
-    load_hours? : number;
-    delivery_pct? : number;
-    dg_hours? : number;
-    green_energy_to_load_mwh? : number;
-    bess_hrs? : number;
-    wastage_mw? : number;
-    wastage_pct? : number;
-    load_solar_wastage_pct? : number;
-    bess_loss_mwh? : number;
-    solar_generation? : number;
-    solar_hrs? : number;
-    dg_generation? : number;
-    solar_to_load? : number;
-    bess_to_load? : number;
-    dg_to_load? : number;
-    dg_curtailed? : number;
-    energy_to_load? : number;
-    delivery_met_mwh? : number;
-    charging_loss? : number;
-    discharging_loss? : number;
-    final_soc_pct? : number;
-    solar_gen_during_load? : number;
-    solar_curtailed_during_load? : number;
-    solar_curtailed? : number;
+    bess_mwh?: number;
+    capacity_percent?: number;
+    delivery_hours?: number;
+    load_hours?: number;
+    delivery_pct?: number;
+    dg_hours?: number;
+    green_energy_to_load_mwh?: number;
+    bess_hrs?: number;
+    wastage_mw?: number;
+    wastage_pct?: number;
+    load_solar_wastage_pct?: number;
+    bess_loss_mwh?: number;
+    solar_generation?: number;
+    solar_hrs?: number;
+    dg_generation?: number;
+    solar_to_load?: number;
+    bess_to_load?: number;
+    dg_to_load?: number;
+    dg_curtailed?: number;
+    energy_to_load?: number;
+    delivery_met_mwh?: number;
+    charging_loss?: number;
+    discharging_loss?: number;
+    final_soc_pct?: number;
+    solar_gen_during_load?: number;
+    solar_curtailed_during_load?: number;
+    solar_curtailed?: number;
   };
 
   response: APIResponse<{
-    results: MultiYearProjectionResults[]
+    results: MultiYearProjectionResults[];
   }>;
 }
 
@@ -648,5 +662,151 @@ export interface GetMultiYearProgress {
   response: APIResponse<{
     simulation_job_id: number;
     status: number;
+  }>;
+}
+
+export interface GreenAnalysis {
+  payload: {
+    simulation_id: number;
+    solar_min: number | null;
+    solar_max: number | null;
+    solar_step: number | null;
+    bess_min: number | null;
+    bess_max: number | null;
+    dg_min: number | null;
+    dg_max: number | null;
+    dg_step_size: number | null;
+    min_green_energy: number | null;
+    max_wastage: number | null;
+  };
+  response: APIResponse<{
+    id: number;
+    simulation_id: number;
+    solar_min: number | null;
+    solar_max: number | null;
+    solar_step: number | null;
+    bess_min: number | null;
+    bess_max: number | null;
+    dg_min: number | null;
+    dg_max: number | null;
+    dg_step_size: number | null;
+    min_green_energy: number | null;
+    max_wastage: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export interface GetGreenAnalysis {
+  payload: {
+    simulation_id: number;
+  };
+  response: APIResponse<{
+    id: number;
+    simulation_id: number;
+    solar_min: number | null;
+    solar_max: number | null;
+    solar_step: number | null;
+    bess_min: number | null;
+    bess_max: number | null;
+    dg_min: number | null;
+    dg_max: number | null;
+    dg_step_size: number | null;
+    min_green_energy: number | null;
+    max_wastage: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export interface GreenAnalysisResultRequest {
+  params: {
+    simulation_id: number;
+    page?: number;
+    limit?: number;
+    solar_capacity?: number[];
+    duration_hr?: number[];
+    dg_capacity?: number[];
+    bess_capacity?: number[];
+    viable_only?: boolean;
+    sort?: string[];
+    delivery_100_only?: boolean;
+    zero_dg_hours_only?: boolean;
+  };
+
+  response: APIResponse<{
+    min_green_energy: number | null;
+    max_wastage: number | null;
+    results: GreenAnalysisResults[];
+    total_configs: number;
+    total_pages: number;
+    current_page: number;
+    next_page: number | null;
+  }>;
+}
+
+export interface DetailedGreenAnalysis {
+  payload: {
+    simulation_id: number;
+    duration_class: number | null;
+    solar_peak: number | null;
+    bess_capacity: number | null;
+    dg_capacity: number | null;
+  };
+  response: APIResponse<{
+    id: number;
+    simulation_id: number;
+    duration_class: number | null;
+    solar_peak: number | null;
+    bess_capacity: number | null;
+    dg_capacity: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export interface GetDetailedGreenAnalysis {
+  payload: {
+    simulation_id: number;
+  };
+  response: APIResponse<{
+    id: number;
+    simulation_id: number;
+    duration_class: number | null;
+    solar_peak: number | null;
+    bess_capacity: number | null;
+    dg_capacity: number | null;
+    created_at: string;
+    updated_at: string;
+  }>;
+}
+
+export interface GetDetailedGreenAnalysisSimulationResult {
+  params: {
+    simulation_id: number;
+  };
+  response: APIResponse<{
+    simulation_id: number;
+    job_id: number;
+    solar_mwp: number;
+    bess_mwh: number;
+    duration_hr: number;
+    power_mw: number;
+    containers: number;
+    dg_mw: number;
+    delivery_pct: number;
+    green_pct: number;
+    green_energy_pct: number;
+    green_hours_mar_oct_pct: number;
+    wastage_pct: number;
+    delivery_hours: number;
+    load_hours: number;
+    green_hours: number;
+    dg_hours: number;
+    dg_starts: number;
+    bess_cycles: number;
+    unserved_mwh: number;
+    fuel_consumption_l: number;
+    created_at: string;
   }>;
 }

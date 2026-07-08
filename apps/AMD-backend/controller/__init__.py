@@ -1,3 +1,7 @@
 from .user_controller import UserController
 from .organization_controller import OrganizationController
 from .digest_controller import DigestController
+from .asset_controller import AssetController
+from .asset_analysis_controller import AnalysisController
+from .audit_controller import AuditController
+from .invoice_analysis_controller import PdfInvoiceController 

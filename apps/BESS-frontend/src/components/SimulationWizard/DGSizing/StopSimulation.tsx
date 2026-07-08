@@ -35,6 +35,7 @@ export const StopSimulation: React.FC<StopSimulationProps> = ({
           <div className="flex flex-col gap-1">
             <span>{warningMessage}</span>
             <span>{infoMessage}</span>
+            <span>After stopping the simulation, please wait 5–10 seconds before starting a new one. </span>
           </div>
         }
         variant="warning"

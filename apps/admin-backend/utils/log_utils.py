@@ -1,35 +1,57 @@
-from models import AuditLog
+from datetime import datetime, timezone
+from typing import Optional
+import json
+
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from db.db_config import SessionUser
-from datetime import timezone, datetime
+from models import AuditLog
+
 
 async def audit_logs(
-    user_id: int,
+    user_id: str,
     user_role: int,
     module: int,
     action: int,
-    before: dict | None,
-    after: dict | None,
-    db,
+    before: str | dict | None,
+    after: str | dict | None,
+    resource_id: Optional[str] = None,
+    db: Optional[AsyncSession] = None,
 ):
-    try:
-        async with SessionUser() as db_session:
-            audit_log = AuditLog(
-                user_id=user_id,
-                role=user_role,
-                module=module,
-                action=action,
-                before=before,
-                after=after,
-                created_at=datetime.now(timezone.utc),
-            )
-            if db:
-                db.add(audit_log)
-            else:
-                db_session.add(audit_log)
-                await db_session.commit()
+    own_session = db is None
 
-    except Exception as e:
-        raise e
+    if own_session:
+        db = SessionUser()
+
+    try:
+        if isinstance(before, dict):
+            before = json.dumps(before)
+
+        if isinstance(after, dict):
+            after = json.dumps(after)
+
+        audit_log = AuditLog(
+            user_id=str(user_id),
+            role=user_role,
+            module=module,
+            action=action,
+            before=before,
+            after=after,
+            resource_id=resource_id,
+            created_at=datetime.now(timezone.utc),
+        )
+        db.add(audit_log)
+        if own_session:
+            await db.commit()
+            await db.refresh(audit_log)
+        return audit_log
+    except Exception:
+        if own_session:
+            await db.rollback()
+        raise
+    finally:
+        if own_session:
+            await db.close()
 
 # async def log_logout_async(user_role, user_name, user_id, user_scope, db, request, session_id=None):
 #     module_id = AccessModule.PATIENT_DASHBOARD.value

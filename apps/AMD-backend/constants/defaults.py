@@ -12,7 +12,10 @@ CONSTRAINT_NAMES = {
 }
 
 UPLOAD_PATHS = {
-    "MERGED_DATASETS": lambda asset_id: f"assets/asset-{asset_id}/merged_report/"
+    "MERGED_DATASETS": lambda asset_id: f"assets/asset-{asset_id}/merged_report/",
+    "INVOICE_PATH" :"invoice-analysis/pdf-invoices/",
+    "SETTLEMENT_PATH":"invoice-analysis/settlements/",
+
 }
 
 ASSET_METRIC_LABEL = {

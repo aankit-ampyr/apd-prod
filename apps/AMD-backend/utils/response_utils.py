@@ -1,6 +1,7 @@
 from fastapi.responses import JSONResponse
 from .encryption_utils import EncryptionUtils
 from config import ENCRYPT
+import json
 
 
 class Res:
@@ -41,3 +42,5 @@ class Res:
         if ENCRYPT:
             res_data = EncryptionUtils.encrypt(res_data)
         return JSONResponse(content=res_data, status_code=http_status_code)
+
+    
