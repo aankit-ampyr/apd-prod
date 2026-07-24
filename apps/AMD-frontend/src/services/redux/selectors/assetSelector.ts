@@ -44,8 +44,8 @@ export const allAssetsList = createSelector([(state: RootState) => state.asset.a
 export const analysisAssetsList = createSelector([(state: RootState) => state.asset.allAssets], allAssets => {
   return (
     allAssets
-      // exclude asset without analysis and solar assets
-      .filter(item => item.analysis_available && item.type !== AssetTypeEnum.Solar)
+      // exclude assets without analysis (solar assets are included)
+      .filter(item => item.analysis_available)
       .map(
         (
           item,
@@ -108,6 +108,8 @@ export const aggregatorReportUploadError = (state: RootState) => state.asset.agg
 // scada report loading selectors
 export const scadaReportUploadLoading = (state: RootState) => state.asset.scadaReportUploadLoading;
 export const scadaReportUploadError = (state: RootState) => state.asset.scadaReportUploadError;
+export const solarReportUploadLoading = (state: RootState) => state.asset.solarReportUploadLoading;
+export const solarReportUploadError = (state: RootState) => state.asset.solarReportUploadError;
 
 // iar report loading selectors
 export const iarReportUploadLoading = (state: RootState) => state.asset.iarReportUploadLoading;
@@ -287,6 +289,16 @@ export const assetMarketRevenueDistributionLoading = (state: RootState) =>
   state.asset.analyticsLoading.market?.revenue_distribution ?? false;
 export const assetMarketRevenueDistributionError = (state: RootState) =>
   state.asset.analyticsError.market?.revenue_distribution ?? false;
+
+// solar analysis
+export const assetSolarKpiVitalsResult = (state: RootState) => state.asset.analytics.solar?.kpi_vitals;
+export const assetSolarKpiVitalsLoading = (state: RootState) => state.asset.analyticsLoading.solar?.kpi_vitals ?? false;
+export const assetSolarKpiVitalsError = (state: RootState) => state.asset.analyticsError.solar?.kpi_vitals ?? false;
+export const assetSolarGenerationSplitResult = (state: RootState) => state.asset.analytics.solar?.generation_split;
+export const assetSolarGenerationSplitLoading = (state: RootState) =>
+  state.asset.analyticsLoading.solar?.generation_split ?? false;
+export const assetSolarGenerationSplitError = (state: RootState) =>
+  state.asset.analyticsError.solar?.generation_split ?? false;
 
 // market hourly price patterns
 export const assetMarketHourlyPricePatternsResult = (state: RootState) =>

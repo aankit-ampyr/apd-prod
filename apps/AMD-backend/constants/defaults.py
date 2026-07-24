@@ -13,6 +13,7 @@ CONSTRAINT_NAMES = {
 
 UPLOAD_PATHS = {
     "MERGED_DATASETS": lambda asset_id: f"assets/asset-{asset_id}/merged_report/",
+    "SOLAR_DATASETS": lambda asset_id: f"assets/asset-{asset_id}/solar-reports/",
     "INVOICE_PATH" :"invoice-analysis/pdf-invoices/",
     "SETTLEMENT_PATH":"invoice-analysis/settlements/",
 

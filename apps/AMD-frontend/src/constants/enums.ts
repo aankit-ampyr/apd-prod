@@ -45,6 +45,7 @@ export enum AssetFileType {
   MergedDataset = 3,
   IAR = 4,
   OptimizedDataset = 5,
+  SolarDataset = 6,
 }
 
 export enum AssetMarketUtilizationTypes {

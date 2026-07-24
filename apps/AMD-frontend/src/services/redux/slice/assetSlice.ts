@@ -24,6 +24,9 @@ import type {
   AssetMarketUtilizationAnalysisRequest,
   AssetBestMarketsAnalysisRequest,
   AssetMarketRevenueDistributionRequest,
+  AssetSolarKpiVitalsRequest,
+  AssetSolarGenerationSplitRequest,
+  UploadSolarReportRequest,
   AssetMarketHourlyPricePatternsRequest,
   AssetBatteryPowerOverTimeRequest,
   AssetEnergyPriceComparisonRequest,
@@ -71,6 +74,7 @@ const initialState: AssetSliceInitialState = {
   assetDetailsFetchLoading: false,
   aggregatorReportUploadLoading: false,
   scadaReportUploadLoading: false,
+  solarReportUploadLoading: false,
   iarReportUploadLoading: false,
   mergeLoading: false,
   optimizedDatasetGenerationLoading: false,
@@ -118,6 +122,7 @@ const initialState: AssetSliceInitialState = {
   // file upload errors
   aggregatorReportUploadError: null,
   scadaReportUploadError: null,
+  solarReportUploadError: null,
   iarReportUploadError: null,
   invoiceSettlementUploadError: null,
   invoiceUploadError: null,
@@ -138,6 +143,10 @@ const initialState: AssetSliceInitialState = {
       statistics: null,
       utilization: null,
       best_markets: null,
+    },
+    solar: {
+      kpi_vitals: null,
+      generation_split: null,
     },
     market_prices: {
       spread: null,
@@ -183,6 +192,10 @@ const initialState: AssetSliceInitialState = {
       utilization: false,
       best_markets: false,
     },
+    solar: {
+      kpi_vitals: false,
+      generation_split: false,
+    },
     market_prices: {
       spread: false,
       hourly_prices: false,
@@ -226,6 +239,10 @@ const initialState: AssetSliceInitialState = {
       statistics: false,
       utilization: false,
       best_markets: false,
+    },
+    solar: {
+      kpi_vitals: false,
+      generation_split: false,
     },
     market_prices: {
       spread: false,
@@ -754,6 +771,48 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // Upload Solar Report
+    // =======================================
+    uploadSolarReportRequest: (state, _action: PayloadAction<UploadSolarReportRequest['payload']>) => {
+      state.solarReportUploadLoading = true;
+      state.solarReportUploadError = null;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    uploadSolarReportSuccess: (state, action: PayloadAction<UploadSolarReportRequest['response']>) => {
+      state.solarReportUploadLoading = false;
+      state.assetSuccess = action.payload.status_code;
+      if (state.currentSelectedAsset && action.payload.data) {
+        state.currentSelectedAsset.solar_dataset_file = {
+          id: action.payload.data.id,
+          asset_id: action.payload.data.asset_id,
+          name: action.payload.data.name,
+          size: action.payload.data.size,
+          uploaded_at: action.payload.data.uploaded_at,
+          projection_summary: {
+            end_timestamp: action.payload.data?.projection_summary?.end_timestamp || '',
+            start_timestamp: action.payload.data?.projection_summary?.start_timestamp || '',
+          },
+          total_rows: action.payload.data.total_rows,
+          type: AssetFileType.SolarDataset,
+        };
+      }
+    },
+    uploadSolarReportFailure: (state, action: PayloadAction<UploadSolarReportRequest['error_response']>) => {
+      state.solarReportUploadLoading = false;
+      state.assetError = action.payload.status_code;
+      if (['E-10087', 'E-10084', 'E-10233'].includes(action.payload.status_code)) {
+        if (!state.solarReportUploadError) {
+          state.solarReportUploadError = {};
+        }
+        state.solarReportUploadError.file = action.payload.data?.file || {name: 'Uploaded File'};
+        state.solarReportUploadError.validation_errors = action.payload.data?.validation_errors || [
+          action.payload.message || 'Failed to parse solar report content',
+        ];
+      }
+    },
+
+    // =======================================
     // upload iar report
     // =======================================
     uploadIARReportRequest: (state, _action: PayloadAction<UploadIARReportRequest['payload']>) => {
@@ -1251,6 +1310,52 @@ const assetSlice = createSlice({
     assetMarketRevenueDistributionFailure: (state, action: PayloadAction<APIResponse>) => {
       state.analyticsLoading.market.revenue_distribution = false;
       state.analyticsError.market.revenue_distribution = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Solar KPI Vitals
+    // =======================================
+    assetSolarKpiVitalsRequest: (state, _action: PayloadAction<AssetSolarKpiVitalsRequest['params']>) => {
+      state.analyticsLoading.solar.kpi_vitals = true;
+      state.analyticsError.solar.kpi_vitals = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    assetSolarKpiVitalsSuccess: (state, action: PayloadAction<AssetSolarKpiVitalsRequest['response']>) => {
+      state.analyticsLoading.solar.kpi_vitals = false;
+      state.assetSuccess = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.analytics.solar.kpi_vitals = action.payload.data;
+      }
+    },
+    assetSolarKpiVitalsFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.kpi_vitals = false;
+      state.analyticsError.solar.kpi_vitals = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Solar Generation Split
+    // =======================================
+    assetSolarGenerationSplitRequest: (state, _action: PayloadAction<AssetSolarGenerationSplitRequest['params']>) => {
+      state.analyticsLoading.solar.generation_split = true;
+      state.analyticsError.solar.generation_split = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    assetSolarGenerationSplitSuccess: (state, action: PayloadAction<AssetSolarGenerationSplitRequest['response']>) => {
+      state.analyticsLoading.solar.generation_split = false;
+      state.assetSuccess = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.analytics.solar.generation_split = action.payload.data;
+      }
+    },
+    assetSolarGenerationSplitFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.generation_split = false;
+      state.analyticsError.solar.generation_split = action.payload.status_code;
       state.assetError = action.payload.status_code;
     },
 
@@ -2427,6 +2532,8 @@ const assetSlice = createSlice({
       state.analyticsLoading.market.statistics = false;
       state.analyticsLoading.market.best_markets = false;
       state.analyticsLoading.market.revenue_distribution = false;
+      state.analyticsLoading.solar.kpi_vitals = false;
+      state.analyticsLoading.solar.generation_split = false;
       state.analyticsLoading.market_prices.spread = false;
       state.analyticsLoading.market_prices.hourly_prices = false;
       state.analyticsLoading.market_prices.price_volatility = false;
@@ -2456,6 +2563,8 @@ const assetSlice = createSlice({
       state.analyticsError.market.statistics = false;
       state.analyticsError.market.best_markets = false;
       state.analyticsError.market.revenue_distribution = false;
+      state.analyticsError.solar.kpi_vitals = false;
+      state.analyticsError.solar.generation_split = false;
       state.analyticsError.market_prices.spread = false;
       state.analyticsError.market_prices.hourly_prices = false;
       state.analyticsError.market_prices.price_volatility = false;
@@ -2613,6 +2722,19 @@ export const {
   assetMarketRevenueDistributionRequest,
   assetMarketRevenueDistributionSuccess,
   assetMarketRevenueDistributionFailure,
+
+  // solar analysis
+  assetSolarKpiVitalsRequest,
+  assetSolarKpiVitalsSuccess,
+  assetSolarKpiVitalsFailure,
+  assetSolarGenerationSplitRequest,
+  assetSolarGenerationSplitSuccess,
+  assetSolarGenerationSplitFailure,
+
+  // solar upload
+  uploadSolarReportRequest,
+  uploadSolarReportSuccess,
+  uploadSolarReportFailure,
 
   // get asset market hourly price patterns
   assetMarketHourlyPricePatternsRequest,

@@ -69,6 +69,7 @@ export const AssetFileLabel: Record<AssetFileType, string> = {
   [AssetFileType.MergedDataset]: 'Merged',
   [AssetFileType.ScadaReport]: 'SCADA',
   [AssetFileType.OptimizedDataset]: 'Optimized',
+  [AssetFileType.SolarDataset]: 'Solar Dataset',
 };
 
 export const AuditLogModuleLabels: Record<APDAuditLogModules, string> = {
@@ -172,6 +173,7 @@ export const AssetFileBadgeVariants: Record<AssetFileType, string> = {
   [AssetFileType.MergedDataset]: 'green',
   [AssetFileType.ScadaReport]: 'blue',
   [AssetFileType.OptimizedDataset]: 'navy',
+  [AssetFileType.SolarDataset]: 'green',
 };
 
 export const InvoiceTypeBadgeVariants: Record<

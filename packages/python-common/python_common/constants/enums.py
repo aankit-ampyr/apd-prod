@@ -328,6 +328,8 @@ class AuditLogScenario(BaseEnum):
     GREEN_ENERGY_CONF_CREATED = 117
     SOLAR_PROFILE_CREATED = 118
     SOLAR_PROFILE_UPDATED = 119
+    SOLAR_REPORT_UPLOADED = 120
+    SOLAR_FILE_REPLACED = 121
 
 
 class AuditLogModules(BaseEnum):

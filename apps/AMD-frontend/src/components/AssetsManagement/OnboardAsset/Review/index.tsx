@@ -28,6 +28,7 @@ import {SectionFrame} from './common';
 import {OptimizationParamsSection} from './OptimizationParamsSection';
 import {BasicInformationSection} from './BasicSteps';
 import {InvoiceUploadSection} from './InvoiceUploadSection';
+import {SolarFileUpload} from '../SolarFileUpload';
 
 // =======================
 // constants and Type
@@ -525,6 +526,21 @@ export function Review(props: ReviewProps) {
             />
           )}
         />
+        {!isNonSolarAsset && (
+          <SectionFrame
+            title="Upload Solar Data"
+            headerContent={
+              isAssetOnboarded ? (
+                <ReportingPeriod
+                  value={reportingPeriod}
+                  onChange={setReportingPeriod}
+                  onDone={handleReportingPeriodDone}
+                />
+              ) : null
+            }
+            children={() => <SolarFileUpload monthYearValidation={reportingPeriod ?? undefined} />}
+          />
+        )}
         {isNonSolarAsset && (
           <>
             <SectionFrame

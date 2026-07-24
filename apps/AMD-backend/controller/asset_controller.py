@@ -206,6 +206,28 @@ class AssetController:
             current_user=current_user,
         )
 
+    async def upload_solar_report(
+        self,
+        asset_id: int,
+        file: UploadFile = File(...),
+        db: AsyncSession = Depends(get_db),
+        month: int = Form(None),
+        year: int = Form(None),
+        current_user: dict = Depends(
+            allowed_roles(UserRole.ADMIN.value, UserRole.ANALYST.value)
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013")
+        return await self.service.upload_solar_report(
+            db=db,
+            asset_id=asset_id,
+            file=file,
+            validation_month=month,
+            validation_year=year,
+            current_user=current_user,
+        )
+
     async def merge_and_process_dataset(
         self,
         asset_id: int,

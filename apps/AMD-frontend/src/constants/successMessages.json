@@ -458,5 +458,20 @@
     "key": "settlement_files_list_retrieved",
     "message": "User logged out successfully.",
     "type": "success"
+  },
+  "S-10093": {
+    "key": "solar_report_uploaded",
+    "message": "Solar report uploaded successfully.",
+    "type": "success"
+  },
+  "S-10094": {
+    "key": "solar_kpi_vitals_retrieved",
+    "message": "Solar KPI vitals fetched successfully.",
+    "type": "success"
+  },
+  "S-10095": {
+    "key": "solar_generation_split_retrieved",
+    "message": "Solar generation split fetched successfully.",
+    "type": "success"
   }
 }

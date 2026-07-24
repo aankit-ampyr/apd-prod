@@ -20,6 +20,9 @@ import {
   AssetBestMarketsAnalysisRequest,
   AssetBestMarketsAnalysisExportRequest,
   AssetMarketRevenueDistributionRequest,
+  AssetSolarKpiVitalsRequest,
+  AssetSolarGenerationSplitRequest,
+  UploadSolarReportRequest,
   AssetMarketHourlyPricePatternsRequest,
   AssetBatteryPowerOverTimeRequest,
   AssetEnergyPriceComparisonRequest,
@@ -545,6 +548,35 @@ export async function assetMarketRevenueDistribution(params: AssetMarketRevenueD
   const {assetId, ...rest} = params;
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_revenue_distribution(assetId),
+    method: 'GET',
+    headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function uploadSolarReport({assetId, formData}: UploadSolarReportRequest['payload']) {
+  return await createAxiosInstance({
+    url: API.authUrls.asset_solar_report_upload(assetId),
+    method: 'POST',
+    headers: {...authHeaders},
+    data: formData,
+  });
+}
+
+export async function assetSolarKpiVitals(params: AssetSolarKpiVitalsRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_kpi_vitals(assetId),
+    method: 'GET',
+    headers: {...authHeaders},
+    params: rest,
+  });
+}
+
+export async function assetSolarGenerationSplit(params: AssetSolarGenerationSplitRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_generation_split(assetId),
     method: 'GET',
     headers: {...authHeaders},
     params: rest,

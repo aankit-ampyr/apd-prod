@@ -24,6 +24,7 @@ class AssetRouter:
         # report files
         self.router.post("/{asset_id}/aggregator-report")(self.controller.upload_aggregator_report)
         self.router.post("/{asset_id}/scada-report")(self.controller.upload_scada_report)
+        self.router.post("/{asset_id}/solar-report")(self.controller.upload_solar_report)
         self.router.post("/{asset_id}/iar-report")(self.controller.upload_iar_report)
         
 

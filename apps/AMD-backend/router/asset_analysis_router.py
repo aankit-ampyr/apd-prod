@@ -19,6 +19,10 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/operations/market-summary")(self.controller.get_market_summary)
         self.router.get("/{asset_id}/analysis/operations/energy-price")(self.controller.get_asset_energy_price_comparison)
         self.router.get("/{asset_id}/analysis/operations/battery-power-over-time")(self.controller.get_batter_power)
+
+        # solar analysis
+        self.router.get("/{asset_id}/analysis/solar/kpi-vitals")(self.controller.get_solar_kpi_vitals)
+        self.router.get("/{asset_id}/analysis/solar/generation-split")(self.controller.get_solar_generation_split)
         
         # multi market optmization
         self.router.get("/{asset_id}/analysis/market/summary")(self.controller.get_market_analysis_summary)

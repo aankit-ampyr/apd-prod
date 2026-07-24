@@ -17,6 +17,7 @@ import type {
   AssetBenchmarkRevenueActualvsIAR,
   AssetTBSpreadAnalytics,
   AssetMarketAnalytics,
+  AssetSolarAnalytics,
   AssetMarketPriceAnalytics,
   AssetOperationAnalytics,
   AssetReportFile,
@@ -129,6 +130,9 @@ export interface ApiConfigInterface {
     asset_analysis_market_best_markets: (assetId: number) => string;
     asset_analysis_market_best_markets_export: (assetId: number) => string;
     asset_analysis_market_revenue_distribution: (assetId: number) => string;
+    asset_solar_report_upload: (assetId: number) => string;
+    asset_analysis_solar_kpi_vitals: (assetId: number) => string;
+    asset_analysis_solar_generation_split: (assetId: number) => string;
     asset_analysis_market_hourly_price_patterns: (assetId: number) => string;
 
     // executive analysis related APIs
@@ -709,6 +713,36 @@ export interface AssetMarketRevenueDistributionRequest {
     market_strategy: 'multi' | 'epex_daily' | 'epex_efa' | 'actual';
   };
   response: APIResponse<AssetMarketAnalytics['revenue_distribution']>;
+}
+
+export interface AssetSolarKpiVitalsRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<AssetSolarAnalytics['kpi_vitals']>;
+}
+
+export interface AssetSolarGenerationSplitRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<AssetSolarAnalytics['generation_split']>;
+}
+
+export interface UploadSolarReportRequest {
+  payload: {
+    assetId: number;
+    formData: any; // formdata
+  };
+  response: APIResponse<AssetReportFile>;
+  error_response: APIResponse<{
+    file: {name: string};
+    validation_errors: string[];
+  }>;
 }
 
 export interface AssetMarketHourlyPricePatternsRequest {

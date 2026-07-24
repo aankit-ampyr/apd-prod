@@ -82,6 +82,52 @@ class AnalysisController:
             current_user=current_user,
         )
 
+    async def get_solar_kpi_vitals(
+        self,
+        asset_id: int,
+        month: Month = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+
+        return await self.service.get_solar_kpi_vitals(
+            db=db,
+            asset_id=asset_id,
+            month=month.value,
+            year=year,
+            current_user=current_user,
+        )
+
+    async def get_solar_generation_split(
+        self,
+        asset_id: int,
+        month: Month = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error("E-10013", message="Unauthorized: AMD platform required")
+
+        return await self.service.get_solar_generation_split(
+            db=db,
+            asset_id=asset_id,
+            month=month.value,
+            year=year,
+            current_user=current_user,
+        )
+
     async def get_market_summary(
         self,
         asset_id: int,

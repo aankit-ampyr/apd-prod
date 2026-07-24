@@ -105,6 +105,19 @@ import {
   assetMarketRevenueDistributionSuccess,
   assetMarketRevenueDistributionFailure,
 
+  // solar analysis
+  assetSolarKpiVitalsRequest,
+  assetSolarKpiVitalsSuccess,
+  assetSolarKpiVitalsFailure,
+  assetSolarGenerationSplitRequest,
+  assetSolarGenerationSplitSuccess,
+  assetSolarGenerationSplitFailure,
+
+  // solar upload
+  uploadSolarReportRequest,
+  uploadSolarReportSuccess,
+  uploadSolarReportFailure,
+
   // asset market hourly price patterns
   assetMarketHourlyPricePatternsRequest,
   assetMarketHourlyPricePatternsSuccess,
@@ -331,6 +344,9 @@ import {
   assetMarketUtilizationAnalysis,
   assetBestMarketsAnalysis,
   assetMarketRevenueDistribution,
+  assetSolarKpiVitals,
+  assetSolarGenerationSplit,
+  uploadSolarReport,
   assetMarketHourlyPricePatterns,
   assetEnergyPriceComparison,
   assetBatteryPowerOverTime,
@@ -704,6 +720,45 @@ function* AssetMarketRevenueDistributionSaga(
     }
   } catch (error: any) {
     yield put(assetMarketRevenueDistributionFailure(error.response?.data || error.response));
+  }
+}
+
+function* AssetSolarKpiVitalsSaga(action: ReturnType<typeof assetSolarKpiVitalsRequest>): Generator {
+  try {
+    const response: any = yield call(assetSolarKpiVitals, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(assetSolarKpiVitalsSuccess(response.data));
+    } else {
+      yield put(assetSolarKpiVitalsFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(assetSolarKpiVitalsFailure(error.response?.data || error.response));
+  }
+}
+
+function* AssetSolarGenerationSplitSaga(action: ReturnType<typeof assetSolarGenerationSplitRequest>): Generator {
+  try {
+    const response: any = yield call(assetSolarGenerationSplit, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(assetSolarGenerationSplitSuccess(response.data));
+    } else {
+      yield put(assetSolarGenerationSplitFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(assetSolarGenerationSplitFailure(error.response?.data || error.response));
+  }
+}
+
+function* UploadSolarReportSaga(action: ReturnType<typeof uploadSolarReportRequest>): Generator {
+  try {
+    const response: any = yield call(uploadSolarReport, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(uploadSolarReportSuccess(response.data));
+    } else {
+      yield put(uploadSolarReportFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(uploadSolarReportFailure(error.response?.data || error.response));
   }
 }
 
@@ -1300,6 +1355,9 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(assetMarketUtilizationAnalysisRequest.type, AssetMarketUtilizationAnalysisSaga);
   yield takeLatest(assetBestMarketsAnalysisRequest.type, AssetBestMarketsAnalysisSaga);
   yield takeLatest(assetMarketRevenueDistributionRequest.type, AssetMarketRevenueDistributionSaga);
+  yield takeLatest(assetSolarKpiVitalsRequest.type, AssetSolarKpiVitalsSaga);
+  yield takeLatest(assetSolarGenerationSplitRequest.type, AssetSolarGenerationSplitSaga);
+  yield takeLatest(uploadSolarReportRequest.type, UploadSolarReportSaga);
   yield takeLatest(assetMarketHourlyPricePatternsRequest.type, AssetMarketHourlyPricePatternsSaga);
   yield takeLatest(assetEnergyPriceComparisonRequest.type, AssetEnergyPriceComparisonSaga);
   yield takeLatest(assetBatteryPowerOverTimeRequest.type, AssetBatteryPowerOverTimeSaga);

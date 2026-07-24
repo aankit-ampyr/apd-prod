@@ -56,6 +56,7 @@ export const API: ApiConfigInterface = {
     asset_multiple_users: `api/v1/assets/users`,
     asset_aggregator_report_upload: (assetId: number) => `api/v1/assets/${assetId}/aggregator-report`,
     asset_scada_report_upload: (assetId: number) => `api/v1/assets/${assetId}/scada-report`,
+    asset_solar_report_upload: (assetId: number) => `api/v1/assets/${assetId}/solar-report`,
     asset_merge_dataset: (assetId: number) => `api/v1/assets/${assetId}/merge-dataset`,
     asset_optimized_dataset: (assetId: number) => `api/v1/assets/${assetId}/optimized-dataset`,
     asset_merged_dataset_download: (assetId: number) => `api/v1/assets/${assetId}/merged-dataset/download`,
@@ -145,6 +146,9 @@ export const API: ApiConfigInterface = {
       `api/v1/assets/${assetId}/analysis/market/best-markets/export`,
     asset_analysis_market_revenue_distribution: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/market/revenue-distribution`,
+    asset_analysis_solar_kpi_vitals: (assetId: number) => `api/v1/assets/${assetId}/analysis/solar/kpi-vitals`,
+    asset_analysis_solar_generation_split: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/solar/generation-split`,
     asset_analysis_market_hourly_price_patterns: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/market/hourly-price-patterns`,
 

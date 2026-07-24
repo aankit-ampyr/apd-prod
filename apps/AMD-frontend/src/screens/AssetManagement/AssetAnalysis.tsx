@@ -3,12 +3,14 @@ import {
   Tabs,
   AssetOperations,
   AssetMarket,
+  AssetSolar,
   AssetBatteryHealth,
   AssetAncillaryServices,
   AssetMarketPrices,
   AssetImabalanceAnalysis,
   AssetTbSpread,
 } from '@/components';
+import {AssetType} from '@/constants';
 import {MonthYear, SelectInputItem} from '@/interface';
 import {Routes} from '@/navigation/Routes';
 import {analysisAssetsList, assetError, assetSuccess, currentSelectedAsset} from '@/services/redux/selectors';
@@ -29,6 +31,7 @@ const TabsRoute = {
   PERFORMANCE: 'Performance',
   BATTERY_HEALTH: 'Battery Health',
   TB_SPREAD: 'TB Spread',
+  SOLAR: 'Solar',
 };
 
 export function AssetAnalysis() {
@@ -47,6 +50,7 @@ export function AssetAnalysis() {
   const success = useSelector(assetSuccess) as SuccessCodes;
   const failure = useSelector(assetError) as ErrorCodes;
   const allAssets = useSelector(analysisAssetsList);
+  const isSolar = currentAsset?.type === AssetType.Solar;
 
   // ==============
   // states
@@ -183,6 +187,25 @@ export function AssetAnalysis() {
             Select an asset and specify month and year to view analysis.
           </Text>
         </div>
+      ) : isSolar ? (
+        <Tabs
+          key={currentSelectedAssetID}
+          className="h-full mt-6"
+          tabButtonClassName="px-1"
+          defaultValue={TabsRoute.SOLAR}>
+          <Tabs.Screen
+            name={TabsRoute.SOLAR}
+            element={
+              <AssetSolar
+                key={location.pathname}
+                assetSystemGenerationId={currentAsset?.asset_id}
+                assetId={currentSelectedAssetID}
+                month={period?.month}
+                year={period?.year}
+              />
+            }
+          />
+        </Tabs>
       ) : (
         <Tabs
           key={currentSelectedAssetID}

@@ -2,6 +2,7 @@ import type {
   Asset,
   AssetOperationAnalytics,
   AssetMarketAnalytics,
+  AssetSolarAnalytics,
   Digest,
   Organization,
   User,
@@ -70,6 +71,7 @@ export interface AssetSliceInitialState {
   optimizedDatasetGenerationLoading: boolean;
   aggregatorReportUploadLoading: boolean;
   scadaReportUploadLoading: boolean;
+  solarReportUploadLoading: boolean;
   iarReportUploadLoading: boolean;
   currentAssetFilesLoading: boolean;
 
@@ -104,6 +106,7 @@ export interface AssetSliceInitialState {
 
   aggregatorReportUploadError: AssetFileUploadError | null;
   scadaReportUploadError: AssetFileUploadError | null;
+  solarReportUploadError: AssetFileUploadError | null;
   iarReportUploadError: AssetFileUploadError | null;
   invoiceUploadError: AssetFileUploadError | null;
   invoiceSettlementUploadError: AssetFileUploadError | null;
@@ -128,6 +131,10 @@ export interface AssetSliceInitialState {
       best_markets: Nullable<AssetMarketAnalytics['best_markets']>;
       statistics: Nullable<AssetMarketAnalytics['statistics']>;
       revenue_distribution: Nullable<AssetMarketAnalytics['revenue_distribution']>;
+    }>;
+    solar: Partial<{
+      kpi_vitals: Nullable<AssetSolarAnalytics['kpi_vitals']>;
+      generation_split: Nullable<AssetSolarAnalytics['generation_split']>;
     }>;
     market_prices: Partial<{
       spread: Nullable<AssetMarketPriceAnalytics['spread']>;
@@ -179,6 +186,11 @@ export interface AssetSliceInitialState {
       statistics: boolean;
     }>;
 
+    solar: Partial<{
+      kpi_vitals: boolean;
+      generation_split: boolean;
+    }>;
+
     market_prices: Partial<{
       spread: boolean;
       hourly_prices: boolean;
@@ -224,6 +236,10 @@ export interface AssetSliceInitialState {
       revenue_distribution: boolean | string;
       best_markets: boolean | string;
       statistics: boolean | string;
+    }>;
+    solar: Partial<{
+      kpi_vitals: boolean | string;
+      generation_split: boolean | string;
     }>;
     market_prices: Partial<{
       spread: boolean | string;

@@ -1113,5 +1113,10 @@
     "key": "invoice_pdf_invalid_file_type",
     "message": "Only PDF files are supported. Please upload a valid PDF invoice.",
     "type": "validation_error"
+  },
+  "E-10233": {
+    "key": "solar_dataset_asset_type_invalid",
+    "message": "Solar dataset upload is only applicable for Solar or Solar+BESS assets.",
+    "type": "validation_error"
   }
 }

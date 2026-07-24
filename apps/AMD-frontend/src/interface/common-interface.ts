@@ -102,6 +102,7 @@ export interface Asset {
   iar_report_file?: Nullable<AssetReportFile>;
   merged_dataset_file?: Nullable<AssetGenerateReport>;
   optimized_dataset_file?: Nullable<AssetGenerateReport>;
+  solar_dataset_file?: Nullable<AssetReportFile>;
 
   // invoice files
   invoice_file?: Nullable<Invoice>;
@@ -139,6 +140,27 @@ export interface Asset {
 }
 
 // asset analysis
+export interface AssetSolarAnalytics {
+  kpi_vitals: {
+    asset_id: number;
+    month: number;
+    year: number;
+    capacity_mw: number;
+    energy_exported_mwh: number;
+    peak_power_mw: number;
+    capacity_factor_pct: number | null;
+    specific_yield_kwh_per_kw: number | null;
+    performance_ratio_pct: number | null;
+    insolation_kwh_per_m2: number;
+  };
+  generation_split: {
+    asset_id: number;
+    month: number;
+    year: number;
+    chart_data: Array<{label: string; value: number}>;
+  };
+}
+
 export interface AssetOperationAnalytics {
   revenue: {
     sffr: number;

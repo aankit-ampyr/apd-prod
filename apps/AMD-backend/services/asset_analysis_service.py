@@ -544,6 +544,182 @@ class AnalysisService:
             traceback.print_exc()
             return Res.error("E-10001")
 
+    async def get_solar_kpi_vitals(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error(
+                    "E-10034", message=f"Asset with ID {asset_id} not found."
+                )
+
+            await audit_logs(
+                db=db,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.VIEW_ANALYSIS,
+                action=AuditLogScenario.VIEWED_ASSET_ANALYSIS,
+                before={
+                    "Asset": asset.name,
+                    "Month/Year": f"{month}/{year}",
+                },
+                after="User viewed Solar KPI vitals",
+                resource_id=asset.asset_id,
+            )
+            await db.commit()
+
+            file_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_DATASET.value,
+                    AssetFile.month == month,
+                    AssetFile.year == year,
+                )
+            )
+            solar_file = file_query.scalars().first()
+            if not solar_file:
+                return Res.error(
+                    "E-10100",
+                    message="Solar dataset is not available.",
+                    http_status_code=404,
+                )
+
+            try:
+                file_obj, _ = FileStorageManager.get_file_object(
+                    solar_file.key, storage_type=solar_file.storage_server
+                )
+                df = pd.read_excel(BytesIO(file_obj))
+
+                if "Timestamp" in df.columns:
+                    df["Timestamp"] = pd.to_datetime(df["Timestamp"], format="mixed")
+                    df.set_index("Timestamp", inplace=True)
+
+                filtered_df = df[(df.index.month == month) & (df.index.year == year)]
+                if filtered_df.empty:
+                    return Res.error(
+                        "E-10111",
+                        message="Analysis data not found for the selected period.",
+                    )
+
+            except botocore.exceptions.ClientError as e:
+                if e.response["Error"]["Code"] == "NoSuchKey":
+                    return Res.error(
+                        "E-10114",
+                        message="File key not found in S3. Please re-upload the solar report.",
+                    )
+                raise e
+            except Exception:
+                traceback.print_exc()
+                return Res.error("E-10001", message="Error processing analysis data.")
+
+            # 15-minute cadence: interval length in hours for energy/insolation integration
+            interval_hours = 0.25
+
+            energy_kwh = float(filtered_df.get("Export_kWh", 0).sum())
+            energy_mwh = energy_kwh / 1000
+            peak_power_mw = float(filtered_df.get("AC_Power_kW", 0).max()) / 1000
+            insolation_kwh_m2 = (
+                float((filtered_df.get("Irradiance_Wm2", 0) * interval_hours).sum())
+                / 1000
+            )
+
+            # capacity is stored as a single MW value on the asset
+            capacity_mw = float(asset.capacity) if asset.capacity else 0
+            capacity_kw = capacity_mw * 1000
+            hours_in_month = calendar.monthrange(year, month)[1] * 24
+
+            specific_yield = (
+                round(energy_kwh / capacity_kw, 2) if capacity_kw else None
+            )
+            capacity_factor_pct = (
+                round((energy_mwh / (capacity_mw * hours_in_month)) * 100, 2)
+                if capacity_mw and hours_in_month
+                else None
+            )
+            performance_ratio_pct = (
+                round((specific_yield / insolation_kwh_m2) * 100, 2)
+                if specific_yield is not None and insolation_kwh_m2
+                else None
+            )
+
+            return Res.success(
+                "S-10094",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "capacity_mw": round(capacity_mw, 2),
+                    "energy_exported_mwh": round(energy_mwh, 2),
+                    "peak_power_mw": round(peak_power_mw, 2),
+                    "capacity_factor_pct": capacity_factor_pct,
+                    "specific_yield_kwh_per_kw": specific_yield,
+                    "performance_ratio_pct": performance_ratio_pct,
+                    "insolation_kwh_per_m2": round(insolation_kwh_m2, 2),
+                },
+            )
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10001")
+
+    async def get_solar_generation_split(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error("E-10034", message="Asset not found")
+
+            file_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_DATASET.value,
+                    AssetFile.month == month,
+                    AssetFile.year == year,
+                )
+            )
+            solar_file = file_query.scalars().first()
+            if not solar_file:
+                return Res.error(
+                    "E-10100",
+                    message="Solar dataset is not available.",
+                    http_status_code=404,
+                )
+
+            file_obj, _ = FileStorageManager.get_file_object(
+                solar_file.key, storage_type=solar_file.storage_server
+            )
+            df = pd.read_excel(BytesIO(file_obj))
+
+            if "Timestamp" in df.columns:
+                df["Timestamp"] = pd.to_datetime(df["Timestamp"], format="mixed")
+                df.set_index("Timestamp", inplace=True)
+
+            filtered_df = df[(df.index.month == month) & (df.index.year == year)]
+
+            offpeak_mwh = round(
+                float(filtered_df.get("Offpeak_kWh", 0).sum()) / 1000, 2
+            )
+            peak_mwh = round(float(filtered_df.get("Peak_kWh", 0).sum()) / 1000, 2)
+
+            chart_data = [
+                {"label": "Off-Peak", "value": offpeak_mwh},
+                {"label": "Peak", "value": peak_mwh},
+            ]
+
+            return Res.success(
+                "S-10095",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    "chart_data": chart_data,
+                },
+            )
+        except Exception:
+            traceback.print_exc()
+            return Res.error("E-10135", message="Aggregation/calculation failed")
+
     async def get_market_summary(
         self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict
     ):
