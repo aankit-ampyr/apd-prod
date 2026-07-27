@@ -580,7 +580,7 @@ class AnalysisService:
             solar_file = file_query.scalars().first()
             if not solar_file:
                 return Res.error(
-                    "E-10100",
+                    "E-10237",
                     message="Solar dataset is not available.",
                     http_status_code=404,
                 )
@@ -605,7 +605,7 @@ class AnalysisService:
             except botocore.exceptions.ClientError as e:
                 if e.response["Error"]["Code"] == "NoSuchKey":
                     return Res.error(
-                        "E-10114",
+                        "E-10237",
                         message="File key not found in S3. Please re-upload the solar report.",
                     )
                 raise e
@@ -681,7 +681,7 @@ class AnalysisService:
             solar_file = file_query.scalars().first()
             if not solar_file:
                 return Res.error(
-                    "E-10100",
+                    "E-10237",
                     message="Solar dataset is not available.",
                     http_status_code=404,
                 )

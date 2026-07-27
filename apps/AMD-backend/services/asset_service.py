@@ -3051,11 +3051,11 @@ class AssetService:
                 )
             if size_bytes < 1024:
                 return Res.error(
-                    "E-10094", message="Solar file size must be at least 1 KB."
+                    "E-10235", message="Solar file size must be at least 1 KB."
                 )
             if size_bytes > 100 * 1024 * 1024:
                 return Res.error(
-                    "E-10095", message="Solar file size should not exceed 100 MB."
+                    "E-10236", message="Solar file size should not exceed 100 MB."
                 )
 
             # 2. Read required sheets & Validate
@@ -3073,7 +3073,7 @@ class AssetService:
                         for err in validation_errors
                     ]
                     return Res.error(
-                        "E-10087",
+                        "E-10234",
                         data={
                             "file": {"name": original_name},
                             "validation_errors": formatted_errors,
@@ -3082,13 +3082,13 @@ class AssetService:
             except Exception:
                 traceback.print_exc()
                 return Res.error(
-                    "E-10087", message="Failed to parse excel file content."
+                    "E-10234", message="Failed to parse excel file content."
                 )
 
             # 3. Build the normalized 15-min solar dataset
             dataset = self._build_solar_dataset(sheets)
             if dataset.empty:
-                return Res.error("E-10087", message="No valid solar data rows found.")
+                return Res.error("E-10234", message="No valid solar data rows found.")
 
             # 4. Derive month/year from the dominant period of the data
             periods = dataset["Timestamp"].dt.to_period("M")
@@ -3102,7 +3102,7 @@ class AssetService:
                 validation_year and file_year != validation_year
             ):
                 return Res.error(
-                    "E-10087",
+                    "E-10234",
                     data={
                         "validation_errors": [
                             f"File content month/year ({file_month}/{file_year}) does not match the expected month/year ({validation_month}/{validation_year})."
@@ -3958,9 +3958,6 @@ class AssetService:
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034", message="Asset not found")
-            if asset.type == AssetType.SOLAR.value:
-                return Res.error("E-10120", message="Not applicable for solar asset")
-
             query = select(AssetFile).where(AssetFile.asset_id == asset_id)
 
             if month is not None and len(month) > 0:

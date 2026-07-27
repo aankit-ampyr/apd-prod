@@ -1118,5 +1118,25 @@
     "key": "solar_dataset_asset_type_invalid",
     "message": "Solar dataset upload is only applicable for Solar or Solar+BESS assets.",
     "type": "validation_error"
+  },
+  "E-10234": {
+    "key": "solar_report_validation_failed",
+    "message": "Solar data file validation failed. Please check the file and try again.",
+    "type": "validation_error"
+  },
+  "E-10235": {
+    "key": "solar_file_min_size",
+    "message": "Solar data file size must be at least 1 KB.",
+    "type": "validation_error"
+  },
+  "E-10236": {
+    "key": "solar_file_max_size",
+    "message": "Solar data file size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10237": {
+    "key": "solar_dataset_not_found",
+    "message": "Solar dataset not found for the selected period.",
+    "type": "not_found_error"
   }
 }

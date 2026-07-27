@@ -801,7 +801,7 @@ const assetSlice = createSlice({
     uploadSolarReportFailure: (state, action: PayloadAction<UploadSolarReportRequest['error_response']>) => {
       state.solarReportUploadLoading = false;
       state.assetError = action.payload.status_code;
-      if (['E-10087', 'E-10084', 'E-10233'].includes(action.payload.status_code)) {
+      if (['E-10234', 'E-10084', 'E-10233'].includes(action.payload.status_code)) {
         if (!state.solarReportUploadError) {
           state.solarReportUploadError = {};
         }
@@ -2149,6 +2149,14 @@ const assetSlice = createSlice({
         const scadaFile = action.payload.response.data.find(item => item.type === AssetFileType.ScadaReport);
         const mergedFile = action.payload.response.data.find(item => item.type === AssetFileType.MergedDataset);
         const optimizedFile = action.payload.response.data.find(item => item.type === AssetFileType.OptimizedDataset);
+        const solarFile = action.payload.response.data.find(item => item.type === AssetFileType.SolarDataset);
+
+        if (solarFile) {
+          state.currentSelectedAsset.solar_dataset_file = solarFile;
+        } else {
+          state.currentSelectedAsset.solar_dataset_file = null;
+          state.solarReportUploadError = null;
+        }
 
         if (aggregatorFile) {
           state.currentSelectedAsset.aggregator_report_file = aggregatorFile;
