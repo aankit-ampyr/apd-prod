@@ -696,6 +696,11 @@ class AnalysisService:
                 df.set_index("Timestamp", inplace=True)
 
             filtered_df = df[(df.index.month == month) & (df.index.year == year)]
+            if filtered_df.empty:
+                return Res.error(
+                    "E-10111",
+                    message="Analysis data not found for the selected period.",
+                )
 
             offpeak_mwh = round(
                 float(filtered_df.get("Offpeak_kWh", 0).sum()) / 1000, 2
@@ -718,7 +723,9 @@ class AnalysisService:
             )
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10135", message="Aggregation/calculation failed")
+            return Res.error(
+                "E-10238", message="Failed to calculate the solar generation split."
+            )
 
     async def get_market_summary(
         self, db: AsyncSession, asset_id: int, month: int, year: int, current_user: dict

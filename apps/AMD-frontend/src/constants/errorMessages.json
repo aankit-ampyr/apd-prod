@@ -1138,5 +1138,10 @@
     "key": "solar_dataset_not_found",
     "message": "Solar dataset not found for the selected period.",
     "type": "not_found_error"
+  },
+  "E-10238": {
+    "key": "solar_generation_split_failed",
+    "message": "Failed to calculate the solar generation split.",
+    "type": "server_error"
   }
 }
