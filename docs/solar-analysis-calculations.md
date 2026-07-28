@@ -73,6 +73,45 @@ before any metric uses them.
 Only intervals present in `Meter data` survive; weather and power rows outside
 those intervals are discarded (the meter is the join spine).
 
+The April workbook carries a single irradiance sensor and a single plant-level
+power column, so the two cell ranges above are read directly. Other exports
+carry several sensors and one column per inverter — §2.1 covers how those are
+resolved into the same two operands.
+
+### 2.1 Raw columns only
+
+Plant workbooks contain columns the site team computes by hand inside the file
+(highlighted in the source). **None of them are read.** They are convenience
+aggregates of columns already present, and they carry the site's own arithmetic
+errors — in the May-26 export the manual `AC Power` column is out by a factor of
+60, which would have reported peak power as 0.12 MW instead of 7.39 MW.
+
+| Manual column | Sheet | Read instead |
+| --- | --- | --- |
+| `POA`, `Avg` | WMS | the raw irradiance sensor columns |
+| `AC Power` | Active Power 1 min | the raw per-inverter power columns |
+| `sum` | Active Power 15 min | the raw per-inverter power columns |
+| `DC Gen`, `Mod temp` | — | not used by these metrics |
+
+`Meter data` contains no calculated columns, so all six meter-derived numbers
+come straight from the instrument.
+
+The two derived operands are therefore built as:
+
+```
+Irradiance_Wm2 = mean of every raw irradiance sensor column
+                 (header contains "irradiance" or "radiation";
+                  temperature columns and the manual POA/Avg excluded)
+
+AC_Power_kW    = sum of the raw per-inverter columns / 1000     (values in W)
+                 or, in exports that have no per-inverter data,
+                 the plant-level "Fleet Sum" column              (already kW)
+```
+
+Averaging the raw sensors reproduces the manual `POA` column exactly (maximum
+difference 0.000000 across May and June), and summing the raw inverter columns
+reproduces a correct `AC Power` exactly where that column is itself correct.
+
 ---
 
 ## 3. The calculations
@@ -180,6 +219,30 @@ Reconciliation: `380.93 + 962.41 = 1343.34` = energy exported. ✔
 Unused by these metrics: `Meter data!H` (`Meterstand`, the cumulative register),
 `WMS!C` (module temperature), and the `Setpoint`, `Active Power 15 min`,
 `String DC Current`, `AC & DC Active Power` and `Daily AC Power` sheets.
+
+### 4.1 Verified figures across months
+
+Produced from the plant exports through the upload endpoint. Useful as test
+vectors — a re-implementation should reproduce these.
+
+| Month | Export MWh | Peak MW | Insol kWh/m² | CF % | PR % | Off-peak | Peak |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Feb-26 | 212.77 | 3.11 | 36.88 | 3.23 | 58.87 | 63.10 | 147.04 |
+| Mar-26 | 607.78 | 6.43 | 108.40 | 8.34 | 57.21 | 174.20 | 424.31 |
+| Apr-26 | 1343.34 | 7.66 | 160.55 | 19.04 | 85.38 | 380.93 | 962.41 |
+| May-26 | 1328.73 | 7.39 | 179.60 | 18.22 | 75.49 | 525.22 | 803.52 |
+| Jun-26 | 1174.67 | 6.77 | 178.43 | 16.65 | 67.18 | 296.21 | 878.13 |
+
+Two notes on comparability. April and earlier expose a plant-level power
+measurement; May onward expose only per-inverter columns, so peak power from May
+is inverter-referenced and sits a few percent below an equivalent plant reading.
+April's higher performance ratio also reflects a single irradiance sensor where
+later months average two.
+
+One source defect is worth recording: in the June export the second irradiance
+sensor's header was the number `-1` rather than a name. It was corrected in the
+file to `KippZonenSMP1020232979:IrradianceW/m²`; until the site fixes its export
+template the same header should be expected in later months.
 
 ---
 

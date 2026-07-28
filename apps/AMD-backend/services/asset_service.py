@@ -2887,12 +2887,36 @@ class AssetService:
             await db.rollback()
             return Res.error("E-10098")
 
-    def _find_col(self, df, keyword):
-        keyword = keyword.lower()
+    # Columns the plant computes by hand inside the workbook (highlighted in
+    # the source file). They are ignored so the dashboard is derived from raw
+    # instrument readings only.
+    SOLAR_MANUAL_COLUMNS = ("poa", "avg", "ac power", "sum", "dc gen", "mod temp")
+
+    def _find_irradiance_cols(self, df):
+        """Raw irradiance sensor columns, averaged later into a single series."""
+        cols = []
         for col in df.columns:
-            if keyword in str(col).lower():
-                return col
-        return None
+            name = str(col).strip().lower()
+            if name in self.SOLAR_MANUAL_COLUMNS or "temp" in name:
+                continue
+            if "irradiance" in name or "radiation" in name:
+                cols.append(col)
+        return cols
+
+    def _find_power_cols(self, df):
+        """Raw AC power columns and the divisor that converts them to kW.
+
+        Newer exports carry one column per inverter in W; older ones carry a
+        single plant-level total already in kW.
+        """
+        inverters = [
+            col for col in df.columns if "powerac" in str(col).lower().replace(" ", "")
+        ]
+        if inverters:
+            return inverters, 1000
+
+        plant = [col for col in df.columns if "fleet sum" in str(col).lower()]
+        return plant, 1
 
     def _read_solar_sheet(self, xl, sheet_name):
         # Some plant exports ship a stray summary row above the real header
@@ -2941,24 +2965,25 @@ class AssetService:
                         }
                     )
 
-        # Irradiance / active-power columns carry a plant-specific prefix,
-        # so match them by keyword rather than an exact name.
-        if "WMS" in sheets and not self._find_col(sheets["WMS"], "Irradiance"):
+        # Sensor column names carry a plant-specific prefix and vary between
+        # exports, so match them by keyword rather than an exact name.
+        if "WMS" in sheets and not self._find_irradiance_cols(sheets["WMS"]):
             errors.append(
                 {
                     "column": "Irradiance",
                     "row": None,
-                    "message": "No irradiance column found in sheet 'WMS'.",
+                    "message": "No irradiance sensor column found in sheet 'WMS'.",
                 }
             )
-        if "Active Power 1 min" in sheets and not self._find_col(
-            sheets["Active Power 1 min"], "Active Power"
+        if (
+            "Active Power 1 min" in sheets
+            and not self._find_power_cols(sheets["Active Power 1 min"])[0]
         ):
             errors.append(
                 {
                     "column": "Active Power",
                     "row": None,
-                    "message": "No active power column found in sheet 'Active Power 1 min'.",
+                    "message": "No AC power column found in sheet 'Active Power 1 min'.",
                 }
             )
 
@@ -2981,25 +3006,32 @@ class AssetService:
         ).dropna(subset=["Timestamp"])
         spine["merge_key"] = spine["Timestamp"].dt.floor("15min")
 
-        # WMS irradiance (1-min) resampled to the 15-min grid as a mean.
+        # WMS irradiance: average the raw sensors, then resample the 1-min
+        # series onto the 15-min grid as a mean.
         wms = sheets["WMS"].copy()
-        irr_col = self._find_col(wms, "Irradiance")
+        irr_cols = self._find_irradiance_cols(wms)
         wms["merge_key"] = pd.to_datetime(wms["Time"], errors="coerce").dt.floor(
             "15min"
         )
-        wms["Irradiance_Wm2"] = pd.to_numeric(wms[irr_col], errors="coerce")
+        wms["Irradiance_Wm2"] = (
+            wms[irr_cols].apply(pd.to_numeric, errors="coerce").mean(axis=1)
+        )
         wms = wms.dropna(subset=["merge_key"])
         irr_grouped = (
             wms.groupby("merge_key")["Irradiance_Wm2"].mean().reset_index()
         )
 
-        # Fleet AC power (1-min) resampled to 15-min as a max to preserve the peak.
+        # Fleet AC power: total the raw power columns, then resample to 15-min
+        # as a max so the peak is preserved.
         power = sheets["Active Power 1 min"].copy()
-        power_col = self._find_col(power, "Active Power")
+        power_cols, power_divisor = self._find_power_cols(power)
         power["merge_key"] = pd.to_datetime(power["Time"], errors="coerce").dt.floor(
             "15min"
         )
-        power["AC_Power_kW"] = pd.to_numeric(power[power_col], errors="coerce")
+        power["AC_Power_kW"] = (
+            power[power_cols].apply(pd.to_numeric, errors="coerce").sum(axis=1)
+            / power_divisor
+        )
         power = power.dropna(subset=["merge_key"])
         power_grouped = (
             power.groupby("merge_key")["AC_Power_kW"].max().reset_index()
