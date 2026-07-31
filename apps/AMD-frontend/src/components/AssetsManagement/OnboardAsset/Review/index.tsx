@@ -66,10 +66,11 @@ interface ReviewProps {
   onUnsavedChangesChange?: (value: boolean) => void;
   registerDiscardHandler?: (fn: () => void) => void;
   mode?: 'create' | 'edit';
+  assetTypeOverride?: AssetType | null;
 }
 
 export function Review(props: ReviewProps) {
-  const {onUnsavedChangesChange, registerDiscardHandler, mode = 'create'} = props;
+  const {onUnsavedChangesChange, registerDiscardHandler, mode = 'create', assetTypeOverride} = props;
   // ===============================================================
   // hooks
   // ===============================================================
@@ -136,7 +137,8 @@ export function Review(props: ReviewProps) {
   /**
    * this a utility variable to store the boolean value, can be used to conditionally render section for solar asset
    */
-  const isNonSolarAsset = currentAsset?.type !== AssetType.Solar;
+  const effectiveAssetType = currentAsset?.type ?? assetTypeOverride;
+  const isNonSolarAsset = effectiveAssetType !== AssetType.Solar;
 
   /**
    * state to whether this step is locked or not (i.e. user cannot proceed to create asset until completing previous steps and unlocking this step)
@@ -154,7 +156,9 @@ export function Review(props: ReviewProps) {
   /**
    * A derevied flag to check whether the file upload section (aggregator-&-scada and IAR report) has file uploaded or not, if not disable the create asset button.
    */
-  const isFileUploadSectionValid = isAggregatorScadaSectionValid(currentAsset) && isIARScadaSectionValid(currentAsset);
+  const isFileUploadSectionValid = isNonSolarAsset
+    ? isAggregatorScadaSectionValid(currentAsset) && isIARScadaSectionValid(currentAsset)
+    : Boolean(currentAsset?.solar_dataset_file);
 
   /**
    * ref to reset the form values after changes inside them are discarded via discard CTA in unsaved changes modal.
@@ -225,6 +229,12 @@ export function Review(props: ReviewProps) {
 
   function handleBack() {
     navigate(Routes.ASSET_MANAGEMENT);
+  }
+
+  function handleSolarViewAnalysis() {
+    if (!currentAsset?.id) return;
+
+    navigate(Routes.VIEW_ASSET_ANALYSIS.replace(':id', String(currentAsset.id)));
   }
 
   function runOrBlockAction(action: () => void) {
@@ -538,7 +548,19 @@ export function Review(props: ReviewProps) {
                 />
               ) : null
             }
-            children={() => <SolarFileUpload monthYearValidation={reportingPeriod ?? undefined} />}
+            children={() => (
+              <div className="flex flex-col gap-4">
+                <SolarFileUpload monthYearValidation={reportingPeriod ?? undefined} />
+                <Button
+                  rightIcon="link"
+                  onClick={handleSolarViewAnalysis}
+                  variant="secondary"
+                  text="View Analysis"
+                  disabled={!currentAsset?.solar_dataset_file}
+                  className="w-45 bg-white justify-center self-center"
+                />
+              </div>
+            )}
           />
         )}
         {isNonSolarAsset && (
@@ -591,10 +613,10 @@ export function Review(props: ReviewProps) {
                 children={() => invoiceUploadSectionMemo}
               />
             )}
-
-            {isAssetOnboarded && <UploadFileHistory />}
           </>
         )}
+
+        {isAssetOnboarded && <UploadFileHistory />}
 
         <WithRole roles={[UserRole.Admin]}>
           {currentAsset?.status !== AssetStatus.PendingApproval && (

@@ -12,6 +12,7 @@ import {
   WithRole,
   Divider,
 } from '@/components';
+import {SolarFileUpload} from '@/components/AssetsManagement/OnboardAsset/SolarFileUpload';
 import {StepsWithUnderscoreType} from '@/interface';
 import {Images} from '@lazarus/react-common/assets';
 import {cn, ErrorCodes, formatDate, getErrorMessage, getSuccessMessage, matchesRoute, SuccessCodes} from '@/utils';
@@ -38,8 +39,9 @@ import {
   gotoReviewStep,
   getAllOrganizationsListRequest,
 } from '@/services/redux/slice';
-import {AssetStatus, AssetSteps, AssetType, UserRole} from '@/constants';
-import {AlertBox, Skeleton, Text} from '@/ui-kits';
+import {editAssetDetails} from '@/services/api';
+import {AssetStatus, AssetSteps, AssetType, SUCCESS_KEY, UserRole} from '@/constants';
+import {AlertBox, Button, Skeleton, Text} from '@/ui-kits';
 
 const steps: StepsWithUnderscoreType[] = [
   {
@@ -69,6 +71,36 @@ const steps: StepsWithUnderscoreType[] = [
   },
 ];
 
+const solarSteps: StepsWithUnderscoreType[] = [
+  {
+    image: Images.fileEdit,
+    label: 'Basic Information',
+    step: 1,
+  },
+  {
+    image: Images.upload,
+    label: 'Solar Data Upload',
+    step: 2,
+  },
+  {
+    image: Images.fileSuccess,
+    label: 'Review',
+    step: 3,
+  },
+];
+
+const solarRealToVisualStep: Record<number, number> = {
+  [AssetSteps.BasicInformation]: 1,
+  [AssetSteps.AggregatorScada]: 2,
+  [AssetSteps.Review]: 3,
+};
+
+const solarVisualToRealStep: Record<number, number> = {
+  1: AssetSteps.BasicInformation,
+  2: AssetSteps.AggregatorScada,
+  3: AssetSteps.Review,
+};
+
 export function OnboardAssetScreen() {
   // ==================
   // hooks
@@ -95,8 +127,10 @@ export function OnboardAssetScreen() {
   // state
   // =================
   const [showHeaderStep, setShowHeaderSteps] = useState<boolean>(true);
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetType | null>(currentAsset?.type ?? null);
   const [step, setStep] = useState<number>(currentAsset?.current_step ?? 0);
   const [reviewHasUnsavedChanges, setReviewHasUnsavedChanges] = useState(false);
+  const [solarProceedLoading, setSolarProceedLoading] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
   const [pendingStepAction, setPendingStepAction] = useState<null | (() => void)>(null);
   const [showPostApprovalAlert, setShowPostApprovalAlert] = useState(false);
@@ -133,6 +167,12 @@ export function OnboardAssetScreen() {
     setStep(nextStep);
   }
 
+  function handleWizardStepChange(nextStep: number) {
+    const targetStep = isSolarAsset ? solarVisualToRealStep[nextStep] : nextStep;
+    if (!targetStep) return;
+    handleStepChange(targetStep);
+  }
+
   function handleCloseUnsavedChangesModal() {
     setShowUnsavedChangesModal(false);
     setPendingStepAction(null);
@@ -157,6 +197,33 @@ export function OnboardAssetScreen() {
   function handleIARSave() {
     setStep(AssetSteps.Review);
     dispatch(gotoReviewStep());
+  }
+
+  async function handleSolarUploadSave() {
+    if (!currentAsset?.id) return;
+
+    setSolarProceedLoading(true);
+    try {
+      const {data} = await editAssetDetails({
+        id: currentAsset.id,
+        current_step: AssetSteps.Review,
+      });
+
+      if (data.status === SUCCESS_KEY) {
+        setStep(AssetSteps.Review);
+        dispatch(gotoReviewStep());
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSolarProceedLoading(false);
+    }
+  }
+
+  function handleSolarViewAnalysis() {
+    if (!currentAsset?.id) return;
+
+    navigate(Routes.VIEW_ASSET_ANALYSIS.replace(':id', String(currentAsset.id)));
   }
 
   const aggregatorReportError = useSelector(aggregatorReportUploadError);
@@ -201,7 +268,9 @@ export function OnboardAssetScreen() {
       // S-10040 => IAR file deleted successfully.
       // S-10041 => Asset created successfully.
       // S-10052 => Optimized dataset generated successfully.
+      // S-10053 => Asset file removed successfully.
       // S-10063 => Asset submitted for approval successfully.
+      // S-10093 => Solar report uploaded successfully.
       // If you want to update the query param to 'edit' on success, you can use navigate here
       // if (!['S-10015', 'S-10026', 'S-10029', 'S-10047', 'S-10045'].includes(success)) {
       if (
@@ -216,7 +285,9 @@ export function OnboardAssetScreen() {
           'S-10040',
           'S-10041',
           'S-10052',
+          'S-10053',
           'S-10063',
+          'S-10093',
         ].includes(success)
       ) {
         showToast(getSuccessMessage(success), 'success');
@@ -235,7 +306,7 @@ export function OnboardAssetScreen() {
        */
       if (success === 'S-10025' && location.pathname === Routes.ASSET_ONBOARDING && currentAsset) {
         if (currentAsset.type === AssetType.Solar) {
-          navigate(Routes.VIEW_ASSET.replace(':id', String(currentAsset?.id)), {replace: true});
+          navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
         } else {
           navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
         }
@@ -271,6 +342,16 @@ export function OnboardAssetScreen() {
   }, [currentAsset?.current_step, currentAsset?.type]);
 
   useEffect(() => {
+    if (!currentAsset?.current_step || currentAsset?.type !== AssetType.Solar) return;
+    setStep(currentAsset.current_step);
+  }, [currentAsset?.current_step, currentAsset?.type]);
+
+  useEffect(() => {
+    if (!currentAsset?.type) return;
+    setSelectedAssetType(currentAsset.type);
+  }, [currentAsset?.type]);
+
+  useEffect(() => {
     if (isPendingApprovalNavigationLocked && step !== AssetSteps.Review) {
       setStep(AssetSteps.Review);
     }
@@ -292,8 +373,8 @@ export function OnboardAssetScreen() {
       navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
     }
 
-    // if bess, hybrid asset is changed to solar in user is not onboarding screen, go back to view asset
-    if (isOnboardAssetRoute && currentAsset?.type === AssetType.Solar) {
+    // If an already onboarded solar asset is opened on onboarding route, go back to view asset.
+    if (isOnboardAssetRoute && currentAsset?.type === AssetType.Solar && isAssetOnboarded) {
       navigate(Routes.VIEW_ASSET.replace(':id', String(currentAsset?.id)), {replace: true});
     }
   }, [location.pathname, currentAsset?.type, isLoading, isAssetNormaLoading, isAssetOnboarded]);
@@ -367,6 +448,12 @@ export function OnboardAssetScreen() {
       setStep(AssetSteps.BasicInformation);
     }
   }, [step, location.pathname]);
+
+  const isSolarAsset = (currentAsset?.type ?? selectedAssetType) === AssetType.Solar;
+  const wizardSteps = isSolarAsset ? solarSteps : steps;
+  const wizardCurrentStep = isSolarAsset ? solarRealToVisualStep[step] ?? 1 : step;
+  const wizardMaxStep = isSolarAsset ? 3 : 5;
+
   return (
     <ScreenWrapper
       className={cn(
@@ -392,10 +479,10 @@ export function OnboardAssetScreen() {
                 <StepsWithUnderscore
                   className="justify-center trans"
                   loading={true}
-                  maxStep={5}
+                  maxStep={wizardMaxStep}
                   gotoStep={() => {}}
-                  steps={steps}
-                  currentStep={step}
+                  steps={wizardSteps}
+                  currentStep={wizardCurrentStep}
                 />
               </div>
             )
@@ -404,15 +491,15 @@ export function OnboardAssetScreen() {
             <React.Fragment />
           ) : (
             <div className="absolute top-15 -translate-y-1/2 flex items-center">
-              {showHeaderStep && currentAsset?.type !== AssetType.Solar && (
+              {showHeaderStep && (
                 <StepsWithUnderscore
                   className={
                     isPendingApprovalNavigationLocked ? '[&>button:not(:last-child)]:cursor-not-allowed' : undefined
                   }
-                  maxStep={5}
-                  gotoStep={isPendingApprovalNavigationLocked ? () => {} : handleStepChange}
-                  steps={steps}
-                  currentStep={step}
+                  maxStep={wizardMaxStep}
+                  gotoStep={isPendingApprovalNavigationLocked ? () => {} : handleWizardStepChange}
+                  steps={wizardSteps}
+                  currentStep={wizardCurrentStep}
                 />
               )}
             </div>
@@ -584,6 +671,7 @@ export function OnboardAssetScreen() {
         {isAssetOnboarded ? (
           <Review
             mode="edit"
+            assetTypeOverride={selectedAssetType}
             onUnsavedChangesChange={setReviewHasUnsavedChanges}
             registerDiscardHandler={fn => {
               reviewDiscardRef.current = fn;
@@ -596,17 +684,51 @@ export function OnboardAssetScreen() {
                 mode={mode as any}
                 onBack={() => navigate(Routes.ASSET_MANAGEMENT)}
                 continueOnboarding={() => setStep(Math.min((currentAsset?.current_step ?? 0) + 1, AssetSteps.Review))}
-                hideHeaderFunc={p => setShowHeaderSteps(!p)}
+                hideHeaderFunc={type => {
+                  setSelectedAssetType(type);
+                  setShowHeaderSteps(true);
+                }}
               />
             )}
             {step === AssetSteps.OptimizationConfiguration && (
               <OptimizationParams mode={mode as any} onBack={() => navigate(-1)} />
             )}
-            {step === AssetSteps.AggregatorScada && <UploadAssetReport onSave={handleAggregatorScadaSave} />}
+            {step === AssetSteps.AggregatorScada &&
+              (isSolarAsset ? (
+                <div className="flex flex-col gap-4 w-full">
+                  <SolarFileUpload />
+                  <div className="grid self-center justify-items-center gap-4 grid-cols-3">
+                    <Button
+                      variant="secondary"
+                      text="Back"
+                      className="w-45 bg-white justify-center"
+                      onClick={() => setStep(AssetSteps.BasicInformation)}
+                    />
+                    <Button
+                      rightIcon="link"
+                      onClick={handleSolarViewAnalysis}
+                      variant="secondary"
+                      text="View Analysis"
+                      disabled={!currentAsset?.solar_dataset_file}
+                      className="w-45 bg-white justify-center"
+                    />
+                    <Button
+                      text="Save & Continue"
+                      className="w-45 justify-center"
+                      loading={solarProceedLoading}
+                      disabled={!currentAsset?.solar_dataset_file}
+                      onClick={handleSolarUploadSave}
+                    />
+                  </div>
+                </div>
+              ) : (
+                <UploadAssetReport onSave={handleAggregatorScadaSave} />
+              ))}
             {step === AssetSteps.IAR && <IARUpload onSave={handleIARSave} />}
             {step === AssetSteps.Review && (
               <Review
                 mode="create"
+                assetTypeOverride={selectedAssetType}
                 onUnsavedChangesChange={setReviewHasUnsavedChanges}
                 registerDiscardHandler={fn => {
                   reviewDiscardRef.current = fn;

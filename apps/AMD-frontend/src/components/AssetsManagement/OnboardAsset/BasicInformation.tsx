@@ -46,7 +46,7 @@ const initialValues: FormInitalValues = {
 
 interface BasicInfoProps {
   onBack: () => void;
-  hideHeaderFunc: (val: boolean) => void;
+  hideHeaderFunc: (val: AssetType | null) => void;
   continueOnboarding: () => void;
   mode: 'add' | 'edit';
 }
@@ -169,9 +169,7 @@ export function AssetBasicInformation(props: BasicInfoProps) {
   }, [failure, success]);
 
   useEffect(() => {
-    if (values.type) {
-      hideHeaderFunc(values.type === AssetType.Solar);
-    }
+    hideHeaderFunc(values.type);
   }, [values.type]);
 
   /**

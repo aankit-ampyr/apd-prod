@@ -18,6 +18,14 @@
 # Logs
 *.log
 
+# Local runtime/generated data
+**/local-storage
+**/.local-runtime
+**/tmp_solar_upload.xlsx
+**/local_bootstrap.py
+docker-compose.local.yml
+docker/local-postgres-init.sql
+
 # Local env files (use env_file in docker-compose)
 **/.env.local
 **/.env.*.local

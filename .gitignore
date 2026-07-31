@@ -58,3 +58,13 @@ scripts/
 
 *.egg-info/
 *.egg
+
+# Local AMD backend upload storage
+apps/AMD-backend/.local-runtime/
+apps/AMD-backend/local-storage/
+apps/AMD-backend/tmp_solar_upload.xlsx
+
+# Local-only Docker/bootstrap helpers
+docker-compose.local.yml
+docker/local-postgres-init.sql
+apps/AMD-backend/local_bootstrap.py

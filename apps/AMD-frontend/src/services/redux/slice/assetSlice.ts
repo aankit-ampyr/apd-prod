@@ -794,8 +794,20 @@ const assetSlice = createSlice({
             start_timestamp: action.payload.data?.projection_summary?.start_timestamp || '',
           },
           total_rows: action.payload.data.total_rows,
+          month: action.payload.data.month,
+          year: action.payload.data.year,
           type: AssetFileType.SolarDataset,
         };
+        if (action.payload.data.month && action.payload.data.year) {
+          state.currentSelectedAsset.active_period = {
+            month: action.payload.data.month,
+            year: action.payload.data.year,
+          };
+        }
+        state.currentSelectedAsset.current_step = Math.max(
+          state.currentSelectedAsset.current_step ?? AssetSteps.BasicInformation,
+          AssetSteps.AggregatorScada,
+        );
       }
     },
     uploadSolarReportFailure: (state, action: PayloadAction<UploadSolarReportRequest['error_response']>) => {
@@ -2313,9 +2325,10 @@ const assetSlice = createSlice({
       state.isLoading = false;
       state.assetSuccess = action.payload.status_code;
       if (action.payload.data && state.currentSelectedAsset) {
-        const {file_id, asset_id, child_files} = action.payload.data;
+        const {file_id, asset_id, file_type, child_files} = action.payload.data;
         let isMergedFileRemoved = false;
         let isOptimizedFileRemoved = false;
+        let isSolarDatasetRemoved = false;
         const childFileIds = child_files ? child_files.map(f => f.file_id) : [];
 
         if (asset_id !== state.currentSelectedAsset.id) {
@@ -2330,6 +2343,10 @@ const assetSlice = createSlice({
         }
         if (state.currentSelectedAsset.iar_report_file?.id === file_id) {
           state.currentSelectedAsset.iar_report_file = null;
+        }
+        if (state.currentSelectedAsset.solar_dataset_file?.id === file_id) {
+          state.currentSelectedAsset.solar_dataset_file = null;
+          isSolarDatasetRemoved = true;
         }
         // remove merged dataset either direct deletion or if the removed file is a child file of the merged dataset
         if (
@@ -2362,7 +2379,7 @@ const assetSlice = createSlice({
         }
 
         // update the asset file list, where analysis_available will be set to false if the removed file is a merged dataset or if the removed file is a child file of the merged dataset, as both cases will lead to the merged dataset becoming unavailable for analysis
-        if (isMergedFileRemoved || isOptimizedFileRemoved) {
+        if (isMergedFileRemoved || isOptimizedFileRemoved || isSolarDatasetRemoved || file_type === AssetFileType.SolarDataset) {
           if (state.bess.assets) {
             state.bess.assets = state.bess.assets.map(asset =>
               asset.id === action.payload.data?.asset_id ? {...asset, analysis_available: false} : asset,
@@ -2370,6 +2387,11 @@ const assetSlice = createSlice({
           }
           if (state.solarBess.assets) {
             state.solarBess.assets = state.solarBess.assets.map(asset =>
+              asset.id === action.payload.data?.asset_id ? {...asset, analysis_available: false} : asset,
+            );
+          }
+          if (state.solar.assets) {
+            state.solar.assets = state.solar.assets.map(asset =>
               asset.id === action.payload.data?.asset_id ? {...asset, analysis_available: false} : asset,
             );
           }

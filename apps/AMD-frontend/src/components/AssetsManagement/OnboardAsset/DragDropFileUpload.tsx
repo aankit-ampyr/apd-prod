@@ -131,7 +131,10 @@ export function DragAndDrop(props: DragAndDropProps) {
   // side effects
   // ===================
   useEffect(() => {
-    if (success && ['S-10029', 'S-10030', 'S-10033', 'S-10034', 'S-10039', 'S-10040', 'S-10053'].includes(success)) {
+    if (
+      success &&
+      ['S-10029', 'S-10030', 'S-10033', 'S-10034', 'S-10039', 'S-10040', 'S-10053', 'S-10093'].includes(success)
+    ) {
       resetLocalSelection();
     }
     // any failure, reset the state

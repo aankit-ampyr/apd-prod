@@ -40,7 +40,7 @@ export function ReportingPeriod(props: ReportingPeriodProps) {
           :
         </Text>
       </div>
-      <div className="relative z-50">
+      <div className="relative z-9999">
         <MonthYearPicker
           value={value}
           onChange={onChange}

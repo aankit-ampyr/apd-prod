@@ -3,6 +3,13 @@
 .env.local
 .env.*.local
 
+# Local runtime/generated data
+local-storage/
+.local-runtime/
+tmp_solar_upload.xlsx
+uvicorn*.log
+local_bootstrap.py
+
 # Virtual environment
 venv/
 .venv/
