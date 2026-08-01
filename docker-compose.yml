@@ -25,6 +25,18 @@ services:
     depends_on:
       - amd-backend
     restart: unless-stopped
+  
+  amd-worker:
+    build:
+      context: .
+      dockerfile: ./apps/AMD-backend/Dockerfile
+    container_name: lazarus-AMD-worker-test
+    env_file:
+      - ./apps/AMD-backend/.env
+    depends_on:
+      - lazarus-redis
+    command:
+      ["/app/.venv/bin/taskiq", "worker", "broker:broker", "--workers", "1"]
 
   bess-backend:
     build:

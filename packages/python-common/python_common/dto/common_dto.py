@@ -1,6 +1,7 @@
 import re
 from typing import List, Any, Optional
-from pydantic import BaseModel, EmailStr, field_validator, ValidationInfo
+from datetime import datetime
+from pydantic import BaseModel, ConfigDict, EmailStr, field_validator, ValidationInfo
 from python_common.exceptions import EmptyEmailField, InvalidEmail
 
 
@@ -47,9 +48,11 @@ class OTPLoginPayload(OTPRequestPayload):
             raise ValueError("E-10041")
 
         return v
-    
+
+
 class RefreshTokenPayload(BaseModel):
     refresh_token: str
+
 
 class Pagination(BaseModel):
     records: List[Any] = []
@@ -58,12 +61,28 @@ class Pagination(BaseModel):
     current_page: int
     next_page: Optional[int] | None = None
 
+
 class LogParams(BaseModel):
     user_id: str
     user_role: int
     module: int
     action: int
-    before: Optional[str] | None = None 
-    after: Optional[str] | None = None
+    before: Optional[Any] | None = None 
+    after: Optional[Any] | None = None
     resource_id: Optional[str] | None = None
     db: Any
+
+
+class AuditLogSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    log_id: str
+    user_id: str
+    resource_id: Optional[str]
+    role: int
+    module: int
+    action: int
+    before: Optional[str]
+    after: Optional[str]
+    created_at: datetime

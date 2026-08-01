@@ -12,12 +12,15 @@ from constants.enums import (
     APDAuditLogScenario as AuditLogScenario,
     APDAuditLogModules as AuditLogModules,
 )
-from utils.log_utils import audit_logs
+from utils.log_utils import audit_logs, build_sectioned_audit_payload
+from redis.asyncio import Redis
 from python_common.utils import paginate
 from fastapi import BackgroundTasks
 
 
 class DigestService:
+    DIGEST_CONFIGURATION_AUDIT_SECTION = "DIGEST CONFIGURATION"
+
     async def get_list(
         self,
         db: AsyncSession,
@@ -72,8 +75,8 @@ class DigestService:
 
         if total_results == 0:
             if filter_applied:
-                return Res.error("E-10015")
-            return Res.error("E-10014")
+                return Res.error("E-10015", message="No digests found matching the provided filters", http_status_code=404)
+            return Res.error("E-10014", message="No digests found.", http_status_code=404)
 
         data = []
         for digest in digests:
@@ -168,22 +171,20 @@ class DigestService:
     async def create(
         self,
         db: AsyncSession,
+        redis: Redis,
         current_user: dict,
         data,
         background_tasks: BackgroundTasks,
     ):
-        if not current_user:
-            return Res.error("E-10001", message="User not authenticated")
-
         if Platform.AMD.value not in current_user.get("platform", []):
-            return Res.error("E-10013", message="Only AMD admin can access this API")
+            return Res.error("E-10013", message="Only AMD admin can access this API", http_status_code=403)
 
         # Duplicate Check
         exist = await db.execute(
             select(DigestConfiguration).where(DigestConfiguration.name == data.name)
         )
         if exist.scalar():
-            return Res.error("E-10048")
+            return Res.error("E-10048", message="Digest with this name already exists", http_status_code=409)
 
         # ID Generation
         last = await db.execute(
@@ -205,15 +206,15 @@ class DigestService:
             data.day_of_month,
         )
         if freq == DigestFrequency.DAILY and not time:
-            return Res.error("E-10050", message="Time is required for daily schedule")
+            return Res.error("E-10050", message="Time is required for daily schedule", http_status_code=422)
         elif freq == DigestFrequency.WEEKLY and (not time or weekday is None):
             return Res.error(
-                "E-10051", message="Time and weekday are required for weekly schedule"
+                "E-10051", message="Time and weekday are required for weekly schedule", http_status_code=422
             )
         elif freq == DigestFrequency.MONTHLY and (not time or day_of_month is None):
             return Res.error(
                 "E-10052",
-                message="Time and day_of_month are required for monthly schedule",
+                message="Time and day_of_month are required for monthly schedule", http_status_code=422
             )
 
         # Resources
@@ -245,6 +246,7 @@ class DigestService:
             user_role=current_user["role"],
             module=AuditLogModules.DIGEST_MANAGEMENT_AMD.value,
             action=AuditLogScenario.DIGEST_CREATED.value,
+            redis=redis,
             before=None,
             after=f"Digest name: {data.name}",
             resource_id=new_digest.digest_id,
@@ -290,20 +292,17 @@ class DigestService:
         )
 
     async def update_digest(
-        self, db: AsyncSession, current_user: dict, digest_id: str, data
+        self, db: AsyncSession, redis: Redis, current_user: dict, digest_id: str, data
     ):
-        if not current_user:
-            return Res.error("E-10001", message="User not authenticated")
-
         if Platform.AMD.value not in current_user.get("platform", []):
-            return Res.error("E-10013", message="Only AMD admin can access this API")
+            return Res.error("E-10013", message="Only AMD admin can access this API", http_status_code=403)
 
         result = await db.execute(
             select(DigestConfiguration).where(DigestConfiguration.id == digest_id)
         )
         digest = result.scalar_one_or_none()
         if not digest:
-            return Res.error("E-10022", message="Digest configuration not found")
+            return Res.error("E-10022", message="Digest configuration not found", http_status_code=404)
 
         # Capture old values before updating for audit log
         old_name = digest.name
@@ -326,32 +325,33 @@ class DigestService:
             return freq_map.get(freq, str(freq))
 
         # Track if any config (non-status) changes were made
-        config_before_parts = []
-        config_after_parts = []
+        config_before = {}
+        config_after = {}
 
         # Check name change
         if data.name and data.name != old_name:
-            config_before_parts.append(f"Name: {old_name}")
-            config_after_parts.append(f"Name: {data.name}")
+            config_before["Name"] = old_name
+            config_after["Name"] = data.name
 
         # Check frequency change
         if data.frequency is not None and data.frequency != old_frequency:
-            config_before_parts.append(
-                f"Frequency: {get_frequency_label(old_frequency)}"
-            )
-            config_after_parts.append(
-                f"Frequency: {get_frequency_label(data.frequency)}"
-            )
+            config_before["Frequency"] = get_frequency_label(old_frequency)
+            config_after["Frequency"] = get_frequency_label(data.frequency)
 
         # Log configuration changes (name, frequency, etc.) - if any non-status config changed
-        if config_before_parts:
+        if config_before:
             await audit_logs(
                 user_id=current_user["user_id"],
                 user_role=current_user["role"],
                 module=AuditLogModules.DIGEST_MANAGEMENT_AMD.value,
                 action=AuditLogScenario.DIGEST_UPDATED.value,
-                before=", ".join(config_before_parts),
-                after=", ".join(config_after_parts),
+                redis=redis,
+                before=build_sectioned_audit_payload(
+                    self.DIGEST_CONFIGURATION_AUDIT_SECTION, config_before
+                ),
+                after=build_sectioned_audit_payload(
+                    self.DIGEST_CONFIGURATION_AUDIT_SECTION, config_after
+                ),
                 resource_id=digest.digest_id,
                 db=db,
             )
@@ -365,6 +365,7 @@ class DigestService:
                     user_role=current_user["role"],
                     module=AuditLogModules.DIGEST_MANAGEMENT_AMD.value,
                     action=AuditLogScenario.DIGEST_ACTIVATED.value,
+                    redis=redis,
                     before="Status: Inactive",
                     after="Status: Active",
                     resource_id=digest.digest_id,
@@ -377,6 +378,7 @@ class DigestService:
                     user_role=current_user["role"],
                     module=AuditLogModules.DIGEST_MANAGEMENT_AMD.value,
                     action=AuditLogScenario.DIGEST_DEACTIVATED.value,
+                    redis=redis,
                     before="Status: Active",
                     after="Status: Inactive",
                     resource_id=digest.digest_id,
@@ -392,6 +394,7 @@ class DigestService:
                 user_role=current_user["role"],
                 module=AuditLogModules.DIGEST_MANAGEMENT_AMD.value,
                 action=AuditLogScenario.RECIPIENTS_UPDATED.value,
+                redis=redis,
                 before=f"Recipients: {old_recipients_count} Users",
                 after=f"Recipients: {new_recipients_count} Users",
                 resource_id=digest.digest_id,

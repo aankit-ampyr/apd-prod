@@ -1,5 +1,5 @@
 import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
-import {type AuditLogSliceInitialState} from '@/interface';
+import {type AuditLogSliceInitialState, type APDAuditLog} from '@/interface';
 import {type APIResponse, type AuditLogListRequest} from '@/interface/api-interface';
 
 const initialState: AuditLogSliceInitialState = {
@@ -48,6 +48,13 @@ const auditLogSlice = createSlice({
         state.totalResults = 0;
       }
     },
+    addRealtimeAuditLog: (state, action: PayloadAction<APDAuditLog>) => {
+      state.auditLogs.unshift(action.payload);
+      if (state.auditLogs.length > 100) {
+        state.auditLogs.pop();
+      }
+      state.totalResults += 1;
+    },
 
     resetAuditLogMessage: state => {
       state.auditLogError = false;
@@ -61,6 +68,7 @@ export const {
   auditLogListRequest,
   auditLogListSuccess,
   auditLogListFailure,
+  addRealtimeAuditLog,
 
   // reset message
   resetAuditLogMessage,

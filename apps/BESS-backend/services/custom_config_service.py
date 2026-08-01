@@ -1,3 +1,5 @@
+from typing import Optional
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status
@@ -22,7 +24,15 @@ class CustomSimConfigService:
         payload: CustomSimulationConfigPayload,
         current_user: dict,
         resource_id: str,
+        last_edited: SimulationSetupProgress,
+        redis: Redis,
     ):
+        if last_edited < SimulationSetupProgress.RUN_SIZING_SIMULATION:
+            return Res.error(
+                status_code="E-20062",
+                message="Incomplete Simulation configuration.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         result = await bess_db.execute(
             select(DieselGeneratorConfiguration).where(
@@ -94,6 +104,7 @@ class CustomSimConfigService:
             after=after_config,
             remove_id=True,
             sim_module_type=SimulationLogStep.CUSTOM_CONFIGURATION,
+            redis=redis,
         )
 
         await bess_db.commit()

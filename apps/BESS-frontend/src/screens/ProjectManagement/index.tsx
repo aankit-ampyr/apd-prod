@@ -1,6 +1,6 @@
 import {useEffect, useState, useRef} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
-import {Text, Badge, Button, Icon, IconButton, Tooltip} from '@/ui-kits';
+import {Text, Badge, Button, Icon, IconButton, Tooltip, Skeleton} from '@/ui-kits';
 import {DataTable, FilterGroup} from '@/components';
 import type {DataTableColumn, SelectInputItem} from '@/interface';
 import {formatDate} from '@/utils';
@@ -9,7 +9,7 @@ import {authDataSelector} from '@/services/redux/selectors/authSelector';
 import {cn} from '@/utils/common-functions';
 import {useIsTruncated, useToast} from '@/hooks';
 import {ErrorCodes, getErrorMessage, getSuccessMessage, SuccessCodes} from '@/utils/getMessages';
-import {projectFailure, projects, projectSuccess, projectTotalPages, totalProjectResults} from '@/services/redux/selectors/projectSelector';
+import {projectFailure, projectLoading, projects, projectSuccess, projectTotalPages, totalProjectResults} from '@/services/redux/selectors/projectSelector';
 import {
   archiveProjectRequest,
   deleteProjectRequest,
@@ -53,6 +53,47 @@ type Project = {
 };
 
 const PAGE_SIZE = 10;
+const GHOST_TABLE_ROWS = Array.from({length: 8}, (_, id) => ({id}));
+
+function ProjectManagementGhostLoader() {
+  return (
+    <div className="flex flex-col gap-6 p-4">
+      <div className="flex items-center justify-between gap-4">
+        <Skeleton animation="wave" variant="rounded" width={280} height={20} className="rounded-full!" />
+        <Skeleton animation="wave" variant="rounded" width={150} height={40} className="rounded-lg!" />
+      </div>
+      <div className="flex flex-wrap gap-4">
+        {[300, 140].map((width, index) => (
+          <Skeleton key={index} animation="wave" variant="rounded" width={width} height={40} className="rounded-lg!" />
+        ))}
+      </div>
+      <div className="overflow-x-auto rounded-lg border border-[#D9E1E7]">
+        <table className="w-full min-w-max">
+          <thead className="bg-[#E9FAF8]">
+            <tr>
+              {Array.from({length: 8}).map((_, index) => (
+                <th key={index} className="px-4 py-3">
+                  <Skeleton animation="wave" variant="rounded" width={90} height={18} className="rounded-full!" />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {GHOST_TABLE_ROWS.map(row => (
+              <tr key={row.id}>
+                {Array.from({length: 8}).map((_, index) => (
+                  <td key={index} className="px-4 py-4">
+                    <Skeleton animation="wave" variant="rounded" width={index % 2 ? 120 : 80} height={16} className="rounded-full!" />
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 type FilterType = {
   search?: string;
@@ -72,11 +113,15 @@ export function ProjectManagement() {
   const projectData = useSelector(projects);
   const totalPagesData = useSelector(projectTotalPages);
   const totalResult = useSelector(totalProjectResults);
+  const isLoading = useSelector(projectLoading);
   const success = useSelector(projectSuccess) as SuccessCodes;
   const failure = useSelector(projectFailure) as ErrorCodes;
   const authUser = useSelector(authDataSelector);
 
   const [page, setPage] = useState(1);
+  const [showGhostLoader, setShowGhostLoader] = useState(true);
+  const hasObservedLoading = useRef(false);
+  const pendingProjectList = useRef<typeof projectData | null>(null);
   const [filter, setFilter] = useState<FilterType>({});
   const [createProjectModalOpen, setCreateProjectModalOpen] = useState<false | 'add' | 'edit'>(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -90,6 +135,18 @@ export function ProjectManagement() {
   const [tableMessage, setTableMessage] = useState('');
 
   useEffect(() => {
+    if (isLoading) {
+      hasObservedLoading.current = true;
+      return;
+    }
+
+    if (hasObservedLoading.current) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
     const payload: any = {
       page,
       limit: PAGE_SIZE,
@@ -98,8 +155,25 @@ export function ProjectManagement() {
     if (filter.search) payload.search = filter.search;
     if (filter.status !== undefined) payload.status = filter.status;
 
+    pendingProjectList.current = projectData;
+    setShowGhostLoader(true);
     dispatch(projectListRequest(payload));
   }, [page, filter]);
+
+  useEffect(() => {
+    if (pendingProjectList.current !== projectData) {
+      pendingProjectList.current = null;
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [projectData]);
+
+  useEffect(() => {
+    if (hasObservedLoading.current && (success || failure)) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [success, failure]);
 
   // Reset to page 1 whenever filters change so search is global, not scoped to the current page
   useEffect(() => {
@@ -420,17 +494,44 @@ export function ProjectManagement() {
       />
 
       {/* Table */}
-      <DataTable
-        columns={columns}
-        data={projectData}
-        rowAlign="items-start"
-        totalPages={totalPagesData}
-        currentPage={page}
-        totalResult={totalResult}
-        errorMessage={tableMessage}
-        onPageChange={setPage}
-        stickyHeader
-      />
+      {showGhostLoader ? (
+        <div className="overflow-x-auto rounded-lg border border-[#D9E1E7]">
+          <table className="w-full min-w-max">
+            <thead className="bg-[#E9FAF8]">
+              <tr>
+                {Array.from({length: 8}).map((_, index) => (
+                  <th key={index} className="px-4 py-3">
+                    <Skeleton animation="wave" variant="rounded" width={90} height={18} className="rounded-full!" />
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {GHOST_TABLE_ROWS.map(row => (
+                <tr key={row.id}>
+                  {Array.from({length: 8}).map((_, index) => (
+                    <td key={index} className="px-4 py-4">
+                      <Skeleton animation="wave" variant="rounded" width={index % 2 ? 120 : 80} height={16} className="rounded-full!" />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <DataTable
+          columns={columns}
+          data={projectData}
+          totalPages={totalPagesData}
+          currentPage={page}
+          totalResult={totalResult}
+          errorMessage={tableMessage}
+          onPageChange={setPage}
+          stickyHeader
+          tableHeightWhenScrollable={700}
+        />
+      )}
 
       {(createProjectModalOpen === 'add' || createProjectModalOpen === 'edit') && (
         <CreateProject editData={currentSelectUser} open={true} onClose={closeCreateProjectModal} />

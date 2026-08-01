@@ -5,7 +5,7 @@ from taskiq import TaskiqDepends, Context
 from broker import broker
 
 from .simulations import (
-    run_detailed_green_sizing_simulation,
+    run_detailed_green_simulation,
     run_green_sizing_simulation,
     run_multi_year_projection,
     run_simulation_single_config,
@@ -28,6 +28,7 @@ async def get_db(
 async def bess_sizing_sim_task(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     db: AsyncSession = TaskiqDepends(get_db),
     redis: Redis = TaskiqDepends(get_redis),
 ):
@@ -36,6 +37,7 @@ async def bess_sizing_sim_task(
             return await run_sizing_simulation(
                 simulation_id=simulation_id,
                 job_id=job_id,
+                run_by=run_by,
                 redis=redis,
                 db=db,
             )
@@ -47,6 +49,7 @@ async def bess_sizing_sim_task(
 async def bess_single_sim_task(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     db: AsyncSession = TaskiqDepends(get_db),
     redis: Redis = TaskiqDepends(get_redis),
 ):
@@ -55,6 +58,7 @@ async def bess_single_sim_task(
             return await run_simulation_single_config(
                 simulation_id=simulation_id,
                 job_id=job_id,
+                run_by=run_by,
                 redis=redis,
                 db=db,
             )
@@ -66,6 +70,7 @@ async def bess_single_sim_task(
 async def multi_year_projection_sim_task(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     db: AsyncSession = TaskiqDepends(get_db),
     redis: Redis = TaskiqDepends(get_redis),
 ):
@@ -74,6 +79,7 @@ async def multi_year_projection_sim_task(
             return await run_multi_year_projection(
                 simulation_id=simulation_id,
                 job_id=job_id,
+                run_by=run_by,
                 redis=redis,
                 db=db,
             )
@@ -85,6 +91,7 @@ async def multi_year_projection_sim_task(
 async def green_year_sizing_simulation(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     db: AsyncSession = TaskiqDepends(get_db),
     redis: Redis = TaskiqDepends(get_redis),
 ):
@@ -93,6 +100,7 @@ async def green_year_sizing_simulation(
             return await run_green_sizing_simulation(
                 simulation_id=simulation_id,
                 job_id=job_id,
+                run_by=run_by,
                 redis=redis,
                 db=db,
             )
@@ -104,14 +112,16 @@ async def green_year_sizing_simulation(
 async def detailed_green_simulation(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     db: AsyncSession = TaskiqDepends(get_db),
     redis: Redis = TaskiqDepends(get_redis),
 ):
     try:
         async with redis:
-            return await run_detailed_green_sizing_simulation(
+            return await run_detailed_green_simulation(
                 simulation_id=simulation_id,
                 job_id=job_id,
+                run_by=run_by,
                 redis=redis,
                 db=db,
             )

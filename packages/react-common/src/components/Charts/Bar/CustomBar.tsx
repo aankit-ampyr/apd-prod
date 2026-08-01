@@ -45,9 +45,18 @@ export function CustomBarChart({
     ? { top: 28, right: 20, left: 20, bottom: 28 }
     : { top: 10, right: 20, left: 20, bottom: 20 };
   return (
-    <div className="w-full h-[300px]">
+    <div className="w-full h-75">
       <ResponsiveContainer width="100%" height="100%">
-        <BarChart data={data} margin={chartMargin}>
+        <BarChart
+          data={data}
+          margin={chartMargin}
+          onMouseLeave={() => setActiveIndex(null)}
+          onMouseMove={(state: any) => {
+            if (enableCellHover) {
+              setActiveIndex(state?.activeTooltipIndex ?? null);
+            }
+          }}
+        >
           {/* X Axis */}
           <XAxis
             dataKey={xKey}
@@ -78,14 +87,23 @@ export function CustomBarChart({
                     angle: -90,
                     position: "left",
                     offset: 0,
-                    style: { fontSize: 12, fill: "#475467", textAnchor: "middle", fontWeight: 500 },
+                    style: {
+                      fontSize: 12,
+                      fill: "#475467",
+                      textAnchor: "middle",
+                      fontWeight: 500,
+                    },
                   }
                 : undefined
             }
           />
 
           {tooltipComponent && (
-            <Tooltip content={tooltipComponent} cursor={false} />
+            <Tooltip
+              content={tooltipComponent}
+              cursor={false}
+              wrapperStyle={{ pointerEvents: "none" }}
+            />
           )}
 
           {/* Bars */}
@@ -270,12 +288,14 @@ export const BarGraphChart: React.FC<BarChartProps> = (props) => {
             barSize={barWidth}
             radius={[6, 6, 0, 0]}
             shape={(props: BarShapeProps) => {
-              return <CustomCell
-                {...props}
-                fill={barColor}
-                onMouseMove={handleMouseMove as any}
-                onMouseLeave={handleMouseLeave}
-              />
+              return (
+                <CustomCell
+                  {...props}
+                  fill={barColor}
+                  onMouseMove={handleMouseMove as any}
+                  onMouseLeave={handleMouseLeave}
+                />
+              );
             }}
             label={
               showValues
@@ -310,9 +330,9 @@ export const BarGraphChart: React.FC<BarChartProps> = (props) => {
 };
 
 interface CustomCellProps extends BarShapeProps {
-  payload: any,
-  onMouseMove: any,
-  onMouseLeave: any,
+  payload: any;
+  onMouseMove: any;
+  onMouseLeave: any;
 }
 const CustomCell = (props: BarShapeProps) => {
   const {
@@ -336,9 +356,7 @@ const CustomCell = (props: BarShapeProps) => {
       rx={6}
       ry={6}
       fill={fill}
-      onMouseMove={(e) =>
-        onMouseMove?.(e)
-      }
+      onMouseMove={(e) => onMouseMove?.(e)}
       onMouseLeave={onMouseLeave}
       style={{ cursor: "pointer" }}
     />

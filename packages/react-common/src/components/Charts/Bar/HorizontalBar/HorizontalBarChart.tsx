@@ -59,6 +59,7 @@ interface HorizontalBarChartProps {
   chartClassName?: string;
   xAxisTickFormatter?: (value: string | number) => string;
   xAxisTickCount?: number;
+  customActions?: React.ReactNode;
 }
 
 export function HorizontalBarChart(props: HorizontalBarChartProps) {
@@ -90,6 +91,7 @@ export function HorizontalBarChart(props: HorizontalBarChartProps) {
     yAxisWidth = 120,
     xAxisTickFormatter,
     xAxisTickCount = 5,
+    customActions,
   } = props;
 
   /**
@@ -181,13 +183,14 @@ export function HorizontalBarChart(props: HorizontalBarChartProps) {
         {!isLoading && (
           <div
             className={cn(
-              "flex items-center gap-4 chart-actions",
+              "flex shrink-0 items-center flex-nowrap gap-3 chart-actions",
               actionWrapperClassName,
             )}
           >
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleDownLoad}
@@ -195,7 +198,7 @@ export function HorizontalBarChart(props: HorizontalBarChartProps) {
             {!isFullScreen ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -203,7 +206,7 @@ export function HorizontalBarChart(props: HorizontalBarChartProps) {
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}

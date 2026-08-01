@@ -1,5 +1,5 @@
 import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
-import type {AssetReportFile, AssetSliceInitialState, DonutSegment} from '@/interface';
+import type {ActionWithCallback, AssetReportFile, AssetSliceInitialState} from '@/interface';
 import type {
   AssetListRequest,
   APIResponse,
@@ -13,7 +13,6 @@ import type {
   UploadScadaReportRequest,
   MergeAssetDatasetsRequest,
   AssetOperationalAnalyticsRequest,
-  AssetSocDistributionRequest,
   AssetMarketSummaryRequest,
   AssetMarketSummaryAnalysisRequest,
   AssetAncillaryServiceSummaryRequest,
@@ -61,6 +60,9 @@ import type {
   InvoiceSettlementUploadRequest,
   DeleteInvoiceSettlementRequest,
   InvoiceSettlementListRequest,
+  AssetInvoiceSummaryStatementUploadRequest,
+  DeleteAssetInvoiceSummaryStatementRequest,
+  AssetInvoiceSummaryStatementListRequest,
 } from '@/interface/api-interface';
 import {mergeDeepRight} from 'ramda';
 import {AssetFileType, AssetStatus, AssetSteps, AssetType} from '@/constants';
@@ -75,6 +77,7 @@ const initialState: AssetSliceInitialState = {
   mergeLoading: false,
   optimizedDatasetGenerationLoading: false,
   currentAssetFilesLoading: false,
+  assetListLoading: false,
 
   // for messages
   assetError: false,
@@ -121,17 +124,14 @@ const initialState: AssetSliceInitialState = {
   iarReportUploadError: null,
   invoiceSettlementUploadError: null,
   invoiceUploadError: null,
+  invoiceSummaryStatementUploadError: null,
 
   analytics: {
     operations: {
-      revenue_metrics: null,
-      revenue_distribution: null,
-      soc_distribution: null,
-      market_prices: null,
-      ancillary_services_revenue: null,
-      trading_activity: null,
-      energy_price_comparison: null,
+      revenue: null,
       battery_power_over_time: null,
+      energy_price_comparison: null,
+      market_summary: null,
     },
     market: {
       summary: null,
@@ -172,7 +172,6 @@ const initialState: AssetSliceInitialState = {
   analyticsLoading: {
     operations: {
       revenue: false,
-      soc: false,
       market_summary: false,
       energy_price_comparison: false,
       battery_power_over_time: false,
@@ -317,6 +316,17 @@ const initialState: AssetSliceInitialState = {
     error: false,
     success: false,
   },
+
+  deleteInvoiceSummaryStatement: {
+    loading: false,
+    error: false,
+    success: false,
+  },
+  uploadInvoiceSummaryStatement: {
+    loading: false,
+    error: false,
+    success: false,
+  }
 };
 
 const assetSlice = createSlice({
@@ -346,6 +356,10 @@ const assetSlice = createSlice({
       state.isLoading = false;
       state.assetSuccess = action.payload.data.status_code;
       if (action.payload.data.data) {
+        state.assetErrorMessageVars = {
+          ...state.assetErrorMessageVars,
+          organization_name: (action.payload.data.data as any).organization_name || state.assetErrorMessageVars?.organization_name || 'your organization'
+        };
         const assetData = {
           isLoading: false,
           totalPages: action.payload.data.data?.total_pages,
@@ -465,9 +479,10 @@ const assetSlice = createSlice({
         }
       }
     },
-    reassignAssetOwnershipFailure: (state, action: PayloadAction<APIResponse>) => {
+    reassignAssetOwnershipFailure: (state, action: PayloadAction<ReassignAssetOwnershipRequest['errorResponse']>) => {
       state.isLoading = false;
       state.assetError = action.payload.status_code;
+      state.assetErrorMessageVars = action.payload?.data || {};
     },
 
     // ======================================
@@ -506,17 +521,21 @@ const assetSlice = createSlice({
     // ======================================
     // all assets list for dropdown
     // ======================================
-    getAllAssetsListRequest: state => {
-      state.isLoading = true;
+    getAllAssetsListRequest: (state, _action: PayloadAction<ActionWithCallback<AssetListRequest['response']> | undefined>) => {
+      state.assetListLoading = true;
     },
     getAllAssetsListSuccess: (state, action: PayloadAction<AssetListRequest['response']>) => {
-      state.isLoading = false;
+      state.assetListLoading = false;
       if (action.payload.data) {
         state.allAssets = action.payload.data.assets;
+        state.assetErrorMessageVars = {
+          ...state.assetErrorMessageVars,
+          organization_name: (action.payload.data as any).organization_name || state.assetErrorMessageVars?.organization_name || 'your organization'
+        };
       }
     },
     getAllAssetsListFailure: state => {
-      state.isLoading = false;
+      state.assetListLoading = false;
     },
 
     // =======================================
@@ -578,6 +597,7 @@ const assetSlice = createSlice({
       state.aggregatorReportUploadLoading = true;
       state.aggregatorReportUploadError = null;
       state.assetError = false;
+      state.assetErrorMessage = '';
       state.assetSuccess = false;
     },
     uploadAggregatorReportSuccess: (state, action: PayloadAction<UploadAggregatorReportRequest['response']>) => {
@@ -593,6 +613,8 @@ const assetSlice = createSlice({
           projection_summary: action.payload.data.projection_summary,
           total_rows: action.payload.data.total_rows,
           type: AssetFileType.AggregatorReport,
+          month: action.payload.data.month,
+          year: action.payload.data.year,
         };
         state.currentSelectedAsset.aggregator_report_file = fileData;
         // initialize if null to avoid error when filtering in case of multiple uploads without page refresh
@@ -666,10 +688,13 @@ const assetSlice = createSlice({
     // =======================================
     // get asset details
     // =======================================
-    getAssetDetailsRequest: (state, _action: PayloadAction<GetAssetDetailsRequest['params']>) => {
+    getAssetDetailsRequest: (state, action: PayloadAction<GetAssetDetailsRequest['params']>) => {
       state.assetDetailsFetchLoading = true;
       state.assetError = false;
       state.assetSuccess = false;
+      if (state.currentSelectedAsset && state.currentSelectedAsset.id !== action.payload.id) {
+        state.currentSelectedAsset = null;
+      }
     },
 
     getAssetDetailsSuccess: (state, action: PayloadAction<GetAssetDetailsRequest['response']>) => {
@@ -692,6 +717,7 @@ const assetSlice = createSlice({
       state.scadaReportUploadLoading = true;
       state.scadaReportUploadError = null;
       state.assetError = false;
+      state.assetErrorMessage = '';
       state.assetSuccess = false;
     },
     uploadScadaReportSuccess: (state, action: PayloadAction<UploadScadaReportRequest['response']>) => {
@@ -710,6 +736,8 @@ const assetSlice = createSlice({
           },
           total_rows: action.payload.data.total_rows,
           type: AssetFileType.ScadaReport,
+          month: action.payload.data.month,
+          year: action.payload.data.year,
         };
         state.currentSelectedAsset.scada_report_file = fileData;
         // Add to file history list
@@ -765,7 +793,9 @@ const assetSlice = createSlice({
     uploadIARReportSuccess: (state, action: PayloadAction<UploadIARReportRequest['response']>) => {
       state.iarReportUploadLoading = false;
       state.assetSuccess = action.payload.status_code;
-      if (state.currentSelectedAsset && action.payload.data) {
+      if (action.payload.data) {
+        const uploadedAssetId = Number(action.payload.data.asset_id);
+        const isCurrentAsset = state.currentSelectedAsset && state.currentSelectedAsset.id === uploadedAssetId;
         const fileData = {
           id: action.payload.data.id,
           asset_id: action.payload.data.asset_id,
@@ -779,32 +809,48 @@ const assetSlice = createSlice({
           total_rows: action.payload.data.total_rows,
           type: AssetFileType.IAR,
         };
-        state.currentSelectedAsset.iar_report_file = fileData;
+
+        if (isCurrentAsset && state.currentSelectedAsset) {
+          state.currentSelectedAsset.iar_report_file = fileData;
+          state.currentSelectedAsset.has_iar = true;
+        }
         // Add to file history list
         // state.currentAssetFiles = state.currentAssetFiles.filter(f => f.type !== AssetFileType.IAR);
         // state.currentAssetFiles.push(fileData);
 
         // initialize if null to avoid error when filtering in case of multiple uploads without page refresh
-        if (!state.currentAssetFiles) {
+        if (isCurrentAsset && !state.currentAssetFiles) {
           state.currentAssetFiles = [];
         }
 
-        let isInserted = false;
-        // loop throught current files array and append it
-        for (let i = 0; i < state.currentAssetFiles.length; i++) {
-          const currentFile = state.currentAssetFiles[i];
-          // replace already existing file to prevent duplicates
-          if (currentFile.id === fileData.id) {
-            state.currentAssetFiles[i] = fileData;
-            isInserted = true;
-            break;
+        if (isCurrentAsset) {
+          let isInserted = false;
+          // loop throught current files array and append it
+          for (let i = 0; i < state.currentAssetFiles.length; i++) {
+            const currentFile = state.currentAssetFiles[i];
+            // replace already existing file to prevent duplicates
+            if (currentFile.id === fileData.id) {
+              state.currentAssetFiles[i] = fileData;
+              isInserted = true;
+              break;
+            }
+          }
+
+          // if not inserted in the above loop, then append it to the last
+          if (!isInserted) {
+            state.currentAssetFiles = [...state.currentAssetFiles, fileData];
           }
         }
 
-        // if not inserted in the above loop, then append it to the last
-        if (!isInserted) {
-          state.currentAssetFiles = [...state.currentAssetFiles, fileData];
-        }
+        state.bess.assets = state.bess.assets.map(asset =>
+          asset.id === uploadedAssetId ? {...asset, has_iar: true} : asset,
+        );
+        state.solarBess.assets = state.solarBess.assets.map(asset =>
+          asset.id === uploadedAssetId ? {...asset, has_iar: true} : asset,
+        );
+        state.allAssets = state.allAssets.map(asset =>
+          asset.id === uploadedAssetId ? {...asset, has_iar: true} : asset,
+        );
       }
     },
     uploadIARReportFailure: (state, action: PayloadAction<UploadIARReportRequest['error_response']>) => {
@@ -941,42 +987,12 @@ const assetSlice = createSlice({
       state.assetSuccess = action.payload.status_code;
 
       if (action.payload.data) {
-        state.analytics.operations.revenue_metrics = action.payload.data.trading_analysis;
-        state.analytics.operations.revenue_distribution = action.payload.data.revenue_distribution.map(
-          (item): DonutSegment => ({
-            label: item.name,
-            value: item.value,
-            percentage: item.percentage,
-          }),
-        );
+        state.analytics.operations.revenue = action.payload.data;
       }
     },
     assetOperationalAnalyticsFailure: (state, action: PayloadAction<APIResponse>) => {
       state.analyticsLoading.operations.revenue = false;
       state.analyticsError.operations.revenue = action.payload.status_code;
-      state.assetError = action.payload.status_code;
-    },
-
-    // =======================================
-    // Asset SOC Distribution Analytics
-    // =======================================
-    assetSocDistributionRequest: (state, _action: PayloadAction<AssetSocDistributionRequest['params']>) => {
-      state.analyticsLoading.operations.soc = true;
-      state.analyticsError.operations.soc = false;
-      state.assetError = false;
-      state.assetSuccess = false;
-    },
-    assetSocDistributionSuccess: (state, action: PayloadAction<AssetSocDistributionRequest['response']>) => {
-      state.analyticsLoading.operations.soc = false;
-      state.assetSuccess = action.payload.status_code;
-
-      if (action.payload.data) {
-        state.analytics.operations.soc_distribution = action.payload.data.soc_distribution;
-      }
-    },
-    assetSocDistributionFailure: (state, action: PayloadAction<APIResponse>) => {
-      state.analyticsLoading.operations.soc = false;
-      state.analyticsError.operations.soc = action.payload.status_code;
       state.assetError = action.payload.status_code;
     },
 
@@ -994,9 +1010,7 @@ const assetSlice = createSlice({
       state.assetSuccess = action.payload.status_code;
 
       if (action.payload.data) {
-        state.analytics.operations.market_prices = action.payload.data.market_prices;
-        state.analytics.operations.ancillary_services_revenue = action.payload.data.ancillary_services;
-        state.analytics.operations.trading_activity = action.payload.data.trading_activity;
+        state.analytics.operations.market_summary = action.payload.data;
       }
     },
     assetMarketSummaryFailure: (state, action: PayloadAction<APIResponse>) => {
@@ -2049,14 +2063,12 @@ const assetSlice = createSlice({
           state.currentSelectedAsset.aggregator_report_file = aggregatorFile;
         } else {
           state.currentSelectedAsset.aggregator_report_file = null;
-          state.aggregatorReportUploadError = null;
         }
 
         if (scadaFile) {
           state.currentSelectedAsset.scada_report_file = scadaFile;
         } else {
           state.currentSelectedAsset.scada_report_file = null;
-          state.scadaReportUploadError = null;
         }
 
         if (mergedFile) {
@@ -2082,6 +2094,10 @@ const assetSlice = createSlice({
         } else {
           state.currentSelectedAsset.optimized_dataset_file = null;
         }
+
+        // reset the state
+        state.aggregatorReportUploadError = null;
+        state.scadaReportUploadError = null;
       }
     },
     filterAggregatorScadaFilesFailure: (state, action: PayloadAction<APIResponse>) => {
@@ -2105,6 +2121,7 @@ const assetSlice = createSlice({
         } else {
           state.currentSelectedAsset.invoice_file = null;
         }
+        state.invoiceUploadError = null;
       }
     },
     filterInvoiceFilesFailure: (state, action: PayloadAction<APIResponse>) => {
@@ -2128,6 +2145,7 @@ const assetSlice = createSlice({
         } else {
           state.currentSelectedAsset.invoice_settlement_file = null;
         }
+        state.invoiceSettlementUploadError = null;
       }
     },
     filterInvoiceSettlementFilesFailure: (state, action: PayloadAction<APIResponse>) => {
@@ -2203,6 +2221,7 @@ const assetSlice = createSlice({
         const {file_id, asset_id, child_files} = action.payload.data;
         let isMergedFileRemoved = false;
         let isOptimizedFileRemoved = false;
+        let isIarRemoved = false;
         const childFileIds = child_files ? child_files.map(f => f.file_id) : [];
 
         if (asset_id !== state.currentSelectedAsset.id) {
@@ -2217,6 +2236,8 @@ const assetSlice = createSlice({
         }
         if (state.currentSelectedAsset.iar_report_file?.id === file_id) {
           state.currentSelectedAsset.iar_report_file = null;
+          state.currentSelectedAsset.has_iar = false;
+          isIarRemoved = true;
         }
         // remove merged dataset either direct deletion or if the removed file is a child file of the merged dataset
         if (
@@ -2260,6 +2281,19 @@ const assetSlice = createSlice({
               asset.id === action.payload.data?.asset_id ? {...asset, analysis_available: false} : asset,
             );
           }
+        }
+
+        if (isIarRemoved) {
+          const removedIarAssetId = action.payload.data?.asset_id;
+          state.bess.assets = state.bess.assets.map(asset =>
+            asset.id === removedIarAssetId ? {...asset, has_iar: false} : asset,
+          );
+          state.solarBess.assets = state.solarBess.assets.map(asset =>
+            asset.id === removedIarAssetId ? {...asset, has_iar: false} : asset,
+          );
+          state.allAssets = state.allAssets.map(asset =>
+            asset.id === removedIarAssetId ? {...asset, has_iar: false} : asset,
+          );
         }
 
         state.currentAssetFiles = newFileHistory;
@@ -2392,6 +2426,92 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // Upload Invoice Summary Statement 
+    // =======================================
+    uploadInvoiceSummaryStatementRequest(state, _action: PayloadAction<AssetInvoiceSummaryStatementUploadRequest['payload']>) {
+      state.uploadInvoiceSummaryStatement.loading = true;
+      state.uploadInvoiceSummaryStatement.error = false;
+      state.uploadInvoiceSummaryStatement.success = false;
+      state.invoiceSummaryStatementUploadError = null;
+    },
+    uploadInvoiceSummaryStatementSuccess(state, action: PayloadAction<AssetInvoiceSummaryStatementUploadRequest['response']>) {
+      state.uploadInvoiceSummaryStatement.loading = false;
+      state.uploadInvoiceSummaryStatement.success = action.payload.status_code;
+      const file = action.payload.data;
+      if (state.currentSelectedAsset && file) {
+        state.currentSelectedAsset.invoice_summary_statement = file;
+      }
+      state.invoiceSummaryStatementUploadError = null;
+    },
+    uploadInvoiceSummaryStatementFailure(state, action: PayloadAction<APIResponse<{file: string}>>) {
+      state.uploadInvoiceSummaryStatement.loading = false;
+      state.uploadInvoiceSummaryStatement.error = action.payload.status_code;
+      state.uploadInvoiceSummaryStatement.success = false;
+
+      const message = action.payload.message || action.payload.status_code;
+
+      state.invoiceSummaryStatementUploadError = {
+        file: {
+          name: action.payload.data?.file ?? '',
+        },
+        validation_errors: [message],
+      };
+    },
+
+    // =======================================
+    // Delete Invoice Summary Statement
+    // =======================================
+    deleteInvoiceSummaryStatementRequest(state, _action: PayloadAction<DeleteAssetInvoiceSummaryStatementRequest['payload']>) {
+      state.deleteInvoiceSummaryStatement.loading = true;
+      state.deleteInvoiceSummaryStatement.error = false;
+      state.deleteInvoiceSummaryStatement.success = false;
+      state.invoiceSummaryStatementUploadError = null;
+    },
+    deleteInvoiceSummaryStatementSuccess(state, action: PayloadAction<DeleteAssetInvoiceSummaryStatementRequest['response']>) {
+      state.deleteInvoiceSummaryStatement.loading = false;
+      state.deleteInvoiceSummaryStatement.success = true;
+      if (
+        state.currentSelectedAsset &&
+        action.payload.data &&
+        action.payload.data.asset_id === state.currentSelectedAsset.id &&
+        state.currentSelectedAsset.invoice_summary_statement &&
+        state.currentSelectedAsset.invoice_summary_statement.id === action.payload.data.statement_id
+      ) {
+        state.currentSelectedAsset.invoice_summary_statement = null;
+      }
+      state.invoiceSummaryStatementUploadError = null;
+    },
+    deleteInvoiceSummaryStatementFailure(state, action: PayloadAction<APIResponse>) {
+      state.deleteInvoiceSummaryStatement.loading = false;
+      state.deleteInvoiceSummaryStatement.error = action.payload.status_code;
+      state.invoiceSummaryStatementUploadError = null;
+    },
+
+    // =======================================
+    // filter invoices summary statement files
+    // =======================================
+    filterInvoiceSummaryStatementFilesRequest: (state, _action: PayloadAction<AssetInvoiceSummaryStatementListRequest['params']>) => {
+      state.isLoading = true;
+    },
+    filterInvoiceSummaryStatementFilesSuccess: (state, action: PayloadAction<AssetInvoiceSummaryStatementListRequest['response']>) => {
+      state.isLoading = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data && state.currentSelectedAsset) {
+        const invoiceSummaryStatement = action.payload.data.summary_statements.at(0);
+        if (invoiceSummaryStatement) {
+          state.currentSelectedAsset.invoice_summary_statement = invoiceSummaryStatement;
+        } else {
+          state.currentSelectedAsset.invoice_summary_statement = null;
+        }
+        state.invoiceSummaryStatementUploadError = null;
+      }
+    },
+    filterInvoiceSummaryStatementFilesFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.isLoading = false;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
     // utility
     // =======================================
     gotoReviewStep: state => {
@@ -2418,7 +2538,6 @@ const assetSlice = createSlice({
       state.optimizedDatasetGenerationLoading = false;
 
       state.analyticsLoading.operations.revenue = false;
-      state.analyticsLoading.operations.soc = false;
       state.analyticsLoading.operations.market_summary = false;
       state.analyticsLoading.operations.energy_price_comparison = false;
       state.analyticsLoading.operations.battery_power_over_time = false;
@@ -2558,11 +2677,6 @@ export const {
   assetOperationalAnalyticsRequest,
   assetOperationalAnalyticsSuccess,
   assetOperationalAnalyticsFailure,
-
-  // get asset soc distribution analytics
-  assetSocDistributionRequest,
-  assetSocDistributionSuccess,
-  assetSocDistributionFailure,
 
   // get asset market summary analytics
   assetMarketSummaryRequest,
@@ -2804,6 +2918,21 @@ export const {
   deleteInvoiceSettlementRequest,
   deleteInvoiceSettlementSuccess,
   deleteInvoiceSettlementFailure,
+
+  // upload invoices summary settlement
+  uploadInvoiceSummaryStatementRequest,
+  uploadInvoiceSummaryStatementSuccess,
+  uploadInvoiceSummaryStatementFailure,
+
+  // delete invoices summary settlement
+  deleteInvoiceSummaryStatementRequest,
+  deleteInvoiceSummaryStatementSuccess,
+  deleteInvoiceSummaryStatementFailure,
+
+  // filter invoices summary settlement files
+  filterInvoiceSummaryStatementFilesRequest,
+  filterInvoiceSummaryStatementFilesSuccess,
+  filterInvoiceSummaryStatementFilesFailure,
 
   // utility & reset message
   cancelAssetsRequest,

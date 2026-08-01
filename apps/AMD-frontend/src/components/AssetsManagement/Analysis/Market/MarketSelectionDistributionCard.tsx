@@ -95,12 +95,14 @@ export function MarketSelectionDistributionCard(props: MarketSelectionDistributi
           </Text>
         </div>
 
-        {!loading && <IconButton
-          name="download"
-          onClick={handleDownLoad}
-          className="hover:bg-primary-tint-2! chart-actions cursor-pointer charts-action"
-          iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-        />}
+        {!loading && (
+          <IconButton
+            name="download"
+            onClick={handleDownLoad}
+            className="hover:bg-primary-tint-2! chart-actions cursor-pointer charts-action"
+            iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
+          />
+        )}
       </div>
       <div className={cn('mb-8 flex gap-4', isEpexOnlyView && 'mt-4')}>
         {kpisToMap.map(card => (

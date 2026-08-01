@@ -455,8 +455,33 @@
     "type": "success"
   },
   "S-10092": {
-    "key": "settlement_files_list_retrieved",
+    "key": "user_logged_out",
     "message": "User logged out successfully.",
+    "type": "success"
+  },
+  "S-10093": {
+    "key": "capacity_market_analysis_retrieved",
+    "message": "Capacity Market analysis data fetched successfully.",
+    "type": "success"
+  },
+  "S-10094": {
+    "key": "no_invoice_analysis_data",
+    "message": "No invoice analysis data available.",
+    "type": "success"
+  },
+  "S-10095": {
+    "key": "revenue_reconciliation_analysis_retrieved",
+    "message": "Revenue Reconciliation analysis data fetched successfully.",
+    "type": "success"
+  },
+  "S-10096": {
+    "key": "summary_statement_uploaded_and_validated",
+    "message": "Summary Statement file uploaded and validated successfully.",
+    "type": "success"
+  },
+  "S-10097": {
+    "key": "summary_statement_deleted",
+    "message": "Summary Statement file deleted successfully.",
     "type": "success"
   }
 }

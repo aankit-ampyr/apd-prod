@@ -7,7 +7,13 @@ from sqlalchemy import desc, not_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status
 
-from constants.enums import SimulationJobStatus, SimulationStatus
+from constants.enums import (
+    PSPAuditLogModules,
+    PSPAuditLogScenario,
+    SimulationJobStatus,
+    SimulationSetupProgress,
+    SimulationStatus,
+)
 
 from dtos.simulation_dto import (
     SimulationProgress,
@@ -160,6 +166,7 @@ class RunSizingSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
 
         result = await bess_db.execute(
@@ -174,9 +181,12 @@ class RunSizingSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # WARNING: Uncomment it once the progress status update is implemented after step 3.
-        # if simulation.step < SimulationSetupProgress.BESS_DG_CONFIG:
-        #     return Res.error()
+        if simulation.step < SimulationSetupProgress.BESS_DG_CONFIG:
+            return Res.error(
+                status_code="E-20054",
+                message="Previous simulation steps must be completed before running multi-year projection.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         sim_job_result = await bess_db.execute(
             select(SimulationJob).where(
@@ -229,6 +239,25 @@ class RunSizingSimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
+        await bess_db.flush()
+
+        try:
+            await bess_sizing_sim_task.kiq(
+                simulation.id,
+                job_id=new_simulation_job.job_id,
+                run_by=current_user.get("name"),  # type: ignore
+            )
+
+            await bess_db.commit()
+
+        except Exception:
+            await bess_db.rollback()
+
+            return Res.error(
+                status_code="E-20065",
+                message="Unable to run simulation.",
+            )
+
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -237,13 +266,9 @@ class RunSizingSimulationService:
             action=log_action,
             resource_id=resource_id,
             before=before_config,
-            after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
+            after="Simulation Status: STARTED",
+            redis=redis,
         )
-
-        await bess_db.commit()
-        await bess_db.refresh(new_simulation_job)
-
-        await bess_sizing_sim_task.kiq(simulation.id, job_id=new_simulation_job.job_id)
 
         return Res.success(
             status_code="S-20033", data={"simulation_job_id": new_simulation_job.job_id}
@@ -296,6 +321,7 @@ class RunSizingSimulationService:
             resource_id=resource_id,
             before=f"Simulation Status: {SimulationJobStatus(simulation_job.status).name}",
             after=f"Simulation Status: {SimulationJobStatus.TERMINATED.name}",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -344,6 +370,7 @@ class RunSizingSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         page: int = 1,
         limit: int = 100,
         dg_capacity: Optional[List[float]] = None,
@@ -375,16 +402,23 @@ class RunSizingSimulationService:
             SimulationResult.job_id == simulation_job.id
         )
 
+        applied_filter = False
+
         # Filters
         if dg_capacity is not None:
+            applied_filter = True
             query = query.where(SimulationResult.dg_mw.in_(dg_capacity))
         if bess_capacity is not None:
+            applied_filter = True
             query = query.where(SimulationResult.bess_mwh.in_(bess_capacity))
         if duration_hr is not None:
+            applied_filter = True
             query = query.where(SimulationResult.duration_hr.in_(duration_hr))
         if delivery_percentage is not None:
+            applied_filter = True
             query = query.where(SimulationResult.delivery_pct == delivery_percentage)
         if dg_runtime_hours is not None:
+            applied_filter = True
             query = query.where(SimulationResult.dg_hours == dg_runtime_hours)
 
         # Sorting
@@ -409,6 +443,7 @@ class RunSizingSimulationService:
         }
 
         if sort:
+            applied_filter = True
             for s in sort:
                 if s.startswith("-"):
                     field = s[1:]
@@ -426,7 +461,7 @@ class RunSizingSimulationService:
             db=bess_db, base_query=query, page=page, limit=limit, order_by=order_by
         )
 
-        if page == 1:
+        if page == 1 and not applied_filter:
             await audit_logs(
                 db=bess_db,
                 user_id=f"USER-{current_user.get('id')}",
@@ -436,6 +471,7 @@ class RunSizingSimulationService:
                 resource_id=resource_id,
                 before=None,
                 after="Action: Results Viewed",
+                redis=redis,
             )
 
             await bess_db.commit()
@@ -477,6 +513,9 @@ class RunSizingSimulationService:
         self,
         simulation_id: int,
         bess_db: AsyncSession,
+        current_user: dict,
+        resource_id: str,
+        redis: Redis,
         dg_capacity: Optional[List[float]] = None,
         bess_capacity: Optional[List[float]] = None,
         duration_hr: Optional[List[float]] = None,
@@ -501,6 +540,20 @@ class RunSizingSimulationService:
                 message="Sizing simulation result not found.",
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.SIZING_SIMULATION_RESULT_EXPORTED.value,
+            resource_id=resource_id,
+            before=None,
+            after="Exported Sizing Simulation Results",
+            redis=redis,
+        )
+
+        await bess_db.commit()
 
         return StreamingResponse(
             self._generate_sim_result_csv(
@@ -587,6 +640,8 @@ class RunSizingSimulationService:
         self,
         simulation_id: int,
         bess_db: AsyncSession,
+        current_user: dict,
+        resource_id: str,
     ):
         result = await bess_db.execute(
             select(SimulationJob)

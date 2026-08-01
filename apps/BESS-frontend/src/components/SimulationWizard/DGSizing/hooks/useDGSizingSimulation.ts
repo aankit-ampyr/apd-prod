@@ -3,7 +3,6 @@ import {runSimulationRequest, stopSimulationRequest} from '@/services/redux/slic
 import {SIMULATION_JOB_STORAGE_KEY} from '@/services/socket/SocketManager';
 import {useCallback, useEffect, useRef, useState, useContext} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
-import {useChangeConfigurationConfirmation} from '../../ChangeConfigurationContext';
 import {ActionType, ResourceType} from '@/constants';
 import {WebSocketContext} from '@/context/WebsocketContext';
 import {useSimulationStatus} from '../../SimulationStatusContext';
@@ -28,15 +27,14 @@ export const useDGSizingSimulation = ({
 }: UseDGSizingSimulationParams) => {
   const dispatch = useDispatch();
   const simulationJobData = useSelector(runSimulationData);
-  const {setIsSimulationRunning} = useChangeConfigurationConfirmation();
-  const {isAnySimulationRunning, setIsSizingRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, setIsSizingRunning, runningSimulationId} = useSimulationStatus() ?? {};
 
   const {subscribe} = useContext(WebSocketContext);
 
   const [isSimulationLocked, setIsSimulationLocked] = useState(false);
   const [activeResourceId, setActiveResourceId] = useState<number | null>(null);
   const [simulationProgress, setSimulationProgress] = useState(0);
-  const [isSimulationRunning, setIsSimulationRunningLocal] = useState(false);
+  const [isSimulationRunning, setIsSimulationRunning] = useState(false);
   const [isStopSimulationOpen, setIsStopSimulationOpen] = useState(false);
   const [currentConfig, setCurrentConfig] = useState(0);
   const [totalConfig, setTotalConfig] = useState(0);
@@ -45,6 +43,9 @@ export const useDGSizingSimulation = ({
   const [showCompletionProgress, setShowCompletionProgress] = useState(false);
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [runSimulationDisabled, setRunSimulationDisabled] = useState(false);
+  const [isOwnerRunning, setIsOwnerRunning] = useState(false);
+
+  const [stopSimulationStatus, setStopSimulationStatus] = useState<'confirm' | 'stopping' | 'stopped'>('confirm');
 
   const progressContainerRef = useRef<HTMLDivElement>(null);
   const pendingRunRequestRef = useRef(false);
@@ -53,14 +54,13 @@ export const useDGSizingSimulation = ({
   const savedSimulationJobId = Number(localStorage.getItem(SIMULATION_JOB_STORAGE_KEY));
   const currentResourceId = Number.isFinite(savedSimulationJobId) && savedSimulationJobId > 0 ? savedSimulationJobId : null;
 
-  const isCurrentUserOwner = !!currentResourceId && currentResourceId === activeResourceId;
+  // A status refresh can arrive after the user clicks Start but before the API
+  // returns the new job id. Treat that short handoff as owned by this user too;
+  // otherwise the refresh can briefly replace the progress UI with the
+  // "another user is running" message.
+  const isCurrentUserOwner = pendingRunRequestRef.current || (!!currentResourceId && currentResourceId === activeResourceId);
   const isBlocked = isSimulationLocked && !isCurrentUserOwner && !isSimulationRunning;
   const shouldBlock = isAnySimulationRunning && runningSimulationId === simulationId;
-
-  // Keep global context and local state in sync
-  useEffect(() => {
-    setIsSimulationRunning(isSimulationRunning);
-  }, [isSimulationRunning, setIsSimulationRunning]);
 
   const resetSimulationProgressDetails = useCallback(() => {
     setSimulationProgress(0);
@@ -72,7 +72,6 @@ export const useDGSizingSimulation = ({
 
   useEffect(() => {
     const unsubscribe = subscribe(event => {
-      console.log('event:', event);
       // Only handle SimulationJob events
       if (event.resource_type !== ResourceType.SizingSimulationJob) return;
 
@@ -85,25 +84,26 @@ export const useDGSizingSimulation = ({
 
       // Handle locking regardless of resourceId (if it's the same simulation)
       if (event.data?.simulation_id === simulationId || event.resource_id === activeResourceIdRef.current) {
-        if (action === 'Started' || action === ActionType.Started) {
+        if (action === 'Started' || action === ActionType.Started || action === 'Updated' || action === ActionType.Updated) {
           activeResourceIdRef.current = Number(event.resource_id);
           setIsSimulationLocked(true);
           setActiveResourceId(Number(event.resource_id));
         } else if (isTerminalAction) {
-          activeResourceIdRef.current = null;
-          setIsSimulationLocked(false);
-          setActiveResourceId(null);
-          setIsSimulationRunning(false);
+          const isOwnerEvent = resourceId && event.resource_id === resourceId;
+
+          if (event.action_id !== 8 || !isOwnerEvent) {
+            activeResourceIdRef.current = null;
+            setIsSimulationLocked(false);
+            setActiveResourceId(null);
+            setIsSimulationRunning(false);
+          }
         }
       }
 
       // Handle progress specific to the active resourceId (the job running on this screen)
       if (resourceId && event.resource_id === resourceId) {
-        console.log('ACTION TYPE', action, event.action_id);
-        console.log('event', event);
-
         if (action === 'Started' || action === ActionType.Started) {
-          setIsSimulationRunningLocal(true);
+          setIsSimulationRunning(true);
         } else if (action === 'Updated' || action === ActionType.Updated) {
           setSimulationProgress(Number(event.data?.progress_percentage ?? 0));
           setCurrentConfig(Number(event.data?.current_config ?? 0));
@@ -118,22 +118,30 @@ export const useDGSizingSimulation = ({
           setCurrentBess(Number(event.data?.current_config_details?.bess_size_mwh ?? 0));
           setCurrentDuration(Number(event.data?.current_config_details?.duration_hr ?? 0));
 
-          setIsSimulationRunningLocal(false);
+          setIsSimulationRunning(false);
           setIsSizingRunning(false);
+          setIsOwnerRunning(false);
+
           pendingRunRequestRef.current = false;
           setShowCompletionProgress(true);
           setShowCompletionSummary(false);
           setRunSimulationDisabled(true);
+          setIsStopSimulationOpen(false);
+          setStopSimulationStatus('confirm');
           onSimulationCompleted();
           setTimeout(() => {
             setShowCompletionProgress(false);
             setShowCompletionSummary(true);
           }, 5000);
+        } else if (event.action_id === 8) {
+          setStopSimulationStatus('stopped');
+          return;
         } else if (isTerminalAction) {
+          setIsOwnerRunning(false);
           setIsSimulationRunning(false);
           setIsSizingRunning(false);
           pendingRunRequestRef.current = false;
-          setIsSimulationRunningLocal(false);
+          setIsSimulationRunning(false);
           resetSimulationProgressDetails();
           setShowCompletionProgress(false);
           setShowCompletionSummary(false);
@@ -152,41 +160,54 @@ export const useDGSizingSimulation = ({
   const handleRunSizingSimulation = () => {
     if (!simulationId) return;
 
-    console.log('[Simulation WS] Run simulation requested for simulation:', simulationId);
     localStorage.removeItem(SIMULATION_JOB_STORAGE_KEY);
     resetSimulationProgressDetails();
-    setIsSimulationRunningLocal(true);
+    setIsOwnerRunning(true);
+    setIsSimulationRunning(true);
+    setIsSizingRunning(true);
     pendingRunRequestRef.current = true;
 
     dispatch(runSimulationRequest({simulation_id: simulationId}));
   };
 
   const handleStopSimulation = () => {
-    console.log('[Simulation WS] Stop confirmed by user');
     if (simulationId) {
       dispatch(stopSimulationRequest({simulation_id: simulationId}));
     }
 
-    setIsSimulationRunningLocal(false);
+    setStopSimulationStatus('stopping');
+  };
+
+  const handleCloseStoppedPopup = () => {
+    setIsSimulationRunning(false);
+    setIsOwnerRunning(false);
     setIsSizingRunning(false);
+
     pendingRunRequestRef.current = false;
+
     resetSimulationProgressDetails();
-    setIsStopSimulationOpen(false);
-    localStorage.removeItem(SIMULATION_JOB_STORAGE_KEY);
+
     setShowCompletionProgress(false);
     setShowCompletionSummary(false);
+
+    setSimulationProgress(0);
+
+    localStorage.removeItem(SIMULATION_JOB_STORAGE_KEY);
+
     activeResourceIdRef.current = null;
     setActiveResourceId(null);
     setIsSimulationLocked(false);
+
     setResourceId(null);
     setRunSimulationDisabled(false);
+    setIsStopSimulationOpen(false);
+    setStopSimulationStatus('confirm');
   };
 
   useEffect(() => {
     const jobId = simulationJobData?.simulation_job_id;
     if (!isSimulationRunning || !pendingRunRequestRef.current || !jobId) return;
 
-    console.log('[Simulation WS] Run simulation API returned job id:', jobId);
     pendingRunRequestRef.current = false;
     localStorage.setItem(SIMULATION_JOB_STORAGE_KEY, String(jobId));
     setResourceId(jobId);
@@ -196,25 +217,36 @@ export const useDGSizingSimulation = ({
     const savedJobId = Number(localStorage.getItem(SIMULATION_JOB_STORAGE_KEY));
     const normalizedSavedJobId = Number.isFinite(savedJobId) && savedJobId > 0 ? savedJobId : null;
 
+    if (pendingRunRequestRef.current && simulationStatus !== 2) {
+      return;
+    }
+
     if (simulationStatus === undefined) {
       return;
     }
 
-    if (simulationStatus === 0 || simulationStatus === 1) {
+    if (simulationStatus === 1) {
       activeResourceIdRef.current = simulationJobId ?? null;
       setActiveResourceId(simulationJobId ?? null);
       setIsSimulationLocked(true);
       setRunSimulationDisabled(true);
+      setIsOwnerRunning(normalizedSavedJobId === simulationJobId);
+
       if (!simulationJobId) {
         // Wait until backend sends the job id.
         return;
       }
 
       if (normalizedSavedJobId === simulationJobId) {
-        setIsSimulationRunningLocal(true);
+        setIsSimulationRunning(true);
         setResourceId(normalizedSavedJobId);
+      } else if (pendingRunRequestRef.current) {
+        // The current user has just started a job, but its id has not been
+        // persisted yet. Do not downgrade the local progress state while the
+        // run request is still resolving.
+        setIsSimulationRunning(true);
       } else {
-        setIsSimulationRunningLocal(false);
+        setIsSimulationRunning(false);
         setResourceId(null);
       }
       return;
@@ -222,7 +254,7 @@ export const useDGSizingSimulation = ({
 
     if (!normalizedSavedJobId || simulationStatus === 0) {
       localStorage.removeItem(SIMULATION_JOB_STORAGE_KEY);
-      setIsSimulationRunningLocal(false);
+      setIsSimulationRunning(false);
       setIsSimulationLocked(false);
       setActiveResourceId(null);
       activeResourceIdRef.current = null;
@@ -233,7 +265,7 @@ export const useDGSizingSimulation = ({
     }
 
     if (simulationStatus === 2) {
-      setIsSimulationRunningLocal(false);
+      setIsSimulationRunning(false);
       setIsSimulationLocked(false);
       setActiveResourceId(null);
       activeResourceIdRef.current = null;
@@ -250,8 +282,7 @@ export const useDGSizingSimulation = ({
       return;
     }
 
-    console.log('[Simulation WS] Recovering simulation job after refresh:', normalizedSavedJobId);
-    setIsSimulationRunningLocal(true);
+    setIsSimulationRunning(true);
     setIsSimulationLocked(true);
     setActiveResourceId(normalizedSavedJobId);
     activeResourceIdRef.current = normalizedSavedJobId;
@@ -282,7 +313,10 @@ export const useDGSizingSimulation = ({
     currentBess,
     currentConfig,
     currentDuration,
-    handleCancelStopSimulation: () => setIsStopSimulationOpen(false),
+    handleCancelStopSimulation: () => {
+      setIsStopSimulationOpen(false);
+      setStopSimulationStatus('confirm');
+    },
     handleOpenStopSimulation: () => setIsStopSimulationOpen(true),
     handleRunSizingSimulation,
     handleStopSimulation,
@@ -297,5 +331,9 @@ export const useDGSizingSimulation = ({
     showCompletionSummary,
     simulationProgress,
     totalConfig,
+    isCurrentUserOwner,
+    stopSimulationStatus,
+    handleCloseStoppedPopup,
+    isOwnerRunning,
   };
 };

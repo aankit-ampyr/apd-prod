@@ -1,6 +1,8 @@
 from fastapi import Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.dependencies import get_db,get_user_db,allowed_roles
+from context.dependencies import get_redis_conn
+from redis.asyncio import Redis
 from services.digest_service import DigestService
 from dtos.digest_dto import DigestCreateRequest, DigestUpdateRequest
 from constants.enums import UserRole
@@ -37,16 +39,18 @@ class DigestController:
 
     async def create_digest(self, 
         body: DigestCreateRequest, 
-        background_tasks: BackgroundTasks = BackgroundTasks(),
+        background_tasks: BackgroundTasks,
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user = Depends(allowed_roles(UserRole.ADMIN.value)),
     ):
-        return await self.service.create(db,current_user, body, background_tasks)
+        return await self.service.create(db, redis, current_user, body, background_tasks)
 
     async def update_digest(self, 
         digest_id: int, 
         body: DigestUpdateRequest, 
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user = Depends(allowed_roles(UserRole.ADMIN.value))
     ):
-        return await self.service.update_digest(db,current_user, digest_id, body)
+        return await self.service.update_digest(db, redis, current_user, digest_id, body)

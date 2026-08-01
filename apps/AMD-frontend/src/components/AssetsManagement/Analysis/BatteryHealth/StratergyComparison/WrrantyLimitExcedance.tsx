@@ -8,7 +8,11 @@ import {
 import {Icon, Text} from '@/ui-kits';
 import {cn, formatDate, parseDate} from '@/utils';
 import React, {useRef, useState} from 'react';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 import {useSelector} from 'react-redux';
+import {CommentTrigger} from '@/components/common';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
 
 /**
  * =============================
@@ -60,18 +64,26 @@ const overLimitColorCodingLabel = [
     bgColor: '#FEFFA9',
     textColor: 'var(--color-text-primary)',
     label: 'Low risk. Minor impact',
-    category: 'low',
+    category: 'Low',
     valueLabel: '0 - 0.1 cycles/day  ',
   },
 ];
 
-export function WrrantyLimitExcedance() {
+interface WrrantyLimitExcedanceProps {
+  assetId?: number | null;
+  year?: number | null;
+}
+
+export function WrrantyLimitExcedance(props: WrrantyLimitExcedanceProps) {
+  const {assetId, year} = props;
   /**
    * ================================
    * Hooks
    * ================================
    */
   const ref = useRef<HTMLDivElement>(null);
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
   /**
    * ================================
    * Selectors
@@ -95,26 +107,26 @@ export function WrrantyLimitExcedance() {
         minWidth: '100px',
         maxWidth: '100px',
       },
-      title: <Text variant="14R">Date</Text>,
+      title: <Text variant="12R">Date</Text>,
       render: row => {
         const date = parseDate(row.date, 'dd-MM-yyyy');
         return date ? (
-          <Text variant="14M">{formatDate(date, 'dd MMM yyyy')}</Text>
+          <Text variant="12M">{formatDate(date, 'dd MMM yyyy')}</Text>
         ) : (
-          <Text variant="14M">{row.date ?? ''}</Text>
+          <Text variant="12M">{row.date ?? ''}</Text>
         );
       },
     },
     {
       name: 'daily-cycles',
       align: 'center',
-      title: <Text variant="14R">Daily Cycles</Text>,
-      render: row => <Text variant="14M">{row.daily_cycles ?? ''}</Text>,
+      title: <Text variant="12R">Daily Cycles</Text>,
+      render: row => <Text variant="12M">{row.daily_cycles ?? ''}</Text>,
     },
     {
       name: 'over-limit',
       align: 'center',
-      title: <Text variant="14R">Over Limit</Text>,
+      title: <Text variant="12R">Over Limit</Text>,
       cellClassName: 'relative',
       render: row => {
         const color = getOverLimitColor(row.over_limit);
@@ -122,7 +134,7 @@ export function WrrantyLimitExcedance() {
           <div
             style={{backgroundColor: color?.bgColor}}
             className="absolute inset-0 flex items-center justify-center h-full">
-            <Text variant="14M" style={{color: color?.textColor}}>
+            <Text variant="12M" style={{color: color?.textColor}}>
               +{row.over_limit.toFixed(2)}
             </Text>
           </div>
@@ -163,6 +175,19 @@ export function WrrantyLimitExcedance() {
       <Section
         icon="currency-pound"
         title="Warranty Limit Exceedance Analysis"
+        action={
+          <CommentTrigger
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.BatteryHealth}
+            contextWidget={ViewAnalysisWidgets.WarrantyLimitExceedance}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
         subtitle="Identify high-risk operational days contributing to increased battery degradation">
         <div className="grid grid-cols-2 gap-2 p-2 rounded-sm bg-bg-card self-start w-full max-w-180">
           {batteryMarketTab.map(item => (
@@ -184,41 +209,51 @@ export function WrrantyLimitExcedance() {
           ))}
         </div>
 
-        <div className="flex flex-col @[837px]:flex-row gap-8 @[931px]:gap-12 @[971px]:gap-16 @[991px]:gap-18 @[1011px]:gap-20">
+        <div
+          className={cn(
+            'flex gap-8 @[931px]:gap-12 @[971px]:gap-16 @[991px]:gap-18 @[1011px]:gap-20',
+            isTablet ? 'flex-row' : 'flex-col @[837px]:flex-row',
+          )}>
           <AnalyticsTable
             columns={columns}
-            className="max-w-full @[837px]:max-w-120 @[897px]:max-w-135 @[931px]:max-w-[60%]"
+            className={cn(
+              'max-w-full @[897px]:max-w-135 @[931px]:max-w-[60%]',
+              isTablet ? 'w-[60%] shrink-0' : '@[837px]:max-w-120',
+            )}
             tableClassName="table-auto!"
             data={warrantyLimitExceedanceData}
             headerColor="#EFFAF9"
             noDataMessage={
-              <div className='w-fit mx-auto py-2 flex items-center gap-1'>
-                <Icon name="circle-check-big" className='text-success'/>
-                <Text variant='14R' className='text-success!'>No days exceeded warranty limits!</Text>
+              <div className="w-fit mx-auto py-2 flex items-center gap-1">
+                <Icon name="circle-check-big" className="text-success" />
+                <Text variant="14R" className="text-success!">
+                  No days exceeded warranty limits!
+                </Text>
               </div>
             }
             loading={assetLoading || warrantyLimitExceedanceLoading}
           />
 
           {warrantyLimitExceedanceData.length > 0 && (
-            <div className=" grow flex flex-col gap-5">
-              <Text variant="18SB" className="">
-                Risk Interpretation{' '}
-                <span className="text-error-text! font-InterRegular!">
-                  {' '}
+            <div className=" grow flex flex-col justify-center gap-5">
+              <div className="flex flex-col gap-1">
+                <Text variant="14M" className="font-InterSemiBold!">
+                  Risk Interpretation
+                </Text>
+                <Text variant="14R" className="text-error-text!">
                   ({warrantyLimitExceedanceData.length} Days exceeded)
-                </span>
-              </Text>
+                </Text>
+              </div>
 
-              <div className="grid grid-cols-2 @[837px]:grid-cols-1 gap-8">
+              <div className={cn('grid gap-8', isTablet ? 'grid-cols-1' : 'grid-cols-2 @[837px]:grid-cols-1')}>
                 {overLimitColorCodingLabel.map(item => (
                   <div className="flex gap-2 ">
                     <span className="size-3 mt-1.5" style={{backgroundColor: item.bgColor}} />
                     <div className="flex flex-col gap-1">
-                      <Text variant="16M">
+                      <Text variant="12M">
                         <span className="font-InterBold!">{item.category} :</span> {item.valueLabel}
                       </Text>
-                      <Text variant="16M" className="text-text-secondary!">
+                      <Text variant="12M" className="text-text-secondary! text-[10px]">
                         {item.label}
                       </Text>
                     </div>

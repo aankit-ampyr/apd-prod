@@ -30,6 +30,14 @@ type DispatchThresholdConfig = {
 interface HourlyDispatchChartProps {
   readonly setIsStepsHidden?: (hidden: boolean) => void;
   readonly isFullScreen?: boolean;
+  readonly selectedMonthYear: MonthYear | null;
+  readonly setSelectedMonthYear: React.Dispatch<React.SetStateAction<MonthYear | null>>;
+
+  readonly tempDateRange: DateRange;
+  readonly setTempDateRange: React.Dispatch<React.SetStateAction<DateRange>>;
+
+  readonly appliedDateRange: DateRange;
+  readonly setAppliedDateRange: React.Dispatch<React.SetStateAction<DateRange>>;
 }
 
 const ghostCardRows = Array.from({length: 5}, (_, i) => ({id: i}));
@@ -103,7 +111,18 @@ const isInsideUtcDateRange = (timestamp: string, range: DateRange) => {
 };
 
 export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
-  const {setIsStepsHidden, isFullScreen = false} = props;
+  const {
+    setIsStepsHidden,
+    isFullScreen = false,
+    selectedMonthYear,
+    setSelectedMonthYear,
+
+    tempDateRange,
+    setTempDateRange,
+
+    appliedDateRange,
+    setAppliedDateRange,
+  } = props;
   const dispatch = useDispatch();
   const chartImageRef = useRef<HTMLDivElement>(null);
   const {
@@ -112,7 +131,18 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
     onMinimize,
   } = useChartsActionV2({
     downloadFileName: '',
-    renderFullScreen: () => <HourlyDispatchChart {...props} isFullScreen />,
+    renderFullScreen: () => (
+      <HourlyDispatchChart
+        {...props}
+        isFullScreen
+        selectedMonthYear={selectedMonthYear}
+        setSelectedMonthYear={setSelectedMonthYear}
+        tempDateRange={tempDateRange}
+        setTempDateRange={setTempDateRange}
+        appliedDateRange={appliedDateRange}
+        setAppliedDateRange={setAppliedDateRange}
+      />
+    ),
   });
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
@@ -123,10 +153,6 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
   const dispatchData = useSelector(dispatchRuleData);
   const currentProject = useSelector(simulationProject);
   const allProjects = useSelector(allProjectsData);
-
-  const [selectedMonthYear, setSelectedMonthYear] = useState<MonthYear | null>(null);
-  const [tempDateRange, setTempDateRange] = useState<DateRange>({start: null, end: null});
-  const [appliedDateRange, setAppliedDateRange] = useState<DateRange>({start: null, end: null});
 
   // Get project name and simulation name
   const project_id = proSimulData?.project_id;
@@ -155,6 +181,11 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
   useEffect(() => {
     if (isFullScreen) {
       setIsStepsHidden?.(true);
+
+      const scrollContainer = document.querySelector('.screen-wrapper')?.parentElement;
+      scrollContainer?.scrollTo({top: 0, behavior: 'auto'});
+      globalThis.scrollTo({top: 0, left: 0, behavior: 'auto'});
+
       return () => {
         setIsStepsHidden?.(false);
       };
@@ -303,7 +334,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
     });
   }, [onMinimize]);
 
-  if (isLoading) {
+  if (isLoading && !hasActiveFilters) {
     return <HourlyDispatchChartGhostLoader />;
   }
 
@@ -331,7 +362,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
       <div className={`flex w-full items-center ${isFullScreen ? 'justify-end' : 'justify-between'} mb-4`}>
         {!isFullScreen && (
           <div className="mb-4 flex items-center gap-4 mt-6.5!">
-            <Text variant="14R" className="text-text-secondary! leading-none!">
+            <Text variant="14R" className="text-text-secondary! leading-none! whitespace-nowrap!">
               Select Period :{' '}
               <span className="relative inline-flex group">
                 <Icon name="circle-info" className="text-text-secondary! cursor-pointer  translate-y-1" />
@@ -358,7 +389,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
             />
             <DatePicker
               label=""
-              className="w-60"
+              className="w-64"
               placeholder="Select Date Range"
               showActions
               actionTopContent={
@@ -386,7 +417,7 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
                 onClick={handleClearFilters}
                 className="border-primary cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <Icon name="cross" className="text-text-secondary size-3" />
-                <Text variant="caption" className="text-text-secondary!">
+                <Text variant="caption" className="text-text-secondary! whitespace-nowrap!">
                   Clear filters
                 </Text>
               </button>
@@ -394,8 +425,16 @@ export const HourlyDispatchChart = (props: HourlyDispatchChartProps) => {
           </div>
         )}
 
-        <div className="flex items-center gap-5 pt-1">
-          <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={handleDownload} />
+        <div className={`flex  ${isFullScreen ? 'justify-between' : 'justify-end'} gap-5 pt-1 w-full`}>
+          {isFullScreen && (
+            <div className="flex flex-col">
+              <Text variant="h3">Hourly Dispatch Graph</Text>
+              <Text variant="14R" className="text-text-secondary! my-1.5">
+                Delivery and green energy breakdown by hour. Hover the graph for hourly values.
+              </Text>
+            </div>
+          )}
+
           {isFullScreen ? (
             <Icon name="minimize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={handleMinimize} />
           ) : (

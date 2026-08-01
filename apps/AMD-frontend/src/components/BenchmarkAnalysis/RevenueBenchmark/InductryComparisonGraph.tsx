@@ -53,6 +53,7 @@ type IndustryComparisonGraphProps = {
   yAxisTicks: number[];
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
+  customActions?: React.ReactNode;
 };
 
 function getLeftPosition(index: number, length: number) {
@@ -136,6 +137,7 @@ export function InductryComparisonGraph(props: Readonly<IndustryComparisonGraphP
     yAxisTicks,
     isLoading = false,
     isFullScreenOverride = false,
+    customActions,
   } = props;
   const [tooltipState, setTooltipState] = useState<ChartTooltipState | null>(null);
 
@@ -236,13 +238,16 @@ export function InductryComparisonGraph(props: Readonly<IndustryComparisonGraphP
             <Skeleton animation="wave" variant="rounded" width={32} height={32} className="rounded-md!" />
           </>
         ) : (
-          <IconButton
-            name="download"
-            size={20}
-            onClick={handleChartDownload}
-            className="hover:bg-primary-tint-2! cursor-pointer charts-action"
-            iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-          />
+          <>
+            {customActions}
+            <IconButton
+              name="download"
+              size={20}
+              onClick={handleChartDownload}
+              className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
+            />
+          </>
         )}
         {!isLoading &&
           (!isFullScreen ? (

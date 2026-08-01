@@ -12,11 +12,13 @@ import {
 } from '@/services/redux/selectors';
 import {useDispatch, useSelector} from 'react-redux';
 import {getAssetBatteryHealthCycleComparisonRequest, getAssetBatteryHealthSummaryRequest} from '@/services/redux/slice';
-import {AssetBatteryCycleCalculationMethod, BatteryCycleCalculationMethodLabels} from '@/constants';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
+import {AssetBatteryCycleCalculationMethod, BatteryCycleCalculationMethodLabels, CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
 import {BatteryFormulaKpi} from './CycleMethodInfoBox';
 import {Alert, Text} from '@/ui-kits';
 import {StratergyComparison} from './StratergyComparison';
 import {useContainerDimentions} from '@/hooks';
+import {CommentTrigger} from '@/components/common';
 
 interface AssetBatteryHealthTabProps extends AssetAnalysisTabProps {}
 
@@ -215,12 +217,12 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
    */
   function getCycleCycleMethodColumnsWidth() {
     const minTriggerWidth = 900;
-    const baseWidth = 210;
+    const baseWidth = 260;
     const step = 10;
     const maxWidth = 330;
 
     if (containerWidth <= minTriggerWidth) {
-      return 200;
+      return 260;
     }
 
     const increments = Math.floor((containerWidth - minTriggerWidth) / 10);
@@ -240,6 +242,18 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
     dispatch(getAssetBatteryHealthCycleComparisonRequest({assetId, year, month}));
   }, [assetId, month, year]);
 
+  useEffect(() => {
+    if (!assetId) return;
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.BatteryHealth,
+        context_year: year ?? undefined,
+      })
+    );
+  }, [assetId, year, dispatch]);
+
   return (
     <div ref={containerRef} className="flex flex-col gap-8">
       <Section
@@ -254,14 +268,19 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
       </Section>
 
       <div className="flex flex-col gap-4 bg-white border border-border rounded-xl p-4 -mt-3">
-        <div className='flex justify-between'>
-          <div className='flex flex-col gap-2'>
+        <div className="flex justify-between">
+          <div className="flex flex-col gap-2">
             <Text variant="18B">Cycle Calculation Methods & Comparison</Text>
             <Text variant="16SB" className="text-text-secondary!">
               Cycle Calculation Methods
             </Text>
           </div>
-          <Alert message="Warranty Limit: 1.5 cycles/day (547 cycles/year)" className='self-start' iconName='octagon-alert' iconClassName='rotate-180' />
+          <Alert
+            message="Warranty Limit: 1.5 cycles/day (547 cycles/year)"
+            className="self-start"
+            iconName="octagon-alert"
+            iconClassName="rotate-180"
+          />
         </div>
         <div className="grid grid-cols-3 gap-4">
           <BatteryFormulaKpi
@@ -305,9 +324,25 @@ export function AssetBatteryHealth(props: AssetBatteryHealthTabProps) {
           />
         </div>
 
-        <Text variant="16SB" className="text-text-secondary! mt-4">
-          Cycle Comparison
-        </Text>
+        <div className="flex justify-between items-center mt-4">
+          <Text variant="16SB" className="text-text-secondary!">
+            Cycle Comparison
+          </Text>
+          <div className="flex shrink-0 items-center flex-nowrap gap-3">
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.BatteryHealth}
+              contextWidget={ViewAnalysisWidgets.CycleComparison}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          </div>
+        </div>
         <AnalyticsGroupedTable
           data={cycleComparisonTableData}
           columns={cycleComparisonColumns}

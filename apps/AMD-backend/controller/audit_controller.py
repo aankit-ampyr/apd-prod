@@ -34,7 +34,7 @@ class AuditController:
     ):
         
         if Platform.AMD not in current_user["platform"]:
-            return Res.error("E-10013", message="Access denied")
+            return Res.error("E-10013", message="Access denied", http_status_code=403)
         
 
         return await self.service.get_audit_logs(

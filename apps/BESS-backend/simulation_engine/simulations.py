@@ -4,12 +4,14 @@ from typing import Optional
 import numpy as np
 from numpy.typing import NDArray
 import pandas as pd
+from pydantic import TypeAdapter
 from redis.asyncio import Redis
 from sqlalchemy import select, update
 from sqlalchemy.orm import joinedload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from constants.defaults import SIMULATION_UPDATES_CHANEL, SIZING_STRATEGY
+from dtos.simulation_dto import MonthlySimulationMetrics
 from dtos.socket_dto import (
     ConfigDetails,
     GreenConfigDetails,
@@ -54,6 +56,7 @@ from models.simulation_model import (
     DispatchRuleConfiguration,
 )
 from simulation_engine.repository import (
+    batch_insert_green_monthly_simulation_data,
     batch_insert_green_sizing_data,
     batch_insert_hourly_data,
     batch_insert_green_hourly_data,
@@ -61,6 +64,7 @@ from simulation_engine.repository import (
     batch_insert_simulation_results,
     handle_simulation_termination,
     progress_simulation_setup,
+    batch_insert_monthly_simulation_data,
 )
 from simulation_engine.core import SimulationEngine
 from simulation_engine.schemas import (
@@ -75,6 +79,7 @@ from simulation_engine.utils import (
     create_windowed_load_profile,
     should_simulation_stopped,
     create_availability_hours_array,
+    aggregate_monthly_data,
 )
 
 from python_common.utils.file_utils import FileStorageManager  # type: ignore
@@ -232,11 +237,14 @@ async def get_constant_simulation_params(
         )
         simulation_params.dg_takeover_mode = dispatch_rules.is_dg_takeover_full_load  # type: ignore
 
-        if dg_config.advanced_fuel_curve and not dg_config.is_binary:
-            simulation_params.dg_fuel_curve_enabled = dg_config.advanced_fuel_curve
+        if not dg_config.is_binary:
             simulation_params.min_stable_load_pct = dg_config.min_stable_load  # type: ignore
-            simulation_params.dg_fuel_f0 = dg_config.no_load_coeff  # type: ignore
-            simulation_params.dg_fuel_f1 = dg_config.load_coeff  # type: ignore
+            if dg_config.advanced_fuel_curve:
+                simulation_params.dg_fuel_curve_enabled = dg_config.advanced_fuel_curve
+                simulation_params.dg_fuel_f0 = dg_config.no_load_coeff  # type: ignore
+                simulation_params.dg_fuel_f1 = dg_config.load_coeff  # type: ignore
+            else:
+                simulation_params.dg_fuel_flat_rate = dg_config.flat_fuel_rate  # type: ignore
         else:
             simulation_params.dg_fuel_flat_rate = dg_config.flat_fuel_rate  # type: ignore
 
@@ -399,6 +407,7 @@ async def get_detailed_green_configuration(
 async def run_sizing_simulation(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     redis: Redis,
     db: AsyncSession,
     intervals: int = 25,
@@ -409,7 +418,7 @@ async def run_sizing_simulation(
 
     try:
         # INFO: Send Started Event
-        start_data = StartedData(simulation_id=simulation_id)
+        start_data = StartedData(simulation_id=simulation_id, user_name=run_by)
 
         start_event = SocketEvent(
             resource_type=ResourceType.SIZING_SIMULATION_JOB,
@@ -486,6 +495,7 @@ async def run_sizing_simulation(
                 progress_percentage = round((i / combination_count) * 100, 2)
                 progress_data = ProgressData(
                     simulation_id=simulation_id,
+                    user_name=run_by,
                     current_config=i,
                     total_config=combination_count,
                     progress_percentage=progress_percentage,
@@ -537,7 +547,6 @@ async def run_sizing_simulation(
 
         simulation_job.completed_iterations = combination_count
         simulation_job.status = SimulationJobStatus.COMPLETED
-        simulation_job.simulation.status = SimulationStatus.COMPLETED
         await db.commit()
 
         await progress_simulation_setup(
@@ -549,6 +558,7 @@ async def run_sizing_simulation(
         # INFO: Send Completed Event
         complete_data = CompletedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             total_config=combination_count,
         )
         complete_event = SocketEvent(
@@ -585,6 +595,7 @@ async def run_sizing_simulation(
         # INFO: Send Failed Event
         fail_data = FailedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             error_code="SIM_EXEC_ERROR",
             error_message=str(e),
         )
@@ -607,6 +618,7 @@ async def run_sizing_simulation(
 async def run_simulation_single_config(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     redis: Redis,
     db: AsyncSession,
     channel: str = SIMULATION_UPDATES_CHANEL,
@@ -617,7 +629,10 @@ async def run_simulation_single_config(
 
     try:
         # INFO: Send Started Event
-        start_data = StartedData(simulation_id=simulation_id)
+        start_data = StartedData(
+            simulation_id=simulation_id,
+            user_name=run_by,
+        )
 
         start_event = SocketEvent(
             resource_type=ResourceType.SIMULATION_JOB,
@@ -668,6 +683,18 @@ async def run_simulation_single_config(
 
         await batch_insert_hourly_data(db=db, results=hourly_data)
 
+        # Calculate and store the monthly data
+        monthly_data = aggregate_monthly_data(
+            simulation_id=simulation_id,
+            job_id=simulation_job.id,
+            hourly_data=hourly_data,
+        )
+
+        adapter = TypeAdapter(list[MonthlySimulationMetrics])
+        await batch_insert_monthly_simulation_data(
+            db=db, results=adapter.dump_python(monthly_data)
+        )
+
         filtered_result = ScenarioResult.model_validate(simulation_result)
         filtered_result.finalize()
 
@@ -679,7 +706,6 @@ async def run_simulation_single_config(
         db.add(sim_result)
 
         simulation_job.status = SimulationJobStatus.COMPLETED
-        simulation_job.simulation.status = SimulationStatus.COMPLETED
 
         await db.commit()
 
@@ -689,17 +715,18 @@ async def run_simulation_single_config(
             db=db,
         )
 
-        # INFO: Send Completed Event
-        # complete_data = CompletedData(
-        #     simulation_id=simulation_id,
-        #     total_config=combination_count,
-        # )
+        complete_data = UpdateData(
+            simulation_id=simulation_id,
+            user_name=run_by,
+            status_code="",
+            message=f"Simulation {simulation_id} completed successfully",
+        )
+
         complete_event = SocketEvent(
             resource_type=ResourceType.SIMULATION_JOB,
             resource_id=job_id,
             action_id=ActionType.COMPLETED,
-            # data=complete_data,
-            data=None,
+            data=complete_data,
         )
         await redis.publish(channel, complete_event.model_dump_json())
 
@@ -729,6 +756,7 @@ async def run_simulation_single_config(
         # INFO: Send Failed Event
         fail_data = FailedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             error_code="SIM_EXEC_ERROR",
             error_message=str(e),
         )
@@ -751,6 +779,7 @@ async def run_simulation_single_config(
 async def run_multi_year_projection(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     redis: Redis,
     db: AsyncSession,
     channel: str = SIMULATION_UPDATES_CHANEL,
@@ -762,7 +791,7 @@ async def run_multi_year_projection(
 
     try:
         # INFO: Send Started Event
-        start_data = StartedData(simulation_id=simulation_id)
+        start_data = StartedData(simulation_id=simulation_id, user_name=run_by)
 
         start_event = SocketEvent(
             resource_type=ResourceType.MULTI_YEAR_SIMULATION,
@@ -851,6 +880,7 @@ async def run_multi_year_projection(
                     return {"status": "terminated", "message": "Simulation terminated."}
                 progress_data = MultiYearProgressData(
                     simulation_id=simulation_id,
+                    user_name=run_by,
                     current_config=i,
                     total_config=duration,
                     progress_percentage=progress_percentage,
@@ -886,12 +916,20 @@ async def run_multi_year_projection(
                 bol=first_year_bol,
             )
 
-            # WARNING: It can be calcuated only once in schema functions
             final_energy = simulation_result.bess_mwh * (
                 simulation_result.final_soc_pct / 100
             )
+
+            # INFO: It can be calulated before running the simulation, and in summary section the substraction of last year degradation_loss can be skippedegradation_loss can be skipped
+            excess_energy = 0
+            if i != duration:
+                excess_energy = max(
+                    (final_energy - simulation_params.bess_max_soc_mwh), 0
+                )
+                sim_result.degradation_loss = excess_energy
+
             simulation_params.bess_initial_soc_pct = (
-                final_energy / simulation_params.bess_capacity_mwh
+                (final_energy - excess_energy) / simulation_params.bess_capacity_mwh
             ) * 100
 
             sim_result.finalize()
@@ -901,7 +939,6 @@ async def run_multi_year_projection(
         await batch_insert_multi_year_projection(results=simulation_results, db=db)
 
         simulation_job.status = SimulationJobStatus.COMPLETED
-        simulation_job.simulation.status = SimulationStatus.COMPLETED
 
         await db.commit()
 
@@ -913,6 +950,7 @@ async def run_multi_year_projection(
 
         complete_data = CompletedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             total_config=duration,
         )
 
@@ -951,6 +989,7 @@ async def run_multi_year_projection(
         # INFO: Send Failed Event
         fail_data = FailedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             error_code="SIM_EXEC_ERROR",
             error_message=str(e),
         )
@@ -973,6 +1012,7 @@ async def run_multi_year_projection(
 async def run_green_sizing_simulation(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     redis: Redis,
     db: AsyncSession,
     channel: str = SIMULATION_UPDATES_CHANEL,
@@ -984,7 +1024,7 @@ async def run_green_sizing_simulation(
 
     try:
         # INFO: Send Started Event
-        start_data = StartedData(simulation_id=simulation_id)
+        start_data = StartedData(simulation_id=simulation_id, user_name=run_by)
 
         start_event = SocketEvent(
             resource_type=ResourceType.GREEN_ENERGY_CONFIG,
@@ -1051,6 +1091,10 @@ async def run_green_sizing_simulation(
                 simulation_params.solar_profile, solar_scale
             )
 
+            simulation_params.total_solar_generated = np.sum(
+                simulation_params.solar_profile
+            )
+
             engine = SimulationEngine(params=simulation_params, year=year)
             simulation_result, _ = engine.run_simulation(
                 template_id=template_id,
@@ -1089,6 +1133,7 @@ async def run_green_sizing_simulation(
 
                 progress_data = ProgressData(
                     simulation_id=simulation_id,
+                    user_name=run_by,
                     current_config=i,
                     total_config=combination_count,
                     progress_percentage=progress_percentage,
@@ -1138,6 +1183,7 @@ async def run_green_sizing_simulation(
 
         complete_data = CompletedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             total_config=combination_count,
         )
 
@@ -1176,6 +1222,7 @@ async def run_green_sizing_simulation(
         # INFO: Send Failed Event
         fail_data = FailedData(
             simulation_id=simulation_id,
+            user_name=run_by,
             error_code="SIM_EXEC_ERROR",
             error_message=str(e),
         )
@@ -1195,20 +1242,21 @@ async def run_green_sizing_simulation(
     return {"status": "success", "message": "Simulation completed"}
 
 
-async def run_detailed_green_sizing_simulation(
+async def run_detailed_green_simulation(
     simulation_id: int,
     job_id: int,
+    run_by: str,
     redis: Redis,
     db: AsyncSession,
     channel: str = SIMULATION_UPDATES_CHANEL,
 ):
-    print(f"Running simulation for ID: {simulation_id} (Job: {job_id})")
+    print(f"Running detail green simulation for ID: {simulation_id} (Job: {job_id})")
 
     simulation_job = None
 
     try:
         # INFO: Send Started Event
-        start_data = StartedData(simulation_id=simulation_id)
+        start_data = StartedData(simulation_id=simulation_id, user_name=run_by)
 
         start_event = SocketEvent(
             resource_type=ResourceType.DETAIL_GREEN_SIMULATION,
@@ -1236,6 +1284,10 @@ async def run_detailed_green_sizing_simulation(
         solar_scale = required_pieak / peak_generation
         simulation_params.solar_profile = np.multiply(
             simulation_params.solar_profile, solar_scale
+        )
+
+        simulation_params.total_solar_generated = np.sum(
+            simulation_params.solar_profile
         )
 
         result = await db.execute(
@@ -1269,6 +1321,17 @@ async def run_detailed_green_sizing_simulation(
 
         await batch_insert_green_hourly_data(db=db, results=hourly_data)
 
+        monthly_data = aggregate_monthly_data(
+            simulation_id=simulation_id,
+            job_id=simulation_job.job_id,
+            hourly_data=hourly_data,
+        )
+
+        adapter = TypeAdapter(list[MonthlySimulationMetrics])
+        await batch_insert_green_monthly_simulation_data(
+            db=db, results=adapter.dump_python(monthly_data)
+        )
+
         filtered_result = GreenResult.model_validate(
             vars(simulation_result)
             | {
@@ -1298,6 +1361,7 @@ async def run_detailed_green_sizing_simulation(
         # INFO: Send Completed Event
         complete_data = UpdateData(
             simulation_id=simulation_id,
+            user_name=run_by,
             status_code="",
             message=f"Simulation {simulation_id} completed successfully",
         )
@@ -1335,6 +1399,7 @@ async def run_detailed_green_sizing_simulation(
         # INFO: Send Failed Event
         fail_data = UpdateData(
             simulation_id=simulation_id,
+            user_name=run_by,
             status_code="",
             message=str(e),
         )

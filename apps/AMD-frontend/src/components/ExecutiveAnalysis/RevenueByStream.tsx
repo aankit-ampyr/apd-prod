@@ -18,6 +18,7 @@ interface RevenueByStreamProps {
   selectedMonths?: SelectInputItem['id'][] | null;
   data: ExecutiveRevenueByStreamEntries[];
   year: number;
+  customActions?: React.ReactNode;
 }
 
 export function RevenueByStream(props: RevenueByStreamProps) {
@@ -31,6 +32,7 @@ export function RevenueByStream(props: RevenueByStreamProps) {
     loading,
     selectedMonths: selectedMonthsFromProps = null,
     year,
+    customActions,
   } = props;
 
   /**
@@ -214,6 +216,7 @@ export function RevenueByStream(props: RevenueByStreamProps) {
         />
         {!loading && (
           <div className={cn('flex shrink-0 items-center gap-3 chart-actions', actionWrapperClassName)}>
+            {customActions}
             <IconButton
               name="download"
               size={20}

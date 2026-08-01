@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import List, Optional, Literal
 from pydantic import BaseModel, Field, validator
 import re
 from constants.enums import AssetType
@@ -7,6 +7,11 @@ from constants.enums import AssetType
 class ReassignAsset(BaseModel):
     organization_id: int
 
+class AssetGenerateAnalytics(BaseModel):
+    month: int | Literal['all']
+    year: int | Literal['all']
+    asset_id: int | Literal['all']
+    dependencies: List[str]
 
 class AssetCreate(BaseModel):
     name: str = Field(...)

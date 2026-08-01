@@ -1,6 +1,8 @@
 import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
 import type {
   APIResponse,
+  BessContainerConfigRequest,
+  BessContainerConfigResponse,
   CustomConfig,
   CustomHourlyChartResult,
   CustomHourlyResult,
@@ -16,189 +18,36 @@ import type {
   GetDetailedGreenAnalysisSimulationResult,
   GetDGSizing,
   GetDispatchRule,
+  GetEditedStepSimulation,
   GetGeneratorDg,
   GetGreenAnalysis,
   GetMultiYearProgress,
   GetMultiYearProjection,
   GetSimulationProgress,
+  GetSolarProfileRequest,
   GreenAnalysis,
   GreenAnalysisResultRequest,
   InitiateSimulation,
+  InitiateSimulationRequest,
+  InitiateSimulationResponse,
+  LoadProfileRequest,
+  LoadProfileResponse,
   MultiYearProjection,
   MultiYearProjectionRequest,
   RunSimulationRequest,
+  SaveSolarProfileRequest,
   SimulationListRequest,
   SimulationResultRequest,
+  SolarProfileData,
+  SolarProfileRequest,
+  SolarProfileResponse,
   SolarProfileSourceListRequest,
   UpdateSimulationRequest,
+  UploadSolarCSVData,
+  UploadSolarCSVRequest,
+  UploadSolarCSVResponse,
 } from '@/interface/api-interface';
 import {Simulation, SolarProfileSource} from '@/interface/common-interface';
-
-export interface LoadProfileRequest {
-  simulation_id: number;
-  params?: Record<string, unknown>;
-  payload: {
-    pattern: number; // enum
-    config: Record<string, any>;
-  };
-}
-
-export interface LoadProfileResponse {
-  status: string;
-  status_code: string;
-  data: {
-    pattern: {
-      id: number;
-      label: string;
-    };
-    config: Record<string, any>;
-    output: {
-      peak_load: number;
-      total_hours: number;
-      total_energy: number;
-      hour_percentage: number;
-      data_points: {
-        hour: number;
-        value: number;
-      }[];
-    };
-  };
-}
-
-export interface InitiateSimulationRequest {
-  project_id: number;
-  project_name?: string;
-}
-
-export interface InitiateSimulationResponse {
-  status: string;
-  status_code: string;
-  data: Simulation;
-}
-
-// ======================================
-// Solar Profile Types
-// ======================================
-
-export interface SolarProfileRequest {
-  simulation_id: number;
-  params?: Record<string, unknown>;
-  payload: {
-    type: 'static' | 'file';
-    source_id: number;
-  };
-}
-
-export interface SolarProfileData {
-  id: number;
-  source: {
-    type: 'static' | 'file';
-    id: number;
-    metadata: {
-      name: string;
-      size: number;
-      rows: number;
-    };
-  };
-  total_generation: number;
-  peak_generation: number;
-  avg_generation: number;
-  generation_hours: number;
-  max_storable: number;
-  excess_hours: number;
-  total_storable: number;
-  hourly_generation_graph_points: {
-    hour: number;
-    value: number;
-  }[];
-  monthly_generation_graph_points: {
-    month: number;
-    value: number;
-  }[];
-  storable_solar_graph_points: {
-    hour: number;
-    value: number;
-  }[];
-}
-
-export interface SolarProfileResponse {
-  status: string;
-  status_code: string;
-  data: SolarProfileData;
-}
-
-// ======================================
-// Upload Solar Profile CSV Types
-// ======================================
-
-export interface UploadSolarCSVRequest {
-  simulation_id: number;
-  file: File;
-}
-
-export interface UploadSolarCSVData {
-  key: string;
-  size: number;
-  rows: number;
-  name: string;
-  id: number;
-  created_at?: string; // ISO string, optional for compatibility
-}
-
-export interface UploadSolarCSVResponse {
-  status: string;
-  status_code: string;
-  data: UploadSolarCSVData;
-}
-
-// ======================================
-// Save/Get Solar Profile Types
-// ======================================
-
-export interface SaveSolarProfileRequest {
-  simulation_id: number;
-  payload: {
-    type: 'static' | 'file';
-    source_id: number;
-  };
-}
-
-export interface GetSolarProfileRequest {
-  simulation_id: number;
-}
-
-export interface BessContainerConfigRequest {
-  simulation_id: number;
-  params?: Record<string, unknown>;
-  payload: {
-    containers: number[];
-    bess_efficiency: number;
-    bess_min_soc: number;
-    bess_max_soc: number;
-    bess_initial_soc: number;
-    bess_daily_cycle_limit: number;
-    bess_enforce_cycle_limit: boolean;
-  };
-}
-
-export interface BessContainerConfigResponse {
-  status: string;
-  status_code: string;
-  data: {
-    id: number;
-    simulation_id: number;
-    containers: {
-      id: number;
-      label: string;
-    }[];
-    bess_efficiency: number;
-    bess_min_soc: number;
-    bess_max_soc: number;
-    bess_initial_soc: number;
-    bess_daily_cycle_limit: number;
-    bess_enforce_cycle_limit: boolean;
-  };
-}
 
 // ==============================
 // STATE
@@ -268,6 +117,10 @@ interface SimulationWizardState {
   dispatchRuleError: string | false;
   dispatchRuleSuccess: string | false;
   dispatchRuleData: GetDispatchRule['response']['data'] | null;
+
+  getDispatchRuleLoading: boolean;
+  getDispatchRuleError: string | false;
+  getDispatchRuleSuccess: string | false;
 
   dgSizingLoading: boolean;
   dgSizingError: string | false;
@@ -442,6 +295,11 @@ interface SimulationWizardState {
   detailedGreenAnalysisResultError: string | false;
   detailedGreenAnalysisResultSuccess: string | false;
   detailedGreenAnalysisResultData: GetDetailedGreenAnalysisSimulationResult['response']['data'] | null;
+
+  editedStepSimulationLoading: boolean;
+  editedStepSimulationError: string | false;
+  editedStepSimulationSuccess: string | false;
+  editedStepSimulationData: GetEditedStepSimulation['response']['data'] | null;
 }
 
 const initialState: SimulationWizardState = {
@@ -505,6 +363,10 @@ const initialState: SimulationWizardState = {
   dispatchRuleError: false,
   dispatchRuleSuccess: false,
   dispatchRuleData: null,
+
+  getDispatchRuleLoading: false,
+  getDispatchRuleError: false,
+  getDispatchRuleSuccess: false,
 
   dgSizingLoading: false,
   dgSizingError: false,
@@ -680,6 +542,11 @@ const initialState: SimulationWizardState = {
   detailedGreenAnalysisResultError: false,
   detailedGreenAnalysisResultSuccess: false,
   detailedGreenAnalysisResultData: null,
+
+  editedStepSimulationLoading: false,
+  editedStepSimulationError: false,
+  editedStepSimulationSuccess: false,
+  editedStepSimulationData: null,
 };
 
 // ==============================
@@ -937,6 +804,7 @@ const simulationWizardSlice = createSlice({
 
     uploadSolarCSVFailure: (state, action: PayloadAction<APIResponse>) => {
       state.uploadSolarCSVLoading = false;
+      state.uploadSolarCSVSuccess = false;
       state.uploadSolarCSVError = action.payload.status_code;
       state.uploadSolarCSVData = null;
     },
@@ -1164,6 +1032,24 @@ const simulationWizardSlice = createSlice({
       state.generatorDgError = action.payload.status_code;
     },
 
+    // Silent request used to synchronize configuration updates across other browser tabs/users
+    // without triggering the page-level ghost loader.
+    getGeneratorDgSilentRequest: (state, _action: PayloadAction<GetGeneratorDg['params']>) => {
+      state.generatorDgError = false;
+      state.generatorDgSuccess = false;
+    },
+    getGeneratorDgSilentSuccess: (state, action: PayloadAction<GetGeneratorDg['response']>) => {
+      state.generatorDgSuccess = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.generatorDgData = action.payload.data;
+      }
+    },
+    getGeneratorDgSilentFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.generatorDgError = action.payload.status_code;
+      // Keep the existing data intact if the background sync fails.
+    },
+
     // ======================================
     // generator DG fuel curve data
     // ======================================
@@ -1217,13 +1103,13 @@ const simulationWizardSlice = createSlice({
     // get dispatch rule data
     // ======================================
     getDispatchRuleRequest: (state, _action: PayloadAction<GetDispatchRule['params']>) => {
-      state.dispatchRuleLoading = true;
-      state.dispatchRuleError = false;
-      state.dispatchRuleSuccess = false;
+      state.getDispatchRuleLoading = true;
+      state.getDispatchRuleError = false;
+      state.getDispatchRuleSuccess = false;
     },
     getDispatchRuleSuccess: (state, action: PayloadAction<GetDispatchRule['response']>) => {
-      state.dispatchRuleLoading = false;
-      state.dispatchRuleSuccess = action.payload.status_code;
+      state.getDispatchRuleLoading = false;
+      state.getDispatchRuleSuccess = action.payload.status_code;
       if (action.payload.data) {
         state.dispatchRuleData = {
           ...action.payload.data,
@@ -1233,8 +1119,8 @@ const simulationWizardSlice = createSlice({
       }
     },
     getDispatchRuleFailure: (state, action: PayloadAction<APIResponse>) => {
-      state.dispatchRuleLoading = false;
-      state.dispatchRuleError = action.payload.status_code;
+      state.getDispatchRuleLoading = false;
+      state.getDispatchRuleError = action.payload.status_code;
       state.dispatchRuleData = null;
     },
 
@@ -1373,6 +1259,8 @@ const simulationWizardSlice = createSlice({
       state.detailedGreenAnalysisResultSuccess = false;
       state.detailedGreenAnalysisDataSuccess = false;
       state.greenAnalysisDataSuccess = false;
+      state.runGreenAnalysisSuccess = false;
+      state.runDetailedGreenAnalysisSuccess = false;
 
       // Clear all wizard data when selecting a new simulation to prevent stale data
       state.loadProfileData = null;
@@ -1466,6 +1354,25 @@ const simulationWizardSlice = createSlice({
       state.projectSimulationError = action.payload.status_code;
       state.projectSimulationData = null;
     },
+
+    // Silent request used to synchronize configuration updates across other browser tabs/users
+    // without triggering the page-level ghost loader.
+    getProjectSimulationSilentRequest: (state, _action: PayloadAction<any>) => {
+      state.projectSimulationError = false;
+      state.projectSimulationSuccess = false;
+    },
+    getProjectSimulationSilentSuccess: (state, action: PayloadAction<UpdateSimulationRequest['response']>) => {
+      state.projectSimulationSuccess = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.projectSimulationData = action.payload.data;
+      }
+    },
+    getProjectSimulationSilentFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.projectSimulationError = action.payload.status_code;
+      // Keep the existing data intact if the background sync fails.
+    },
+
     resetInitiateSimulation: state => {
       state.initiateSimulationData = null;
     },
@@ -1539,6 +1446,22 @@ const simulationWizardSlice = createSlice({
       state.simulationProgressError = action.payload.status_code;
       state.simulationProgressData = null;
     },
+
+    simulationProgressSilentRequest(state, _action: PayloadAction<GetSimulationProgress['payload']>) {
+      state.simulationProgressError = false;
+      state.simulationProgressSuccess = false;
+    },
+    simulationProgressSilentSuccess(state, action: PayloadAction<GetSimulationProgress['response']>) {
+      state.simulationProgressSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.simulationProgressData = action.payload.data;
+      }
+    },
+    simulationProgressSilentFailure(state, action: PayloadAction<APIResponse>) {
+      state.simulationProgressError = action.payload.status_code;
+      state.simulationProgressData = null;
+    },
+
     simulationResultsRequest(state, _action: PayloadAction<SimulationResultRequest['params']>) {
       state.simulationResultsLoading = true;
       state.simulationResultsError = false;
@@ -1562,7 +1485,7 @@ const simulationWizardSlice = createSlice({
     // Used after saving configurations to update projectSimulationData
     // ======================================
     refreshProjectSimulationRequest(state, _action: PayloadAction<{simulation_id: number}>) {
-      state.projectSimulationLoading = true;
+      // state.projectSimulationLoading = true;
       state.projectSimulationError = false;
     },
     refreshProjectSimulationSuccess(state, action: PayloadAction<UpdateSimulationRequest['response']>) {
@@ -1635,7 +1558,6 @@ const simulationWizardSlice = createSlice({
       state.runCustomSimulationLoading = true;
       state.runCustomSimulationError = false;
       state.runCustomSimulationSuccess = false;
-      state.runCustomSimulationData = null;
     },
     runCustomSimulationSuccess(state, action: PayloadAction<RunSimulationRequest['response']>) {
       state.runCustomSimulationLoading = false;
@@ -2101,6 +2023,37 @@ const simulationWizardSlice = createSlice({
       state.detailedGreenAnalysisResultError = action.payload.status_code;
       state.detailedGreenAnalysisResultData = null;
     },
+
+    editedStepSimulationDataRequest: (state, action: PayloadAction<GetEditedStepSimulation['params']>) => {
+      state.editedStepSimulationLoading = true;
+      state.editedStepSimulationError = false;
+      state.editedStepSimulationSuccess = false;
+    },
+    editedStepSimulationDataSuccess: (state, action: PayloadAction<GetEditedStepSimulation['response']>) => {
+      state.editedStepSimulationLoading = false;
+      state.editedStepSimulationSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.editedStepSimulationData = action.payload.data;
+      }
+    },
+    editedStepSimulationDataFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.editedStepSimulationLoading = false;
+      state.editedStepSimulationError = action.payload.status_code;
+      state.editedStepSimulationData = null;
+    },
+
+    clearDetailedGreenErrors(state) {
+      state.detailedGreenAnalysisError = false;
+      state.runDetailedGreenAnalysisError = false;
+    },
+    clearMultiYearErrors(state) {
+      state.multiYearProjectionError = false;
+      state.runMultiYearProjectionError = false;
+    },
+    clearCustomConfigErrors(state) {
+      state.customConfigError = false;
+      state.runCustomSimulationError = false;
+    },
   },
 });
 
@@ -2380,6 +2333,23 @@ export const {
   detailedGreenAnalysisResultRequest,
   detailedGreenAnalysisResultSuccess,
   detailedGreenAnalysisResultFailure,
+
+  editedStepSimulationDataRequest,
+  editedStepSimulationDataSuccess,
+  editedStepSimulationDataFailure,
+
+  clearDetailedGreenErrors,
+  clearMultiYearErrors,
+  clearCustomConfigErrors,
+  getGeneratorDgSilentRequest,
+  getGeneratorDgSilentSuccess,
+  getGeneratorDgSilentFailure,
+  getProjectSimulationSilentRequest,
+  getProjectSimulationSilentSuccess,
+  getProjectSimulationSilentFailure,
+  simulationProgressSilentRequest,
+  simulationProgressSilentSuccess,
+  simulationProgressSilentFailure,
 } = simulationWizardSlice.actions;
 
 export default simulationWizardSlice.reducer;

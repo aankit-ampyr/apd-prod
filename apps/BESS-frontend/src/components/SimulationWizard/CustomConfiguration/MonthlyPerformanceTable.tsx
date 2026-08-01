@@ -21,7 +21,6 @@ import {
 import {
   customMonthlySimulationResults,
   customConfigData,
-  customSimulationSuccess,
   initiateSimulationData,
   projectSimulationData,
   simulationProject,
@@ -235,7 +234,7 @@ interface ColumnHeaderProps {
 
 const ColumnHeader = ({label, sort, onSortChange, tooltip}: ColumnHeaderProps) => {
   return (
-    <div className="flex items-center gap-2 relative">
+    <div className="flex items-center justify-center gap-2 relative">
       <Text variant="caption2" className="font-InterSemiBold! text-text-primary!">
         {label}
       </Text>
@@ -277,7 +276,6 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
   const dispatch = useDispatch();
   const monthlyData = useSelector(customMonthlySimulationResults);
   const customConfig = useSelector(customConfigData);
-  const customSimulationStatus = useSelector(customSimulationSuccess);
   const simulData = useSelector(initiateSimulationData);
   const isLoading = useSelector((state: RootState) => state.simulationWizard.monthlySimulationResultsLoading);
   const proSimulData = useSelector(projectSimulationData);
@@ -291,7 +289,6 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
 
   // Only month column is sortable
   const [localSortDirection, setLocalSortDirection] = useState<'asc' | 'desc' | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
   const [localPendingMonths, setLocalPendingMonths] = useState<MonthYear[]>([]);
   const [localAppliedMonths, setLocalAppliedMonths] = useState<MonthYear[]>([]);
 
@@ -331,12 +328,17 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
     onMinimize: onChartMinimize,
   } = useChartsActionV2({
     downloadFileName: '',
-    renderFullScreen: () => <MonthlyPerformanceChartSection chartRows={chartRows} isFullScreen onMinimize={onChartMinimize} />,
+    renderFullScreen: () => (
+      <MonthlyPerformanceChartSection chartRows={chartRows} isFullScreen onMinimize={onChartMinimize} onDownload={handleDownloadGraph} chartRef={chartRef} />
+    ),
   });
 
   const handleDownloadGraph = useCallback(async () => {
     await downloadElementAsImage(chartRef.current, 'monthly_dispatch_chart.png');
   }, []);
+
+  // Track active modifications (filters or sorting)
+  const hasActiveModifications = Boolean(appliedMonths.length > 0 || sortDirection !== null);
 
   const simulation_id = customConfig?.simulation_id ?? simulData?.id ?? proSimulData?.id;
 
@@ -361,21 +363,21 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
   }, [simulation_id, appliedMonths, sortDirection]);
 
   // Fetch data on mount and when params change
-  useEffect(() => {
-    const params = buildRequestParams();
-    if (params) {
-      dispatch(customMonthlySimulationResultsRequest(params));
-    }
-  }, [buildRequestParams, dispatch]);
 
   useEffect(() => {
-    if (customSimulationStatus !== 'S-20038') return;
-
     const params = buildRequestParams();
-    if (params) {
-      dispatch(customMonthlySimulationResultsRequest(params));
+
+    if (!params) {
+      return;
     }
-  }, [buildRequestParams, customSimulationStatus, dispatch]);
+
+    // Skip API calls in full screen mode only if no modifications are active
+    if (isFullScreen && !hasActiveModifications) {
+      return;
+    }
+
+    dispatch(customMonthlySimulationResultsRequest(params));
+  }, [buildRequestParams, isFullScreen, hasActiveModifications]);
 
   // Handle full-screen mode
   useEffect(() => {
@@ -405,24 +407,31 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
 
   // Get API year for MonthYearPicker
   const apiYear = monthlyData?.year;
-  const chartRows: MonthlyPerformanceChartRow[] = resultRows.map(row => ({
-    ...row,
-    ...getMonthMeta(row.month, apiYear),
-  }));
+
+  const [chartRows, setChartRows] = useState<MonthlyPerformanceChartRow[]>([]);
+
+  useEffect(() => {
+    if (resultRows.length > 0 && chartRows.length === 0) {
+      setChartRows(
+        resultRows.map(row => ({
+          ...row,
+          ...getMonthMeta(row.month, apiYear),
+        })),
+      );
+    }
+  }, [resultRows, apiYear, chartRows.length]);
 
   // Handle month selection change (from Done button)
   const handleMonthsChange = (months: MonthYear[]) => {
     setPendingMonths(months);
     setAppliedMonths(months);
-    setCurrentPage(1);
   };
 
   // Handle sort change for month column only
-  const handleMonthSortChange = () => {
-    const nextSortDirection = sortDirection === 'asc' ? 'desc' : sortDirection === 'desc' ? null : 'asc';
-    setSortDirection(nextSortDirection);
-  };
 
+  const handleMonthSortChange = (sort: 'asc' | 'desc' | null) => {
+    setSortDirection(sort);
+  };
   // Handle download using backend export API
   const handleDownload = async () => {
     if (!simulation_id) return;
@@ -452,7 +461,6 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
     setPendingMonths([]);
     setAppliedMonths([]);
     setSortDirection(null);
-    setCurrentPage(1);
   };
 
   const renderCell = (value: number | string, accent = false) => (
@@ -467,79 +475,79 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
     {
       name: 'month',
       title: <ColumnHeader label="Month" sort={sortDirection} onSortChange={handleMonthSortChange} tooltip="Calendar month" />,
-      width: {minWidth: '120px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.month),
     },
     {
       name: 'loadMet',
       title: <ColumnHeader label="Load Met (%)" tooltip="Percentage of load demand met" />,
-      width: {minWidth: '120px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.loadMet, false),
     },
     {
       name: 'greenEnergy',
       title: <ColumnHeader label="Green Hours (%)" tooltip="Percentage of energy from renewable sources" />,
-      width: {minWidth: '140px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.greenEnergy),
     },
     {
       name: 'wastedEnergy',
       title: <ColumnHeader label="Wasted Energy (%)" tooltip="Percentage of energy wasted" />,
-      width: {minWidth: '140px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => <Text variant="caption2">{row.wastedEnergy}</Text>,
     },
     {
       name: 'hoursFullyServed',
       title: <ColumnHeader label="Hours Fully Served" tooltip="Total hours with full load met" />,
-      width: {minWidth: '150px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.hoursFullyServed),
     },
     {
       name: 'totalLoadHours',
       title: <ColumnHeader label="Total Load Hours" tooltip="Total hours of load demand" />,
-      width: {minWidth: '140px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.totalLoadHours),
     },
     {
       name: 'generatorHours',
       title: <ColumnHeader label="Generator Hours" tooltip="Hours generator was running" />,
-      width: {minWidth: '140px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.generatorHours),
     },
     {
       name: 'greenEnergyToLoad',
       title: <ColumnHeader label="Green Energy To Load (MWh)" tooltip="Green energy delivered to load" />,
-      width: {minWidth: '180px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.greenEnergyToLoad),
     },
     {
       name: 'dgToLoad',
       title: <ColumnHeader label="DG To Load (MWh)" tooltip="Generator energy delivered to load" />,
-      width: {minWidth: '150px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.dgToLoad),
     },
     {
       name: 'curtailed',
       title: <ColumnHeader label="Curtailed (MWh)" tooltip="Energy curtailed" />,
-      width: {minWidth: '130px'},
+      width: {minWidth: '200px'},
       align: 'center',
       render: row => renderCell(row.curtailed),
     },
   ];
 
   // Check if filters are active
-  const hasActiveFilters = appliedMonths.length > 0 || !!sortDirection;
+  const hasActiveFilters = appliedMonths.length > 0;
 
-  if (isLoading) {
+  if (isLoading && resultRows.length === 0) {
     return <MonthlyPerformanceTableGhostLoader />;
   }
 
@@ -566,13 +574,14 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
         )}
       </div>
       {showChart && (
-        <div ref={chartRef}>
+        <div>
           <MonthlyPerformanceChartSection
             chartRows={chartRows}
             isFullScreen={false}
             onMaximize={onChartMaximize}
             onMinimize={onChartMinimize}
             onDownload={handleDownloadGraph}
+            chartRef={chartRef}
           />
         </div>
       )}
@@ -594,9 +603,11 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
                 <button
                   type="button"
                   onClick={handleClearFilters}
-                  className="border-primary cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
+                  className="border-primary w-full! cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                   <Icon name="cross" className="text-text-secondary size-3" />
-                  <Text variant="caption">Clear Filters</Text>
+                  <Text variant="caption" className="whitespace-nowrap!">
+                    Clear Filters
+                  </Text>
                 </button>
               )}
             </div>
@@ -626,9 +637,10 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
           totalPages={monthlyData?.total_pages ?? 1}
           currentPage={monthlyData?.current_page ?? 1}
           totalResult={resultRows.length}
-          onPageChange={setCurrentPage}
           pageSize={PAGE_SIZE}
           stickyHeader
+          tableHeightWhenScrollable={700}
+          showFooter={false}
           persistHorizontalScrollKey={simulation_id ? `bess-monthly-results-${simulation_id}` : undefined}
         />
       </div>
@@ -636,7 +648,7 @@ export const MonthlyPerformanceTable = (props: MonthlyDataTableProps) => {
   );
 };
 
-const MonthlyPerformanceChartSection = ({chartRows, isFullScreen, onMaximize, onMinimize, onDownload}: any) => {
+const MonthlyPerformanceChartSection = ({chartRows, isFullScreen, onMaximize, onMinimize, onDownload, chartRef}: any) => {
   return (
     <>
       <div className="flex items-start gap-3 mb-4 mt-1.3">
@@ -653,7 +665,7 @@ const MonthlyPerformanceChartSection = ({chartRows, isFullScreen, onMaximize, on
         </div>
       </div>
 
-      <div className="mb-8 rounded-xl border border-[#E2E8F0] bg-white px-5 pb-5 pt-5">
+      <div ref={chartRef} className="mb-8 rounded-xl border border-[#E2E8F0] bg-white px-5 pb-5 pt-5">
         <div className="mb-8 flex justify-end">
           <div className="flex items-center gap-5 no-export">
             <Icon name="download" className="size-5 cursor-pointer text-[#6BCDC6]!" onClick={onDownload} />

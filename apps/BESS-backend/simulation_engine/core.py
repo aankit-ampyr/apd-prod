@@ -369,10 +369,10 @@ class SimulationEngine:
     def get_template_id(cls, params: SimulationParams) -> int:
         if params.dg_enabled is False:
             return 0
-        if params.load_priority == LoadServingPriority.DG_FIRST:
-            return 2
         if params.dg_takeover_mode:
             return 3
+        if params.load_priority == LoadServingPriority.DG_FIRST:
+            return 2
 
         return 1
 
@@ -474,17 +474,6 @@ class SimulationEngine:
             ) * 100
             self.hourly_result.daily_cycles = self.state.daily_cycles
             self.hourly_result.is_dg_running = self.state.is_dg_running
-
-            min_soc_mwh = (
-                self.params.bess_capacity_mwh * self.params.bess_min_soc_pct / 100
-            )
-            max_soc_mwh = (
-                self.params.bess_capacity_mwh * self.params.bess_max_soc_pct / 100
-            )
-            # WARNING: should be removed with proper testing
-            self.state.current_soc = max(
-                min_soc_mwh, min(self.state.current_soc, max_soc_mwh)
-            )
 
             result.unserved_mwh += unserved_load
             if load > 0:

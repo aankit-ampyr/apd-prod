@@ -3,3 +3,7 @@ export * from '@lazarus/react-common/components';
 export * from './IconWrapper';
 export * from './SectionHeader';
 export * from './RoleBasedUI';
+export * from './CommentTrigger';
+export * from './CommentPanel';
+export * from './WidgetActions';
+export * from './AnalyticsFallbackScreen';

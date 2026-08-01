@@ -1,9 +1,16 @@
-import {API, ACCESS_KEY, SUCCESS_KEY} from '@/constants';
+import {API} from '@/constants';
 import {createAxiosInstance} from './axiosConfig';
 import {fetchAndDownloadBlob, fetchBlobFromApi} from './fetchConfig';
 
 import {
   ActivateAssetRequest,
+  FetchCommentsRequest,
+  CreateCommentApiRequest,
+  UpdateCommentApiRequest,
+  DeleteCommentApiRequest,
+  ReplyCommentApiRequest,
+  ReadCommentApiRequest,
+  CheckCommentStatusApiRequest,
   AddMonthlyValuesRequest,
   AssetIndustryBenchmarkAnalysisExportRequest,
   AssetIndustryBenchmarkAnalysisRequest,
@@ -31,7 +38,6 @@ import {
   AssetOperationalAnalyticsRequest,
   AuditLogListRequest,
   GenerateOptimizedDatasetRequest,
-  AssetSocDistributionRequest,
   DownloadAssetFileRequest,
   EditAssetRequest,
   GetAssetFilesRequest,
@@ -78,34 +84,25 @@ import {
   InvoiceSettlementUploadRequest,
   DeleteInvoiceSettlementRequest,
   ExportInvoiceSettlementRequest,
-  AssetCapacityMarketRequest,
+  AssetCapacityMarketSummaryRequest,
+  AssetCapacityMarketPaymentsRequest,
+  AssetCapacityMarketPaymentTrendRequest,
   AssetCapacityMarketExportRequest,
+  AssetInvoiceRevenueReconciliationSummaryRequest,
+  AssetInvoiceRevenueReconciliationPerStreamComparisonRequest,
+  AssetInvoiceRevenueReconciliationExportRequest,
+  AssetInvoiceSummaryStatementUploadRequest,
+  DeleteAssetInvoiceSummaryStatementRequest,
+  AssetInvoiceSummaryStatementListRequest,
+  ExportAssetInvoiceSummaryStatementRequest,
+  ListActiveNotificationsRequest,
+  MarkNotificationReadRequest,
+  AssetAnalysisBatteryStrategyEnergyThroughputSummaryExportRequest,
 } from '@/interface';
 
 const defaultHeaders = {
   'Content-Type': 'application/json',
 };
-const authHeaders: {Authorization: string} = {Authorization: ''};
-
-export function setAuthHeader(token: string) {
-  authHeaders.Authorization = `Bearer ${token}`;
-}
-
-// this function is used to update the token for the authheader object in memory
-function setAuthHeaderFromResponse(response: any) {
-  if (response.data?.status === SUCCESS_KEY) {
-    const token = response.data?.data?.access_token;
-
-    // store the token in local storage for persistence across sessions
-    localStorage.setItem(ACCESS_KEY, token);
-
-    // update the auth header in memory for subsequent API calls
-    setAuthHeader(token);
-  }
-  return response;
-}
-
-setAuthHeader(localStorage.getItem(ACCESS_KEY) as string);
 
 // This is for example
 export async function demo() {
@@ -120,7 +117,7 @@ export async function addUser(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.users,
     method: 'POST',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -129,7 +126,7 @@ export async function editUser(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.user_id(data.id),
     method: 'PATCH',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -138,7 +135,7 @@ export async function getUsers(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.users,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -147,7 +144,7 @@ export async function deleteUser(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.user_id(data.id),
     method: 'DELETE',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -156,7 +153,7 @@ export async function organizationList(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.organization,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -165,7 +162,7 @@ export async function addOrganization(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.organization,
     method: 'POST',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -174,7 +171,7 @@ export async function editOrganization(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.organization_id(data.id),
     method: 'PATCH',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -194,24 +191,21 @@ export async function verifyOtp(data: any) {
     method: 'POST',
     headers: {...defaultHeaders},
     data,
-  })
-    .then(setAuthHeaderFromResponse)
-    .catch(res => res);
+  }).catch(res => res);
 }
 
 export async function logout() {
   return await createAxiosInstance({
     url: API.authUrls.logout,
     method: 'POST',
-    headers: {...authHeaders},
-  })
+  });
 }
 
 export async function assignOrganization(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.user_organization(data.id),
     method: 'PUT',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -221,7 +215,7 @@ export async function auditLogList(params: AuditLogListRequest['params']) {
   return await createAxiosInstance({
     url: API.authUrls.audit_logs,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -231,7 +225,7 @@ export async function getAssets(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.assets,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -240,7 +234,7 @@ export async function reassignAssetOwnership(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.asset_organization(data.asset_id),
     method: 'PUT',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data: {organization_id: data.organization_id},
   });
 }
@@ -250,7 +244,7 @@ export async function onboardNewAsset(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.assets,
     method: 'POST',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -259,7 +253,7 @@ export async function getOrganizationMultipleUsers(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.organization_multiple_users,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -268,7 +262,16 @@ export async function getAssetMultipleUsers(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.asset_multiple_users,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
+    params,
+  });
+}
+
+export async function getAssetTaggableUsers(assetId: number, params: any) {
+  return await createAxiosInstance({
+    url: API.authUrls.asset_taggable_users(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -277,7 +280,7 @@ export async function getDigests(params: any) {
   return await createAxiosInstance({
     url: API.authUrls.digests,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params,
   });
 }
@@ -286,7 +289,7 @@ export async function addDigest(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.digests,
     method: 'POST',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -296,16 +299,17 @@ export async function editDigest(data: any) {
   return await createAxiosInstance({
     url: API.authUrls.digest_id(id),
     method: 'PUT',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data: body,
   });
 }
 
-export async function getAssetDetails({id}: {id: number}) {
+export async function getAssetDetails({id, skip_audit}: {id: number, skip_audit?: boolean}) {
+  const query = skip_audit ? '?skip_audit=true' : '';
   return await createAxiosInstance({
-    url: API.authUrls.asset_id(id),
+    url: `${API.authUrls.asset_id(id)}${query}`,
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
   });
 }
 
@@ -313,7 +317,7 @@ export async function editAssetDetails(data: EditAssetRequest['payload']) {
   return await createAxiosInstance({
     url: API.authUrls.asset_id(data.id),
     method: 'PATCH',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -322,7 +326,7 @@ export async function optimizationParams(data: OptimizationParamsEditRequest['pa
   return await createAxiosInstance({
     url: API.authUrls.asset_optimization_parameters(data.id),
     method: 'PATCH',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data,
   });
 }
@@ -333,7 +337,6 @@ export async function uploadAggregatorReport({assetId, formData}: UploadAggregat
   return await createAxiosInstance({
     url: API.authUrls.asset_aggregator_report_upload(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: formData,
   });
 }
@@ -342,7 +345,6 @@ export async function uploadScadaReport({assetId, formData}: UploadScadaReportRe
   return await createAxiosInstance({
     url: API.authUrls.asset_scada_report_upload(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: formData,
   });
 }
@@ -352,7 +354,6 @@ export async function mergeAssetDatasets(data: RemoveScadaReportRequest['payload
   return await createAxiosInstance({
     url: API.authUrls.asset_merge_dataset(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: rest,
   });
 }
@@ -361,7 +362,7 @@ export async function generateOptimizedDataset({assetId, ...rest}: GenerateOptim
   return await createAxiosInstance({
     url: API.authUrls.asset_optimized_dataset(assetId),
     method: 'POST',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     data: rest,
   });
 }
@@ -371,17 +372,6 @@ export async function assetOperationalAnalytics(params: AssetOperationalAnalytic
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_operations_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
-    params: rest,
-  });
-}
-
-export async function assetSocDistribution(params: AssetSocDistributionRequest['params']) {
-  const {assetId, ...rest} = params;
-  return await createAxiosInstance({
-    url: API.authUrls.asset_analysis_soc_distribution(assetId),
-    method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -391,7 +381,6 @@ export async function assetMarketSummary(params: AssetMarketSummaryRequest['para
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_operations_market_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -401,7 +390,6 @@ export async function assetMarketSummaryAnalysis(params: AssetMarketSummaryAnaly
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -411,7 +399,6 @@ export async function getAssetAncillaryServiceSummary(params: AssetAncillaryServ
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_ancillary_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -423,7 +410,6 @@ export async function getAssetAncillaryServiceRevenueBreakdown(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_ancillary_revenue_breakdown(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -446,7 +432,6 @@ export async function getAssetAncillaryServiceOpportunityCostAnalysis(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_ancillary_opportunity_cost_analysis(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -458,7 +443,6 @@ export async function getAssetAncillaryServiceRevenueByHour(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_ancillary_service_revenue_by_hour(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -468,7 +452,6 @@ export async function assetMarketStatistics(params: AssetMarketStatisticsRequest
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_statistics(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -487,7 +470,6 @@ export async function getAssetMarketPriceSpread(params: AssetMarketPriceSpreadRe
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_price_spread(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -497,7 +479,6 @@ export async function getAssetMarketPriceVolatility(params: AssetMarketPriceVola
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_price_volatility(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -507,7 +488,6 @@ export async function getAssetMarketPriceCorrelationMatrix(params: AssetMarketPr
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_price_correlation_matrix(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -517,7 +497,6 @@ export async function assetMarketUtilizationAnalysis(params: AssetMarketUtilizat
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_utilization(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -527,7 +506,6 @@ export async function assetBestMarketsAnalysis(params: AssetBestMarketsAnalysisR
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_best_markets(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -546,7 +524,6 @@ export async function assetMarketRevenueDistribution(params: AssetMarketRevenueD
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_revenue_distribution(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -556,7 +533,6 @@ export async function assetMarketHourlyPricePatterns(params: AssetMarketHourlyPr
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_market_hourly_price_patterns(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -566,7 +542,6 @@ export async function assetEnergyPriceComparison(params: AssetEnergyPriceCompari
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_operations_energy_price(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -576,7 +551,6 @@ export async function assetBatteryPowerOverTime(params: AssetBatteryPowerOverTim
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_operations_battery_power_over_time(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -586,7 +560,6 @@ export async function getAssetTBSpreadSummary(params: AssetTBSpreadSummaryReques
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_tb_spread_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -596,7 +569,6 @@ export async function getAssetTBSpreadDetails(params: AssetTBSpreadDetailsReques
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_tb_spread_details(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -615,7 +587,6 @@ export async function uploadIARReport(params: UploadIARReportRequest['payload'])
   return await createAxiosInstance({
     url: API.authUrls.asset_iar_report(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: formData,
   });
 }
@@ -625,7 +596,6 @@ export async function submitAssetForApproval(params: SubmitAssetForApprovalReque
   return await createAxiosInstance({
     url: API.authUrls.asset_submit(assetId),
     method: 'POST',
-    headers: {...authHeaders},
   });
 }
 
@@ -634,7 +604,6 @@ export async function activateAsset(params: ActivateAssetRequest['payload']) {
   return await createAxiosInstance({
     url: API.authUrls.asset_activate(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: rest,
   });
 }
@@ -643,7 +612,6 @@ export async function getBenchmarkMetrics() {
   return await createAxiosInstance({
     url: API.authUrls.metrics_benchmarks,
     method: 'GET',
-    headers: {...authHeaders},
   });
 }
 
@@ -651,7 +619,6 @@ export async function updateBenchmarkMetrics(data: UpdateBenchmarkMetricRequest[
   return await createAxiosInstance({
     url: API.authUrls.metrics_benchmarks,
     method: 'PATCH',
-    headers: {...authHeaders},
     data,
   });
 }
@@ -660,7 +627,6 @@ export async function getMonthlyValues(params: GetMonthlyValuesRequest['payload'
   return await createAxiosInstance({
     url: API.authUrls.metrics_monthly_values,
     method: 'GET',
-    headers: {...authHeaders},
     params,
   });
 }
@@ -669,7 +635,6 @@ export async function addMonthlyValues(data: AddMonthlyValuesRequest['payload'])
   return await createAxiosInstance({
     url: API.authUrls.metrics_monthly_values,
     method: 'POST',
-    headers: {...authHeaders},
     data,
   });
 }
@@ -678,7 +643,6 @@ export async function updateMonthlyValues(data: UpdateMonthlyValuesRequest['payl
   return await createAxiosInstance({
     url: API.authUrls.metrics_monthly_values,
     method: 'PATCH',
-    headers: {...authHeaders},
     data,
   });
 }
@@ -689,7 +653,6 @@ export async function getAssetIndustryBenchmarkAnalysis(params: AssetIndustryBen
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_benchmark_industry(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -710,7 +673,6 @@ export async function getAssetBenchmarkRevenueIARvsActual(params: AssetBenchmark
   return await createAxiosInstance({
     url: API.authUrls.asset_benchmark_revenue_iar_vs_actual(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -733,7 +695,6 @@ export async function getAssetBenchmarkMultiMarketOptimizedVsActual(
   return await createAxiosInstance({
     url: API.authUrls.asset_benchmark_multi_market_optimized_vs_actual(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -753,7 +714,6 @@ export async function getModoBenchmarkMonthlyValue(params: ModoBenchmarkMonthlyV
   return await createAxiosInstance({
     url: API.authUrls.modo_benchmark_monthly_value,
     method: 'GET',
-    headers: {...authHeaders},
     params,
   });
 }
@@ -763,7 +723,6 @@ export async function getAssetFiles(params: GetAssetFilesRequest['params']) {
   return await createAxiosInstance({
     url: API.authUrls.asset_files(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -781,7 +740,6 @@ export async function removeAssetFile(params: RemoveAssetFileRequest['params']) 
   return await createAxiosInstance({
     url: API.authUrls.asset_files_id(assetId, fileId),
     method: 'DELETE',
-    headers: {...authHeaders},
   });
 }
 
@@ -790,7 +748,6 @@ export async function getAssetImbalanceSummary(params: AssetImbalanceSummaryRequ
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_imbalance_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -800,7 +757,6 @@ export async function getAssetImbalanceDailyBreakdown(params: AssetImbalanceDail
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_imbalance_daily_breakdown(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -810,7 +766,6 @@ export async function getAssetImbalanceWorstDays(params: AssetImbalanceWorstDays
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_imbalance_worst_days(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -820,7 +775,6 @@ export async function getAssetImbalanceHourlyCharges(params: AssetImbalanceHourl
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_imbalance_hourly_charges(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -839,7 +793,6 @@ export async function getAssetBatteryHealthSummary(params: AssetAnalysisBatteryH
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -851,7 +804,6 @@ export async function getAssetBatteryHealthCycleComparison(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_cycle_comparison(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -863,7 +815,6 @@ export async function getAssetBatteryHealthStrategyCyclingComparison(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_strategy_cycling_comparison(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -875,7 +826,6 @@ export async function getAssetBatteryHealthAnnualProjectionReport(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_annual_projection_report(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -885,7 +835,6 @@ export async function getAssetBatteryHealthDailyCycles(params: AssetAnalysisBatt
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_daily_cycles(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -897,7 +846,6 @@ export async function getAssetBatteryHealthWarrantyExceedance(
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_battery_health_warranty_exceedance(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -909,7 +857,6 @@ export async function getAssetExecutiveAnalysisMonthRevenueComparison(
   return await createAxiosInstance({
     url: API.authUrls.asset_executive_analysis_monthly_revenue_comparison(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -921,7 +868,6 @@ export async function getAssetExecutiveAnalysisRevenueByStream(
   return await createAxiosInstance({
     url: API.authUrls.asset_executive_analysis_revenue_by_stream(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -931,7 +877,6 @@ export async function getAssetExecutiveAnalysisSummary(params: AssetExecutiveAna
   return await createAxiosInstance({
     url: API.authUrls.asset_executive_analysis_summary(assetId),
     method: 'GET',
-    headers: {...authHeaders},
     params: rest,
   });
 }
@@ -963,7 +908,7 @@ export async function getInvoicesList(params: InvoiceListRequest['params']) {
   return await createAxiosInstance({
     url: API.authUrls.asset_invoices(assetId),
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params: rest,
   });
 }
@@ -973,7 +918,7 @@ export async function getInvoicesSummary(params: InvoiceSummaryRequest['params']
   return await createAxiosInstance({
     url: API.authUrls.asset_invoices_summary(assetId),
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params: rest,
   });
 }
@@ -983,7 +928,6 @@ export async function uploadInvoice(data: InvoiceUploadRequest['payload']) {
   return createAxiosInstance({
     url: API.authUrls.asset_invoices(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: formData,
   });
 }
@@ -993,15 +937,15 @@ export async function deleteInvoice(data: InvoiceDeleteRequest['payload']) {
   return createAxiosInstance({
     url: API.authUrls.asset_invoices_id(assetId, invoiceId),
     method: 'DELETE',
-    headers: {...authHeaders},
   });
 }
 
 export async function downloadInvoice(params: InvoiceDownloadRequest['params']) {
-  const {invoiceId, fileName, assetId} = params;
+  const {invoiceId, fileName, assetId, source} = params;
   return fetchAndDownloadBlob({
     url: API.authUrls.asset_invoices_id_export(assetId, invoiceId),
     filename: fileName || `invoice_${invoiceId}.pdf`,
+    params: source ? {source} : undefined,
   });
 }
 
@@ -1024,7 +968,7 @@ export async function getInvoicesSettlementList(params: InvoiceSettlementListReq
   return await createAxiosInstance({
     url: API.authUrls.asset_invoices_settlement(assetId),
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
     params: rest,
   });
 }
@@ -1034,7 +978,6 @@ export async function uploadInvoiceSettlement(data: InvoiceSettlementUploadReque
   return await createAxiosInstance({
     url: API.authUrls.asset_invoices_settlement(assetId),
     method: 'POST',
-    headers: {...authHeaders},
     data: formData,
   });
 }
@@ -1044,7 +987,6 @@ export async function deleteInvoiceSettlement(data: DeleteInvoiceSettlementReque
   return await createAxiosInstance({
     url: API.authUrls.asset_invoices_settlement_id(assetId, settlementId),
     method: 'DELETE',
-    headers: {...authHeaders},
   });
 }
 
@@ -1056,12 +998,32 @@ export async function exportInvoiceSettlement(data: ExportInvoiceSettlementReque
   });
 }
 
-export async function getAssetCapacityMarketAnalytics(params: AssetCapacityMarketRequest['params']) {
+export async function getAssetCapacityMarketSummary(params: AssetCapacityMarketSummaryRequest['params']) {
   const {assetId, ...rest} = params;
   return await createAxiosInstance({
-    url: API.authUrls.asset_invoice_analysis_capacity_market(assetId),
+    url: API.authUrls.asset_invoice_analysis_capacity_market_summary(assetId),
     method: 'GET',
-    headers: {...defaultHeaders, ...authHeaders},
+    headers: {...defaultHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetCapacityMarketPayments(params: AssetCapacityMarketPaymentsRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoice_analysis_capacity_market_payments(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetCapacityMarketPaymentTrend(params: AssetCapacityMarketPaymentTrendRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoice_analysis_capacity_market_payment_trend(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
     params: rest,
   });
 }
@@ -1074,3 +1036,193 @@ export async function downloadAssetCapacityMarketAnalytics(params: AssetCapacity
     params: rest,
   });
 }
+
+export async function getAssetInvoiceRevenueReconciliationSummary(
+  params: AssetInvoiceRevenueReconciliationSummaryRequest['params'],
+) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoice_analysis_revenue_reconciliation_summary(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
+    params: rest,
+  });
+}
+
+export async function getAssetInvoiceRevenueReconciliationPerStreamComparison(
+  params: AssetInvoiceRevenueReconciliationPerStreamComparisonRequest['params'],
+) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoice_analysis_revenue_reconciliation_per_stream_comparison(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
+    params: rest,
+  });
+}
+
+export async function downloadAssetInvoiceRevenueReconciliation(
+  params: AssetInvoiceRevenueReconciliationExportRequest['params'],
+) {
+  const {assetId, fileName, ...rest} = params;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoice_analysis_revenue_reconciliation_export(assetId),
+    filename: fileName || `revenue_reconciliation_${assetId}.csv`,
+    params: rest,
+  });
+}
+
+export async function uploadAssetInvoiceStatementSummary(
+  payload: AssetInvoiceSummaryStatementUploadRequest['payload'],
+) {
+  const {assetId, formData} = payload;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_summary_statement(assetId),
+    method: 'POST',
+    headers: {},
+    data: formData,
+  });
+}
+
+export async function deleteAssetInvoiceStatementSummary(
+  payload: DeleteAssetInvoiceSummaryStatementRequest['payload'],
+) {
+  const {assetId, statementId} = payload;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_summary_statement_id(assetId, statementId),
+    method: 'DELETE',
+    headers: {},
+  });
+}
+
+export async function getAssetInvoiceStatementSummaryList(payload: AssetInvoiceSummaryStatementListRequest['params']) {
+  const {assetId, ...rest} = payload;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_invoices_summary_statement(assetId),
+    method: 'GET',
+    headers: {},
+    params: rest,
+  });
+}
+
+export async function downloadAssetInvoiceStatementSummary(
+  payload: ExportAssetInvoiceSummaryStatementRequest['params'],
+) {
+  const {assetId, statementId, fileName, ...rest} = payload;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_invoices_summary_statement_id_export(assetId, statementId),
+    filename: fileName || `statement_${statementId}.pdf`,
+    params: rest,
+  });
+}
+
+
+// ===============================
+// Comment Management
+// ===============================
+
+export async function fetchComments(params: FetchCommentsRequest['params']) {
+  const {assetId, ...queryParams} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.comments(assetId),
+    method: 'GET',
+    headers: {...defaultHeaders},
+    params: queryParams,
+  });
+}
+
+export async function createComment(request: CreateCommentApiRequest) {
+  const {params, payload} = request;
+  return await createAxiosInstance({
+    url: API.authUrls.comments(params.assetId),
+    method: 'POST',
+    headers: {...defaultHeaders},
+    data: payload,
+  });
+}
+
+export async function updateComment(request: Omit<UpdateCommentApiRequest, 'response'>) {
+  const {params, payload} = request;
+  return await createAxiosInstance({
+    url: API.authUrls.comment_id(params.assetId, params.commentId),
+    method: 'PUT',
+    headers: {...defaultHeaders},
+    data: payload,
+  });
+}
+
+export async function deleteComment(payload: DeleteCommentApiRequest['payload']) {
+  const {assetId, commentId} = payload;
+  return await createAxiosInstance({
+    url: API.authUrls.comment_id(assetId, commentId),
+    method: 'DELETE',
+    headers: {...defaultHeaders},
+  });
+}
+
+export async function replyComment(request: ReplyCommentApiRequest) {
+  const {params, payload} = request;
+  return await createAxiosInstance({
+    url: API.authUrls.comment_reply(params.assetId, params.commentId),
+    method: 'POST',
+    headers: {...defaultHeaders},
+    data: payload,
+  });
+}
+
+export async function readComment(request: ReadCommentApiRequest) {
+  const {params} = request;
+  return await createAxiosInstance({
+    url: API.authUrls.comment_read(params.assetId, params.commentId),
+    method: 'PATCH',
+    headers: {...defaultHeaders},
+  });
+}
+
+export async function checkCommentStatus(request: CheckCommentStatusApiRequest) {
+  const {params} = request;
+  return await createAxiosInstance({
+    url: API.authUrls.comment_status(params.assetId, params.commentId),
+    method: 'GET',
+    headers: {...defaultHeaders},
+  });
+}
+
+// ===============================
+// Notification Management
+// ===============================
+
+export async function fetchActiveNotifications(): Promise<ListActiveNotificationsRequest['response']> {
+  return await createAxiosInstance({
+    url: API.authUrls.notifications_active,
+    method: 'GET',
+    headers: {...defaultHeaders},
+  }) as unknown as ListActiveNotificationsRequest['response'];
+}
+
+export async function markNotificationAsRead(
+  notificationId: number | string
+): Promise<MarkNotificationReadRequest['response']> {
+  return await createAxiosInstance({
+    url: API.authUrls.notification_read(notificationId),
+    method: 'PATCH',
+    headers: {...defaultHeaders},
+  }) as unknown as MarkNotificationReadRequest['response'];
+}
+
+export const getWsToken = async () => {
+  return await createAxiosInstance({
+    url: API.authUrls.websocketToken,
+    method: 'POST',
+    headers: {...defaultHeaders},
+  });
+};
+
+export const exportStrategyEnergyThroughputSummaryExport = async (params: AssetAnalysisBatteryStrategyEnergyThroughputSummaryExportRequest['params']) => {
+  const {assetId, fileName, ...rest} = params;
+  return await fetchAndDownloadBlob({
+    url: API.authUrls.asset_analysis_battery_health_strategy_energy_throughput_summary_export(assetId),
+    filename: fileName || `filename.csv`,
+    params: rest,
+  });
+};

@@ -1,4 +1,4 @@
-import { Ref, useEffect, useState } from "react";
+import { Ref, useEffect, useMemo, useState } from "react";
 import { Button } from "../Button";
 import { CALENDAR_MONTHS_SHORT_NAMES as MONTHS } from "../../constants";
 import { Icon } from "../Icon";
@@ -14,7 +14,13 @@ const isMonthDisabled = (
   year: number,
   disabledMonths?: MonthYear[],
   allowedMonths?: MonthYear[],
+  maxDate?: MonthYear,
 ): boolean => {
+  if (maxDate) {
+    if (year > maxDate.year) return true;
+    if (year === maxDate.year && month + 1 > maxDate.month) return true;
+  }
+
   // If allowedMonths is specified, month must be in the list
   if (allowedMonths && allowedMonths.length > 0) {
     const isAllowed = allowedMonths.some((d) => d.month === month + 1 && d.year === year);
@@ -63,6 +69,8 @@ interface Props {
   defaultYear?: number;
   /** Lock to a specific year, preventing navigation to other years */
   lockYear?: boolean;
+  /** Disable any month/year after this date */
+  maxDate?: MonthYear;
 }
 
 export const MonthYearSelector = ({
@@ -79,6 +87,7 @@ export const MonthYearSelector = ({
   allowedMonths,
   defaultYear,
   lockYear = false,
+  maxDate,
 }: Props) => {
   const today = new Date();
 
@@ -86,8 +95,24 @@ export const MonthYearSelector = ({
     value?.month ? value.month - 1 : today.getMonth(),
   );
   const [year, setYear] = useState<number>(value?.year ?? defaultYear ?? today.getFullYear());
+  const selectableMonthIndexes = useMemo(
+    () =>
+      MONTHS.map((_, idx) => idx).filter((idx) => !isMonthDisabled(idx, year, disabledMonths, allowedMonths)),
+    [allowedMonths, disabledMonths, year],
+  );
+  const hasSelectableMonths = selectableMonthIndexes.length > 0;
+  const isCurrentMonthSelectable = selectableMonthIndexes.includes(month);
+
+  useEffect(() => {
+    if (!hasSelectableMonths) return;
+    if (isCurrentMonthSelectable) return;
+
+    setMonth(selectableMonthIndexes[0]);
+  }, [hasSelectableMonths, isCurrentMonthSelectable, selectableMonthIndexes]);
 
   const handleApply = () => {
+    if (!hasSelectableMonths || !isCurrentMonthSelectable) return;
+
     const nextValue = { month: month + 1, year };
     onChange?.(nextValue);
     handleDone?.(nextValue);
@@ -98,7 +123,7 @@ export const MonthYearSelector = ({
   const handleNextYear = () => setYear((y) => y + 1);
 
   const handleMonthClick = (idx: number) => {
-    if (isMonthDisabled(idx, year, disabledMonths, allowedMonths)) return;
+    if (isMonthDisabled(idx, year, disabledMonths, allowedMonths, maxDate)) return;
     setMonth(idx);
   };
 
@@ -149,7 +174,7 @@ export const MonthYearSelector = ({
       <div className="grid grid-cols-4 gap-3">
         {MONTHS.map((m, idx) => {
           const isActive = month === idx;
-          const isDisabled = isMonthDisabled(idx, year, disabledMonths, allowedMonths);
+          const isDisabled = isMonthDisabled(idx, year, disabledMonths, allowedMonths, maxDate);
 
           return (
             <button
@@ -195,6 +220,7 @@ export const MonthYearSelector = ({
         <Button
           variant="primary"
           className="w-full justify-center"
+          disabled={!hasSelectableMonths || !isCurrentMonthSelectable}
           onClick={handleApply}
         >
           {doneText}
@@ -219,6 +245,8 @@ interface MultiMonthYearSelectorProps {
   defaultYear?: number;
   /** Lock to a specific year, preventing navigation to other years */
   lockYear?: boolean;
+  /** Disable any month/year after this date */
+  maxDate?: MonthYear;
 }
 
 export const MultiMonthYearSelector = ({
@@ -233,6 +261,7 @@ export const MultiMonthYearSelector = ({
   disabledMonths,
   defaultYear,
   lockYear = false,
+  maxDate,
 }: MultiMonthYearSelectorProps) => {
   const currentYear = new Date().getFullYear();
   const selectedValues = value ?? EMPTY_MONTH_YEARS;
@@ -256,7 +285,7 @@ export const MultiMonthYearSelector = ({
   const selectedMonths = selectedByYear[year] ?? [];
 
   const handleToggleMonth = (idx: number) => {
-    if (isMonthDisabled(idx, year, disabledMonths)) return;
+    if (isMonthDisabled(idx, year, disabledMonths, undefined, maxDate)) return;
     setSelectedByYear((prev) => {
       const currentYearSelections = prev[year] ?? [];
       const nextSelections = currentYearSelections.includes(idx)
@@ -332,7 +361,7 @@ export const MultiMonthYearSelector = ({
       <div className="grid grid-cols-4 gap-3">
         {MONTHS.map((m, idx) => {
           const isActive = selectedMonths.includes(idx);
-          const isDisabled = isMonthDisabled(idx, year, disabledMonths);
+          const isDisabled = isMonthDisabled(idx, year, disabledMonths, undefined, maxDate);
 
           return (
             <button

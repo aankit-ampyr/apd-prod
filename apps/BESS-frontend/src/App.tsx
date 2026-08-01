@@ -9,6 +9,7 @@ import {cancelAuthRequest, cancelProjectRequest, cancelUserRequest, resetAuthWit
 import {authStatus} from './services/redux/selectors';
 import {useInactivityTimer} from './hooks';
 import {UserSessionEndReason} from './constants';
+import {useSimulationStatus} from './components/SimulationWizard/SimulationStatusContext';
 export default function App() {
   return (
     <Provider store={store}>
@@ -31,12 +32,13 @@ export default function App() {
 
 function AppRoot({children}: PropsWithChildren) {
   const dispatch = useDispatch();
+  const {shouldPauseSessionTimeout} = useSimulationStatus() ?? {};
 
   const isAuthenticated = useSelector(authStatus);
 
   useInactivityTimer({
     onInactivity: () => dispatch(resetAuthWithReason({reason: UserSessionEndReason.IdleTimeout})),
-    enabled: isAuthenticated,
+    enabled: isAuthenticated && !shouldPauseSessionTimeout,
   });
 
   useEffect(() => {

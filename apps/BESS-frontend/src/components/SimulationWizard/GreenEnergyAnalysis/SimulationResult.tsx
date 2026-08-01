@@ -13,14 +13,16 @@ import {
   simulationProject,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {getGreenAnalysisExport} from '@/services/api';
-import {greenAnalysisResultsRequest, setShowDetailedGreenAnalysis, setShowGreenAnalysisResults} from '@/services/redux/slice/simulationWizardSlice';
-import {Button, Checkbox, Icon, IconTypes, MultiSelectInput, SearchableMultiSelectInput, Skeleton, Sort, Text, Tooltip} from '@/ui-kits';
+import {greenAnalysisResultsRequest, setShowDetailedGreenAnalysis} from '@/services/redux/slice/simulationWizardSlice';
+import {Alert, Button, Checkbox, Icon, IconTypes, MultiSelectInput, SearchableMultiSelectInput, Skeleton, Sort, Text, Tooltip} from '@/ui-kits';
 import {getErrorMessage} from '@/utils';
 import type {ErrorCodes} from '@/utils';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {useParams} from 'react-router-dom';
 import {DetailedAnalysis} from './DetailedAnalysis';
+import {SimulationStatusProvider, useSimulationStatus} from '../SimulationStatusContext';
+import {createPortal} from 'react-dom';
 
 const FILTER_INLINE_CHIP_CLASS = 'rounded-[8px] px-3 py-1 bg-primary-tint-2';
 const FILTER_INLINE_CHIP_TEXT_CLASS = 'text-[12px]! leading-[16px]! font-InterMedium!';
@@ -224,6 +226,7 @@ type GreenAnalysisResultsParams = {
 interface GreenEnergyAnalysisResultProps {
   readonly setIsStepsHidden?: (hidden: boolean) => void;
   readonly isFullScreen?: boolean;
+  readonly shouldShowResults?: boolean;
 }
 
 export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps = {}) => {
@@ -231,16 +234,19 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
   const {showToast} = useToast();
   const {setIsStepsHidden, isFullScreen = false} = props;
   const {id: simulationIdFromUrl} = useParams();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
+
   const currentProject = useSelector(simulationProject);
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
+  const currentSimulationId = proSimulData?.id ?? null;
+  const shouldBlock = isAnySimulationRunning && runningSimulationId === currentSimulationId;
 
   const {width} = useWindowDimensions();
 
   const maxVisibleChips = width >= 1280 ? 3 : 2; // xl breakpoint = 1280px
 
   const greenAnalysisResults = useSelector(greenaAnalysisResultsData);
-  const greenAnalysis = useSelector(greenAnalysisData);
   const detailedScreen = useSelector(detailedGreenAnalysis);
   const isResultsLoading = useSelector((state: RootState) => state.simulationWizard.greenAnalysisResultsLoading);
   const [filter, setFilter] = useState<GreenAnalysisFilter>({});
@@ -264,17 +270,38 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
     onMinimize,
   } = useChartsActionV2({
     downloadFileName: '',
-    renderFullScreen: () => <GreenEnergyAnalysisResult {...props} isFullScreen />,
+    renderFullScreen: () => (
+      <SimulationStatusProvider>
+        <GreenEnergyAnalysisResult {...props} isFullScreen />{' '}
+      </SimulationStatusProvider>
+    ),
   });
 
   useEffect(() => {
-    if (isFullScreen || detailedScreen) {
-      setIsStepsHidden?.(true);
-      return () => {
+    if (!shouldBlock) return;
+
+    const handleClick = (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+
+    document.addEventListener('click', handleClick, true);
+    document.addEventListener('mousedown', handleClick, true);
+
+    return () => {
+      document.removeEventListener('click', handleClick, true);
+      document.removeEventListener('mousedown', handleClick, true);
+    };
+  }, [shouldBlock]);
+
+  useEffect(() => {
+    setIsStepsHidden?.(true);
+    return () => {
+      if (!isFullScreen) {
         setIsStepsHidden?.(false);
-      };
-    }
-  }, [isFullScreen, setIsStepsHidden, detailedScreen]);
+      }
+    };
+  }, [isFullScreen, setIsStepsHidden]);
 
   useEffect(() => {
     const animationFrameId = window.requestAnimationFrame(scrollWizardViewportToTop);
@@ -299,20 +326,13 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
     setCurrentPage(1);
   };
 
-  const handleSortChange = (field: string) => {
+  const handleSortChange = (field: string, direction: 'asc' | 'desc' | null) => {
     setSortFields(prev => {
-      const index = prev.findIndex(item => item.field === field);
+      const others = prev.filter(item => item.field !== field);
 
-      if (index === -1) {
-        return [...prev, {field, direction: 'asc'}];
-      }
-
-      if (prev[index].direction === 'asc') {
-        return [...prev.slice(0, index), {field, direction: 'desc'}, ...prev.slice(index + 1)];
-      }
-
-      return [...prev.slice(0, index), ...prev.slice(index + 1)];
+      return direction ? [...others, {field, direction}] : others;
     });
+
     setCurrentPage(1);
   };
 
@@ -388,7 +408,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Solar Size (MWp)"
           sort={getSortDirection('solar_mwp')}
-          onSortChange={() => handleSortChange('solar_mwp')}
+          onSortChange={direction => handleSortChange('solar_mwp', direction)}
           tooltip="Installed solar PV capacity"
         />
       ),
@@ -402,7 +422,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Battery Size (MWh)"
           sort={getSortDirection('bess_mwh')}
-          onSortChange={() => handleSortChange('bess_mwh')}
+          onSortChange={direction => handleSortChange('bess_mwh', direction)}
           tooltip="Total battery storage capacity"
         />
       ),
@@ -416,7 +436,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Discharge Duration (hr)"
           sort={getSortDirection('duration_hr')}
-          onSortChange={() => handleSortChange('duration_hr')}
+          onSortChange={direction => handleSortChange('duration_hr', direction)}
           tooltip="Battery runtime at rated power"
         />
       ),
@@ -430,7 +450,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Battery Power (MW)"
           sort={getSortDirection('power_mw')}
-          onSortChange={() => handleSortChange('power_mw')}
+          onSortChange={direction => handleSortChange('power_mw', direction)}
           tooltip="Battery charge/discharge power"
         />
       ),
@@ -444,7 +464,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Containers"
           sort={getSortDirection('containers')}
-          onSortChange={() => handleSortChange('containers')}
+          onSortChange={direction => handleSortChange('containers', direction)}
           tooltip="Estimated battery container count"
         />
       ),
@@ -458,7 +478,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Generator Size (MW)"
           sort={getSortDirection('dg_mw')}
-          onSortChange={() => handleSortChange('dg_mw')}
+          onSortChange={direction => handleSortChange('dg_mw', direction)}
           tooltip="Backup generator capacity"
         />
       ),
@@ -472,7 +492,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Load Met (%)"
           sort={getSortDirection('delivery_pct')}
-          onSortChange={() => handleSortChange('delivery_pct')}
+          onSortChange={direction => handleSortChange('delivery_pct', direction)}
           tooltip="Percentage of load demand served"
         />
       ),
@@ -486,7 +506,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Green Energy (%)"
           sort={getSortDirection('green_energy_pct')}
-          onSortChange={() => handleSortChange('green_energy_pct')}
+          onSortChange={direction => handleSortChange('green_energy_pct', direction)}
           tooltip="Share of served energy from solar and battery"
         />
       ),
@@ -500,7 +520,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Green Hours (%)"
           sort={getSortDirection('green_pct')}
-          onSortChange={() => handleSortChange('green_pct')}
+          onSortChange={direction => handleSortChange('green_pct', direction)}
           tooltip="Percentage of hours served without generator"
         />
       ),
@@ -514,7 +534,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Green Hours (Mar-Oct) (%)"
           sort={getSortDirection('green_hours_mar_oct_pct')}
-          onSortChange={() => handleSortChange('green_hours_mar_oct_pct')}
+          onSortChange={direction => handleSortChange('green_hours_mar_oct_pct', direction)}
           tooltip="Green hours percentage during March to October"
         />
       ),
@@ -528,7 +548,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Wastage Energy (%)"
           sort={getSortDirection('wastage_pct')}
-          onSortChange={() => handleSortChange('wastage_pct')}
+          onSortChange={direction => handleSortChange('wastage_pct', direction)}
           tooltip="Renewable energy that could not be used"
         />
       ),
@@ -542,7 +562,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Hours Fully Served"
           sort={getSortDirection('delivery_hours')}
-          onSortChange={() => handleSortChange('delivery_hours')}
+          onSortChange={direction => handleSortChange('delivery_hours', direction)}
           tooltip="Hours where full load was met"
         />
       ),
@@ -556,7 +576,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Total Load Hours"
           sort={getSortDirection('load_hours')}
-          onSortChange={() => handleSortChange('load_hours')}
+          onSortChange={direction => handleSortChange('load_hours', direction)}
           tooltip="Total modeled hours with load demand"
         />
       ),
@@ -570,7 +590,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Green Hours"
           sort={getSortDirection('green_hours')}
-          onSortChange={() => handleSortChange('green_hours')}
+          onSortChange={direction => handleSortChange('green_hours', direction)}
           tooltip="Total hours served without generator"
         />
       ),
@@ -584,7 +604,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Generator Hours"
           sort={getSortDirection('dg_hours')}
-          onSortChange={() => handleSortChange('dg_hours')}
+          onSortChange={direction => handleSortChange('dg_hours', direction)}
           tooltip="Total generator runtime hours"
         />
       ),
@@ -598,7 +618,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Generator Starts"
           sort={getSortDirection('dg_starts')}
-          onSortChange={() => handleSortChange('dg_starts')}
+          onSortChange={direction => handleSortChange('dg_starts', direction)}
           tooltip="Number of generator start events"
         />
       ),
@@ -612,7 +632,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Avg. Battery Cycles per Day"
           sort={getSortDirection('bess_cycles')}
-          onSortChange={() => handleSortChange('bess_cycles')}
+          onSortChange={direction => handleSortChange('bess_cycles', direction)}
           tooltip="Average daily equivalent battery cycles"
         />
       ),
@@ -626,7 +646,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Unmet Energy (MWh)"
           sort={getSortDirection('unserved_mwh')}
-          onSortChange={() => handleSortChange('unserved_mwh')}
+          onSortChange={direction => handleSortChange('unserved_mwh', direction)}
           tooltip="Load energy not served"
         />
       ),
@@ -640,7 +660,7 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
         <ColumnHeader
           label="Fuel Used (L)"
           sort={getSortDirection('fuel_consumption_l')}
-          onSortChange={() => handleSortChange('fuel_consumption_l')}
+          onSortChange={direction => handleSortChange('fuel_consumption_l', direction)}
           tooltip="Total generator fuel consumed"
         />
       ),
@@ -657,8 +677,13 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
       return;
     }
 
+    // Skip API calls in full screen mode only if no modifications are active
+    if (isFullScreen && !hasActiveFilters && sortFields.length === 0) {
+      return;
+    }
+
     dispatch(greenAnalysisResultsRequest(params));
-  }, [buildResultsParams, dispatch]);
+  }, [buildResultsParams, dispatch, isFullScreen, hasActiveFilters]);
 
   useEffect(() => {
     setSolarCapacityOptions([]);
@@ -672,10 +697,10 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
       return;
     }
 
-    const solarValues = greenAnalysisResults.results.map(item => Number(item.solar_mwp)).filter(value => !Number.isNaN(value));
-    const durationValues = greenAnalysisResults.results.map(item => Number(item.duration_hr)).filter(value => !Number.isNaN(value));
-    const dgValues = greenAnalysisResults.results.map(item => Number(item.dg_mw)).filter(value => !Number.isNaN(value));
-    const bessValues = greenAnalysisResults.results.map(item => Number(item.bess_mwh)).filter(value => !Number.isNaN(value));
+    const solarValues = greenAnalysisResults.results.map((item: any) => Number(item.solar_mwp)).filter(value => !Number.isNaN(value));
+    const durationValues = greenAnalysisResults.results.map((item: any) => Number(item.duration_hr)).filter(value => !Number.isNaN(value));
+    const dgValues = greenAnalysisResults.results.map((item: any) => Number(item.dg_mw)).filter(value => !Number.isNaN(value));
+    const bessValues = greenAnalysisResults.results.map((item: any) => Number(item.bess_mwh)).filter(value => !Number.isNaN(value));
 
     setSolarCapacityOptions(prev => mergeFilterOptions(prev, solarValues, 'MWp'));
     setDurationOptions(prev => mergeFilterOptions(prev, durationValues, 'hr'));
@@ -712,17 +737,22 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
 
   return (
     <div className="main">
+      {shouldBlock && (
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
+        </div>
+      )}
       {!isFullScreen && (
         <>
           <div className="flex items-center justify-between mb-5.5">
             <div className="flex items-start gap-2">
-              <button
-                onClick={() => {
-                  dispatch(setShowGreenAnalysisResults(false));
-                }}
-                className="flex items-center gap-1 text-text-primary! mr-5 mt-3 cursor-pointer">
-                <Icon name="arrow-left" size={20} />
-              </button>
               <div className="flex flex-col">
                 <Text variant="h2" className="text-h3! xl:text-h2!">
                   Simulation Result{' '}
@@ -988,10 +1018,12 @@ export const GreenEnergyAnalysisResult = (props: GreenEnergyAnalysisResultProps 
             totalResult={greenAnalysisResults?.total_configs ?? resultRows.length}
             onPageChange={setCurrentPage}
             stickyHeader
+            tableHeightWhenScrollable={700}
             persistHorizontalScrollKey={simulation_id ? `bess-green-analysis-${simulation_id}` : undefined}
           />
         </div>
       </div>
+      {shouldBlock && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
     </div>
   );
 };
@@ -1014,7 +1046,6 @@ function SimulationConfigurationSummary() {
    */
   const proSimulData = useSelector(projectSimulationData);
   const greenAnalysis = useSelector(greenAnalysisData);
-  console.log('proSimulData: ', proSimulData);
 
   /**
    * =======================================
@@ -1175,6 +1206,7 @@ function SimulationConfigurationSummary() {
     },
     () => {
       const dg = proSimulData?.config?.dg;
+      const isTakeoverFullLoad = proSimulData?.config?.dispatch?.is_dg_takeover_full_load;
 
       // If DG is not included
       if (!dg?.is_included) {
@@ -1211,10 +1243,16 @@ function SimulationConfigurationSummary() {
           label: 'DG Charges BESS',
           value: proSimulData?.config?.dispatch?.is_dg_charging_bess ? 'YES - Excess DG power' : 'NO - Solar only',
         },
-        {
-          label: 'Load Priority',
-          value: proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
-        },
+        // Show only when Takeover Mode is NO
+        ...(!isTakeoverFullLoad
+          ? [
+              {
+                label: 'Load Priority',
+                value:
+                  proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
+              },
+            ]
+          : []),
         {
           label: 'Takeover Mode',
           value: proSimulData?.config?.dispatch?.is_dg_takeover_full_load ? 'Yes - DG serves full load' : 'No - DG fills gap',
@@ -1355,12 +1393,24 @@ function ConfigurationSummaryCard(props: Readonly<ConfigSummaryDataType>) {
           const showTooltip = title === 'SOLAR' && point.label === 'Profile';
           return (
             <li key={`${point.label ?? point.value}-${index}`}>
-              <div className="flex items-center gap-1 min-w-0">
-                <Text variant="small" className="text-text-secondary! shrink-0">
-                  {point.label} :
+              {point.label ? (
+                <div className="flex items-center gap-1 min-w-0">
+                  <Text variant="small" className="text-text-secondary! shrink-0">
+                    {point.label}:
+                  </Text>
+                  {showTooltip ? (
+                    <TruncatedTextWithTooltip text={point.value} />
+                  ) : (
+                    <Text variant="12SB" className="leading-none!">
+                      {point.value}
+                    </Text>
+                  )}
+                </div>
+              ) : (
+                <Text variant="12SB" className="leading-none!">
+                  {point.value}
                 </Text>
-                {showTooltip ? <TruncatedTextWithTooltip text={point.value} /> : <Text variant="12SB">{point.value}</Text>}
-              </div>
+              )}
             </li>
           );
         })}

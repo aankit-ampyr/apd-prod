@@ -1,16 +1,12 @@
 import traceback
 from sqlalchemy import select, or_
 from models.audit_log_model import AuditLog
-from constants.enums import (
-    UserRole,
-    APDAuditLogScenario as AuditLogScenario,
-    APDAuditLogModules as AuditLogModules,
-)
+from constants.enums import UserRole
+from python_common.constants.enums import AuditLogScenario, AuditLogModules
 from datetime import datetime, timedelta
 from exceptions import PayloadValidation
-import json
 from python_common.utils import paginate
-from utils import Res
+from utils.response_utils import Res, safe_json_load
 
 
 class AuditService:
@@ -104,22 +100,14 @@ class AuditService:
                     "role": log.role,
                     "module": {
                         "id": log.module,
-                        "name": f"{AuditLogModules(log.module).name} (AMD)",
+                        "name": f"{AuditLogModules(log.module).name} (AMD)" if log.module in [m.value for m in AuditLogModules] else "",
                     },
                     "action": {
                         "id": log.action,
-                        "name": AuditLogScenario(log.action).name,
+                        "name": AuditLogScenario(log.action).name if log.action in [s.value for s in AuditLogScenario] else "",
                     },
-                    "before": (
-                        json.loads(log.before)
-                        if log.before and str(log.before).strip().startswith(("{", "["))
-                        else log.before
-                    ),
-                    "after": (
-                        json.loads(log.after)
-                        if log.after and str(log.after).strip().startswith(("{", "["))
-                        else log.after
-                    ),
+                    "before": safe_json_load(log.before),
+                    "after": safe_json_load(log.after),
                     "timestamp": (
                         log.created_at.isoformat() if log.created_at else None
                     ),
@@ -139,7 +127,7 @@ class AuditService:
             )
 
         except PayloadValidation as e:
-            return Res.error(e.status_code, message=e.message)
+            return Res.error(e.status_code, message=e.message, http_status_code=400)
         except Exception as e:
             traceback.print_exc()
             return Res.error("E-10001", message=str(e))

@@ -1,5 +1,7 @@
-import {Text, Skeleton, Icon} from '@/ui-kits';
-import {useEffect, useMemo} from 'react';
+import {Text, Skeleton} from '@/ui-kits';
+import {useEffect} from 'react';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 import {cn, formatCurrencyToPound, formatMegaWatt} from '@/utils';
 import {
   AnalyticsTable,
@@ -9,20 +11,18 @@ import {
   SectionHeader,
   KeyValueCard,
   KeyValueCardItem,
+  CommentTrigger,
 } from '@/components';
 import {useDispatch, useSelector} from 'react-redux';
 import {
-  assetAnalysisOperationalRevenueLoading,
-  assetOperationalAnalyticsResult,
-  assetAnalysisOperationalMarketSummaryLoading,
-  assetAnalysisOperationalRevenueError,
-  assetAnalysisOperationalMarketSummaryError,
-  assetAnalysisEnergyPriceComparisonLoading,
-  assetAnalysisEnergyPriceComparisonError,
   assetAnalysisBatteryPowerOverTimeLoading,
-  assetAnalysisBatteryPowerOverTimeError,
-  assetEnergyPriceComparisonResult,
+  assetAnalysisEnergyPriceComparisonLoading,
+  assetAnalysisOperationalRevenueLoading,
+  assetAnalysisOperationalSummaryResult,
   assetBatteryPowerOverTimeResult,
+  assetEnergyPriceComparisonResult,
+  assetOperationalMarketSummaryLoading,
+  assetOperationalMarketSummaryResult,
   currentSelectedAsset,
 } from '@/services/redux/selectors';
 import {
@@ -31,13 +31,14 @@ import {
   assetEnergyPriceComparisonRequest,
   assetBatteryPowerOverTimeRequest,
 } from '@/services/redux/slice';
-import {CALENDAR_MONTHS_SHORT_NAMES} from '@/constants';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
+import {CALENDAR_MONTHS_SHORT_NAMES, CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
 import {AssetOperationAnalytics, DataTableColumn} from '@/interface';
 
 // ==================== Types ==============================
 type Stat = {label: string; value: number | null | undefined};
 
-type AncillaryService = AssetOperationAnalytics['ancillary_services_revenue'][number];
+type AncillaryService = AssetOperationAnalytics['market_summary']['ancillary_services'][number];
 
 interface AssetOperationProps {
   assetId?: number | null;
@@ -96,87 +97,90 @@ export function AssetOperations(props: AssetOperationProps) {
   // hooks
   // ==============
   const dispatch = useDispatch();
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
 
   // ==============
   // selector
   // ==============
-  const revenueLoading = useSelector(assetAnalysisOperationalRevenueLoading);
-  const marketSummaryLoading = useSelector(assetAnalysisOperationalMarketSummaryLoading);
-  const analytics = useSelector(assetOperationalAnalyticsResult);
-  const energyPriceComparisonLoading = useSelector(assetAnalysisEnergyPriceComparisonLoading);
-  const batteryPowerOverTimeLoading = useSelector(assetAnalysisBatteryPowerOverTimeLoading);
-  const energyPriceComparisonError = useSelector(assetAnalysisEnergyPriceComparisonError);
-  const batteryPowerOverTimeError = useSelector(assetAnalysisBatteryPowerOverTimeError);
-  const energyPriceComparisonData = useSelector(assetEnergyPriceComparisonResult) ?? [];
-  const batteryPowerOverTimeData = useSelector(assetBatteryPowerOverTimeResult) ?? [];
   const currentAsset = useSelector(currentSelectedAsset);
 
-  const revenueError = useSelector(assetAnalysisOperationalRevenueError);
-  const marketError = useSelector(assetAnalysisOperationalMarketSummaryError);
+  const summaryData = useSelector(assetAnalysisOperationalSummaryResult);
+  const summaryLoading = useSelector(assetAnalysisOperationalRevenueLoading);
+
+  const marketSummaryData = useSelector(assetOperationalMarketSummaryResult);
+  const marketSummaryLoading = useSelector(assetOperationalMarketSummaryLoading);
+
+  const energyPriceComparisonData = useSelector(assetEnergyPriceComparisonResult);
+  const energyPriceComparisonLoading = useSelector(assetAnalysisEnergyPriceComparisonLoading);
+
+  const batteryPowerOverTimeData = useSelector(assetBatteryPowerOverTimeResult);
+  const batteryPowerOverTimeLoading = useSelector(assetAnalysisBatteryPowerOverTimeLoading);
+
+
 
   // ==============
   // data
   // ==============
-  const revenueData = ((): Stat[] => {
+  const kpiData = ((): Stat[] => {
     return [
-      {label: 'SFFR Revenue', value: analytics?.revenue_metrics?.sffr},
-      {label: 'IDA1 Revenue', value: analytics?.revenue_metrics?.ida1},
-      {label: 'EPEX 30 DA Revenue', value: analytics?.revenue_metrics?.epex_30_da},
-      {label: 'Imbalance Revenue', value: analytics?.revenue_metrics?.imbalance_revenue},
-      {label: 'Imbalance Charge', value: analytics?.revenue_metrics?.imbalance_charge},
-      {label: 'Total Net Revenue', value: analytics?.revenue_metrics?.total_net_revenue},
+      {label: 'SFFR Revenue', value: summaryData?.trading_analysis?.sffr},
+      {label: 'IDA1 Revenue', value: summaryData?.trading_analysis?.ida1},
+      {label: 'EPEX 30 DA Revenue', value: summaryData?.trading_analysis?.epex_30_da},
+      {label: 'Imbalance Revenue', value: summaryData?.trading_analysis?.imbalance_revenue},
+      {label: 'Imbalance Charge', value: summaryData?.trading_analysis?.imbalance_charge},
+      {label: 'Total Net Revenue', value: summaryData?.trading_analysis?.total_net_revenue},
     ];
   })();
 
-  //
   const revenueDistributionData = ((): any[] => {
-    if (!analytics) return [];
-    if (!analytics?.revenue_metrics) return [];
+    if (!summaryData) return [];
+    if (!summaryData?.revenue_distribution) return [];
 
     return [
-      {label: 'SFFR', value: analytics.revenue_metrics?.sffr},
-      {label: 'IDA1', value: analytics.revenue_metrics?.ida1},
-      {label: 'EPEX 30 DA', value: analytics.revenue_metrics?.epex_30_da},
-      {label: 'Imbalance (Net)', value: analytics.revenue_metrics?.net_imbalance},
+      {label: 'SFFR', value: summaryData.trading_analysis?.sffr},
+      {label: 'IDA1', value: summaryData.trading_analysis?.ida1},
+      {label: 'EPEX 30 DA', value: summaryData.trading_analysis?.epex_30_da},
+      {label: 'Imbalance (Net)', value: summaryData.trading_analysis?.net_imbalance},
     ];
   })();
 
   const dayAheadPriceData: KeyValueCardItem[] = [
     {
       label: 'Average',
-      value: renderIfDefined(analytics?.market_prices?.day_ahead?.avg, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.day_ahead?.avg, formatCurrencyToPound, '-'),
     },
     {
       label: 'Minimum',
-      value: renderIfDefined(analytics?.market_prices?.day_ahead?.min, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.day_ahead?.min, formatCurrencyToPound, '-'),
     },
     {
       label: 'Maximum',
-      value: renderIfDefined(analytics?.market_prices?.day_ahead?.max, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.day_ahead?.max, formatCurrencyToPound, '-'),
     },
     {
       label: 'Std Dev',
-      value: renderIfDefined(analytics?.market_prices?.day_ahead?.std_dev, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.day_ahead?.std_dev, formatCurrencyToPound, '-'),
     },
   ];
 
   const intraDayPriceData: KeyValueCardItem[] = [
     {
       label: 'Average',
-      value: renderIfDefined(analytics?.market_prices?.intraday?.avg, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.intraday?.avg, formatCurrencyToPound, '-'),
     },
     {
       label: 'Minimum',
-      value: renderIfDefined(analytics?.market_prices?.intraday?.min, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.intraday?.min, formatCurrencyToPound, '-'),
     },
     {
       label: 'Maximum',
-      value: renderIfDefined(analytics?.market_prices?.intraday?.max, formatCurrencyToPound, '-'),
+      value: renderIfDefined(marketSummaryData?.market_prices?.intraday?.max, formatCurrencyToPound, '-'),
     },
   ];
 
   const ancillaryServiceData = ((): AncillaryService[] => {
-    if (!analytics || !analytics?.ancillary_services_revenue) {
+    if (!marketSummaryData || !marketSummaryData?.ancillary_services || marketSummaryLoading) {
       // return dummy data for ghost loader to work
       return Array.from({length: 6}).map(
         (_, index): AncillaryService => ({
@@ -186,15 +190,12 @@ export function AssetOperations(props: AssetOperationProps) {
         }),
       );
     }
-    return analytics.ancillary_services_revenue;
+    return marketSummaryData?.ancillary_services ?? [];
   })();
 
-  const avgDaMw = analytics?.trading_activity?.avg_da_mw ?? 0;
-  const avgEpex30DaMw = analytics?.trading_activity?.avg_epex_30_da_mw ?? 0;
-  const avgIda1Mw = analytics?.trading_activity?.avg_ida1_mw ?? 0;
-
-  const energyPriceLineData = useMemo(() => energyPriceComparisonData, [energyPriceComparisonData]);
-  const batteryPowerLineData = useMemo(() => batteryPowerOverTimeData, [batteryPowerOverTimeData]);
+  const avgDaMw = marketSummaryData?.trading_activity?.avg_da_mw ?? 0;
+  const avgEpex30DaMw = marketSummaryData?.trading_activity?.avg_epex_30_da_mw ?? 0;
+  const avgIda1Mw = marketSummaryData?.trading_activity?.avg_ida1_mw ?? 0;
 
   // ==============
   // side effects
@@ -209,25 +210,27 @@ export function AssetOperations(props: AssetOperationProps) {
     dispatch(assetBatteryPowerOverTimeRequest({assetId, month, year}));
   }, [assetId, month, year]);
 
-  if (revenueError && marketError) {
-    return (
-      <div className="w-full h-full gap-4 flex justify-center items-center">
-        <Icon name="infoCircle" className="size-6 text-error" />
-        <Text variant="free" className="text-[22px] text-error! font-InterMedium">
-          Analysis data not found
-        </Text>
-      </div>
+  useEffect(() => {
+    if (!assetId) return;
+    dispatch(
+      fetchCommentsRequest({
+        assetId,
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.Operations,
+        context_year: year ?? undefined,
+      })
     );
-  }
+  }, [assetId, dispatch, year]);
+
 
   return (
     <div className="flex flex-col gap-6">
       {/* KPIs */}
 
-      <div className="flex py-4 items-center justify-between">
-        {revenueData.map(stat => (
+      <div className={cn('flex py-4 items-center justify-between', isTablet && 'gap-4 overflow-x-auto no-scrollbar')}>
+        {kpiData.map(stat => (
           <AssetOperationStat
-            isLoading={revenueLoading}
+            isLoading={summaryLoading}
             key={stat.label}
             label={stat.label}
             value={stat.value ? formatCurrencyToPound(stat.value) : null}
@@ -238,13 +241,28 @@ export function AssetOperations(props: AssetOperationProps) {
 
       {/* Graphs */}
       <div
+        className={cn(isTablet && 'flex! flex-col!')}
         style={{
           display: 'grid',
           gap: '1rem',
-          gridTemplateColumns: '65% 35%',
+          gridTemplateColumns: isTablet ? undefined : '65% 35%',
         }}>
         <DivergentBarChart
-          isLoading={revenueLoading}
+          isLoading={summaryLoading}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.Operations}
+              contextWidget={ViewAnalysisWidgets.RevenueSourcesDistribution}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`Revenue_Sources_Distribution_${assetSystemGenerationId}_${CALENDAR_MONTHS_SHORT_NAMES[(month ?? 1) - 1]}_${year}`}
           data={revenueDistributionData}
           xKey="label"
@@ -270,15 +288,59 @@ export function AssetOperations(props: AssetOperationProps) {
 
         {/* Market Prices Analysis */}
         <div className="flex flex-col gap-3 border border-border bg-white p-4 rounded-lg">
-          <SectionHeader title="Market Prices Analysis" icon="search-analysis" />
-          <KeyValueCard title="Day Ahead Price (EPEX)" data={dayAheadPriceData} loading={marketSummaryLoading} />
-          <KeyValueCard title="Intraday Price" data={intraDayPriceData} loading={marketSummaryLoading} />
+          <SectionHeader
+            title="Market Prices Analysis"
+            icon="search-analysis"
+            action={
+              <CommentTrigger
+                contextModule={CommentModule.ViewAnalysis}
+                contextTab={ViewAnalysisTabs.Operations}
+                contextWidget={ViewAnalysisWidgets.MarketPricesAnalysis}
+                contextType={CommentContextType.Widget}
+                contextAssetId={assetId}
+                contextYear={year}
+              contextMonth={month}
+                variant="icon-only"
+                className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+              />
+            }
+          />
+          <div className={cn('flex flex-col gap-3', isTablet && 'grid grid-cols-2')}>
+            <KeyValueCard title="Day Ahead Price (EPEX)" data={dayAheadPriceData} loading={marketSummaryLoading} />
+            <KeyValueCard
+              title="Intraday Price"
+              data={intraDayPriceData}
+              loading={marketSummaryLoading}
+              className={cn(
+                isTablet &&
+                  'flex flex-col [&>div:last-child]:flex [&>div:last-child]:flex-col [&>div:last-child]:flex-1 [&>div:last-child>div]:flex-1 [&>div:last-child>div>div]:items-center',
+              )}
+            />
+          </div>
         </div>
       </div>
 
       {/* Ancillary Services Pricing */}
       <div className="flex flex-col gap-3">
-        <SectionHeader title="Ancillary Services Pricing" icon="currency-pound" />
+        <SectionHeader
+          title="Ancillary Services Pricing"
+          icon="currency-pound"
+          action={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.Operations}
+              contextWidget={ViewAnalysisWidgets.AncillaryServicesPricing}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
+        />
         <AnalyticsTable
           loading={marketSummaryLoading}
           columns={AncillaryServiceDataColums}
@@ -289,7 +351,10 @@ export function AssetOperations(props: AssetOperationProps) {
 
       {/* Trading Activity */}
       <div className="gap-3 flex flex-col">
-        <SectionHeader title="Trading Activity" icon="candle-stick" />
+        <SectionHeader
+          title="Trading Activity"
+          icon="candle-stick"
+        />
 
         <div className="grid grid-cols-3 gap-4">
           <AssetOperationStat
@@ -318,10 +383,24 @@ export function AssetOperations(props: AssetOperationProps) {
 
         <div className="grid grid-cols-1 gap-4">
           <LineChart
-            data={energyPriceLineData}
+            data={energyPriceComparisonData ?? []}
+            customActions={
+              <CommentTrigger
+                contextModule={CommentModule.ViewAnalysis}
+                contextTab={ViewAnalysisTabs.Operations}
+                contextWidget={ViewAnalysisWidgets.EnergyPricesComparison}
+                contextType={CommentContextType.Widget}
+                contextAssetId={assetId}
+                contextYear={year}
+              contextMonth={month}
+                variant="icon-only"
+                className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+              />
+            }
             downloadFileName={`${currentAsset?.asset_id}_${month}_${year}_energy_price_comparison_graph.png`}
             title="Energy Prices Comparison"
-            chartClassName="min-h-120"
+            chartClassName={cn('min-h-120', isTablet && 'min-h-[350px]')}
             isLoading={energyPriceComparisonLoading}
             chartMargin={{left: 50}}
             config={{
@@ -372,10 +451,25 @@ export function AssetOperations(props: AssetOperationProps) {
           />
 
           <LineChart
-            data={batteryPowerLineData}
+            data={batteryPowerOverTimeData ?? []}
+            customActions={
+              <CommentTrigger
+                contextModule={CommentModule.ViewAnalysis}
+                contextTab={ViewAnalysisTabs.Operations}
+                contextWidget={ViewAnalysisWidgets.BatteryPowerOverTime}
+                contextType={CommentContextType.Widget}
+                contextAssetId={assetId}
+                contextYear={year}
+              contextMonth={month}
+                variant="icon-only"
+                className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+              />
+            }
             downloadFileName={`${currentAsset?.asset_id}_${month}_${year}_battery_power_graph.png`}
             title="Battery Power Over Time"
             isLoading={batteryPowerOverTimeLoading}
+            chartClassName={cn('min-h-120', isTablet && 'min-h-[350px]')}
             chartMargin={{left: 50}}
             config={{
               yTickStep: 2,
@@ -408,12 +502,6 @@ export function AssetOperations(props: AssetOperationProps) {
             }}
           />
         </div>
-
-        {(energyPriceComparisonError || batteryPowerOverTimeError) && (
-          <Text variant="small" className="text-error-text!">
-            Some time series analysis data could not be loaded.
-          </Text>
-        )}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ from python_common.utils import redisClient
 from redis.asyncio import Redis
 from contextlib import asynccontextmanager
 from simulation_engine.trakers import brodcast_message
+from .bg_worker import brodcast_logs
 
 
 class State:
@@ -12,7 +13,7 @@ class State:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI) -> AsyncIterator[State]:
+async def lifespan(app: FastAPI):
 
     app.state.background_tasks = set()
     # create the instance
@@ -22,11 +23,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[State]:
     app.state.redis = redis_client
 
     # Start the subscriber task and keep a strong reference
-    task = asyncio.create_task(brodcast_message(redis_client))
-    app.state.background_tasks.add(task)
+
+    app.state.background_tasks.add(asyncio.create_task(brodcast_message(redis_client)))
+    app.state.background_tasks.add(asyncio.create_task(brodcast_logs(redis_client)))
 
     # Remove task from set when it's done
-    task.add_done_callback(app.state.background_tasks.discard)
+    for t in app.state.background_tasks:
+        t.add_done_callback(app.state.background_tasks.discard)
 
     yield
 

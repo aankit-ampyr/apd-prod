@@ -7,6 +7,8 @@ import traceback
 from typing import Optional
 
 from fastapi import Depends, Request
+from redis.asyncio import Redis
+from context.dependency import get_redis_conn
 from models.user_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
 from utils.response_utils import Res
@@ -30,6 +32,7 @@ class ProjectController:
         user_db: AsyncSession = Depends(get_user_db),
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.reassign_project(
             bess_db=bess_db,
@@ -37,6 +40,7 @@ class ProjectController:
             project_id=project_id,
             new_user_id=payload.user_id,
             current_user=current_user,
+            redis=redis,
         )
 
     async def list_project(
@@ -68,9 +72,10 @@ class ProjectController:
         bess_db: AsyncSession = Depends(get_bess_db),
         user_db: AsyncSession = Depends(get_user_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.create_project(
-            payload=payload, bess_db=bess_db, user_db=user_db, current_user=current_user
+            payload=payload, bess_db=bess_db, user_db=user_db, current_user=current_user, redis=redis
         )
 
     async def edit_project(
@@ -82,6 +87,7 @@ class ProjectController:
         current_user: dict = Depends(
             allowed_roles(UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST)
         ),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.edit_project(
             project_id=project_id,
@@ -89,6 +95,7 @@ class ProjectController:
             bess_db=bess_db,
             user_db=user_db,
             current_user=current_user,
+            redis=redis,
         )
 
     async def delete_project(
@@ -96,9 +103,10 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.delete_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user
+            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
         )
 
     async def restore_project(
@@ -106,9 +114,10 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.restore_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user
+            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
         )
 
     async def archive_project(
@@ -116,9 +125,10 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.archive_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user
+            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
         )
 
     async def unarchive_project(
@@ -126,9 +136,10 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.unarchive_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user
+            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
         )
 
     async def initiate_or_fetch_simulation(
@@ -136,12 +147,14 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.simulation_service.initiate_or_fetch_simulation(
             bess_db=bess_db,
             project_id=project_id,
             user_id=current_user["id"],
             current_user=current_user,
+            redis=redis,
         )
 
     async def list_simulations(
@@ -179,7 +192,8 @@ class ProjectController:
         project_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.initiate_simulation(
-            bess_db=bess_db, project_id=project_id, current_user=current_user
+            bess_db=bess_db, project_id=project_id, current_user=current_user, redis=redis
         )

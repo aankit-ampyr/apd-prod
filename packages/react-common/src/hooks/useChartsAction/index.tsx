@@ -1,7 +1,8 @@
-import { useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { downloadChart } from "../../utils";
 import { SCREEN_WRAPPER_ID } from "../../constants";
 import { useScreenOverride } from "../useScreenOverride";
+import { ScreenOverrideContext } from "../../context";
 
 /**
  * ===============================================================
@@ -28,6 +29,8 @@ export function useChartsAction(args: UseChartsActionArgs) {
   const chartRef = useRef<HTMLDivElement | null>(null);
   const originalContentRef = useRef<HTMLElement[]>([]);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const screenOverride = useContext(ScreenOverrideContext);
+  const setFullscreenExitHandler = screenOverride?.setFullscreenExitHandler;
 
   function handleDownLoad(e?: any) {
     downloadChart(chartRef, downloadFileName);
@@ -75,6 +78,16 @@ export function useChartsAction(args: UseChartsActionArgs) {
     }
     setIsFullScreen(false);
   }
+
+  useEffect(() => {
+    if (!setFullscreenExitHandler) return;
+
+    setFullscreenExitHandler(isFullScreen ? () => onMinimize() : null);
+
+    return () => {
+      setFullscreenExitHandler(null);
+    };
+  }, [isFullScreen, setFullscreenExitHandler]);
 
   /**
    * Style to apply on chart wrapper

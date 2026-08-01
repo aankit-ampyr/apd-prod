@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {AssetSection, FilterGroup, ReassignAssetOwnership, ScreenWrapper, WithRole} from '@/components';
+import {NoOrganizationAssetMgmt, NoAssetsAvailable} from '@/components/common/AnalyticsFallbackScreen';
 import {
   ASSET_STATUS_LABELS,
   ASSET_TYPE_OPTIONS,
@@ -12,7 +13,7 @@ import {
 } from '@/constants';
 import {useDropdownValues, useRole, useToast, useWindowDimensions} from '@/hooks';
 
-import {allOrganizationsList, assetSuccess, assetError, assetTypeLoading, noAsset} from '@/services/redux/selectors';
+import {allOrganizationsList, assetSuccess, assetError, assetTypeLoading, noAsset, assetErrorMessageVars} from '@/services/redux/selectors';
 import {getAllOrganizationsListRequest, resetAssetMessage, getAssetDetailsRequest} from '@/services/redux/slice';
 import {Button, Skeleton, Text} from '@/ui-kits';
 import {Images} from '@/assets/images';
@@ -70,6 +71,7 @@ export function AssetManagement() {
   // =================
   const success = useSelector(assetSuccess) as SuccessCodes;
   const failure = useSelector(assetError) as ErrorCodes;
+  const failureData = useSelector(assetErrorMessageVars) as Record<string, string>;
   const noAssetFound = useSelector(noAsset);
   const solarLoading = useSelector(assetTypeLoading(ASSET_LOADING_KEYS[AssetType.Solar]));
   const bessLoading = useSelector(assetTypeLoading(ASSET_LOADING_KEYS[AssetType.BESS]));
@@ -83,6 +85,7 @@ export function AssetManagement() {
   const [reassignModalOpen, setReassignModalOpen] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [_noData, setNoData] = useState<boolean>(false);
+  const [showNoOrganizationAssign, setShowNoOrganizationAssign] = useState<boolean>(false);
   const [invalidOrgSearch, setInvalidOrgSearch] = useState(false);
   const [invalidCountrySearch, setInvalidCountrySearch] = useState(false);
   const invalidFilters = invalidOrgSearch || invalidCountrySearch;
@@ -195,7 +198,10 @@ export function AssetManagement() {
       if ('E-10014' === failure) {
         setNoData(true);
       }
-      if (!['E-10014', 'E-10015', 'E-10033'].includes(failure)) {
+      if ('E-10272' === failure) {
+        setShowNoOrganizationAssign(true);
+      }
+      if (!['E-10014', 'E-10015', 'E-10033', 'E-10239', 'E-10272'].includes(failure)) {
         showToast(getErrorMessage(failure), 'error');
       }
     }
@@ -204,8 +210,26 @@ export function AssetManagement() {
     };
   }, [failure, success]);
 
+  if (showNoOrganizationAssign) {
+    return (
+      <ScreenWrapper 
+        className={width >= TABLET_SCREEN_BREAKPOINT ? "p-8" : "p-3"} 
+        wrapperClassName={width >= TABLET_SCREEN_BREAKPOINT ? "p-6" : "p-3"}
+      >
+        <NoOrganizationAssetMgmt />
+      </ScreenWrapper>
+    );
+  }
+
   return (
-    <ScreenWrapper className="p-3 xl:p-8" wrapperClassName="p-3 xl:p-6">
+    <ScreenWrapper 
+      className={
+        showEmptyScreen
+          ? width >= TABLET_SCREEN_BREAKPOINT ? "px-14 py-16" : "p-4"
+          : width >= TABLET_SCREEN_BREAKPOINT ? "p-8" : "p-3"
+      } 
+      wrapperClassName={width >= TABLET_SCREEN_BREAKPOINT ? "p-8" : "p-4"}
+    >
       {isInitialAssetLoading && <LoadingScreen />}
 
       <div
@@ -321,7 +345,7 @@ export function AssetManagement() {
       </div>
 
       <div className={cn('grow', showEmptyScreen ? 'block' : 'hidden')}>
-        <EmptyScreen message={'No Assets have been added yet'}>{AddAssetCTA}</EmptyScreen>
+        <NoAssetsAvailable organizationName={failureData?.organization_name}>{AddAssetCTA}</NoAssetsAvailable>
       </div>
     </ScreenWrapper>
   );

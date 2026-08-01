@@ -2,10 +2,14 @@ from zoneinfo import ZoneInfo
 
 # JWT
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRY = 60 * 60 * 8760  # 1 hour
+JWT_EXPIRY = 60 * 60 * 24  # 1 hour
+ACCESS_JWT_EXPIRY = 60 * 15  # 1 hour
+
+ACCESS_TOKEN_NAME = "at"
+REFRESH_TOKEN_NAME = "rt"
 
 # Ephemeral WebSocket token expiry in seconds
-EPHEMERAL_WS_TOKEN_EXPIRY = 60 * 60 * 8760 # 1 minute
+EPHEMERAL_WS_TOKEN_EXPIRY = 60 * 60 * 8760  # 1 minute
 
 CONSTRAINT_NAMES = {
     "UNIQUE_USER_EMAIL_CONSTRAINT": "uq_users_email",
@@ -13,4 +17,3 @@ CONSTRAINT_NAMES = {
 
 LOCAL_TZ = ZoneInfo("Asia/Kolkata")  # ya dynamic later
 DUMMY_OTP = "000000"
-

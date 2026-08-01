@@ -7,7 +7,9 @@ import {
   GroupedBarDataPoint,
   GroupedBarSeriesMode,
   Section,
+  CommentTrigger,
 } from '../../../common';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets, WidgetDataPointPayload} from '@/constants';
 import {formatCurrencyToPound, formatDate} from '@/utils';
 import {Badge, Icon, Text} from '@/ui-kits';
 import {TopWorstDays} from './TopWorstDays';
@@ -23,9 +25,10 @@ import {
   assetImbalanceAnalysisTopWorstDaysLoading,
   assetImbalanceAnalysisTopWorstDaysResult,
 } from '@/services/redux/selectors';
+import {setActiveContext, setPanelOpen, fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
 import {AssetImbalanceAnalytics, DataTableColumn} from '@/interface';
 import {downloadAssetImbalanceWorstDays} from '@/services/api';
-import {useEffect} from 'react';
+import {useEffect, useMemo} from 'react';
 import {
   getAssetImbalanceAnalysisSummaryRequest,
   getAssetImbalanceHourlyChargesRequest,
@@ -82,6 +85,36 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
   const imbalanceTopWorstDaysLoading = useSelector(assetImbalanceAnalysisTopWorstDaysLoading);
   const imablanceHourlyCharges = useSelector(assetImbalanceAnalysisHourlyChargesResult);
   const imablanceHourlyChargesLoading = useSelector(assetImbalanceAnalysisHourlyChargesLoading);
+  const allComments = useSelector((state: any) => state.comment.comments || []);
+
+  const getCommentCountForDataPoint = <W extends WidgetDataPointPayload['context_widget']>(
+    widget: W,
+    dataPointId: Extract<WidgetDataPointPayload, {context_widget: W}>['context_data_point'],
+  ) => {
+    return allComments.filter(
+      (comment: any) =>
+        String(comment.context_widget) === String(widget) &&
+        (String(comment.context_data_point) === String(dataPointId) || String(dataPointId).includes(String(comment.context_data_point)))
+    ).length;
+  };
+
+  const handleBadgeClick = <W extends WidgetDataPointPayload['context_widget']>(
+    widget: W,
+    dataPointId: Extract<WidgetDataPointPayload, {context_widget: W}>['context_data_point'],
+  ) => {
+    dispatch(
+      setActiveContext({
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.ImbalanceAnalysis,
+        context_widget: widget,
+        context_data_point: dataPointId,
+        context_asset_id: assetId,
+        context_year: year,
+        context_month: month,
+      })
+    );
+    dispatch(setPanelOpen(true));
+  };
 
   /**
    * ==============================
@@ -154,7 +187,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
   /**
    * daily breakdown
    */
-  const dailyBreakdownChartData: GroupedBarDataPoint[] = (() => {
+  const dailyBreakdownChartData: GroupedBarDataPoint[] = useMemo(() => {
     const daily_breakdown = imbalanceDailyBreakdown?.daily_breakdown ?? [];
     return daily_breakdown.map(item => {
       return {
@@ -166,9 +199,12 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
           daily_charges: item.daily_charges,
           daily_net_imbalance: item.daily_net_imbalance,
         },
+        commentCounts: {
+          daily_revenue: getCommentCountForDataPoint(ViewAnalysisWidgets.DailyImbalanceRevenue, item.date),
+        },
       };
     });
-  })();
+  }, [imbalanceDailyBreakdown, allComments]);
 
   /**
    * worst days
@@ -193,20 +229,23 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
    */
   const peakImbalaceHour = imablanceHourlyCharges?.peak_imbalance_hour?.hour;
   const peakImbalaceHourCharge = imablanceHourlyCharges?.peak_imbalance_hour?.total_charges ?? 0;
-  const hourlyChargesData = ((): DivergentBarData[] => {
+  const hourlyChargesData: DivergentBarData[] = useMemo(() => {
     if (imablanceHourlyChargesLoading || !imablanceHourlyCharges) {
-      return Array.from({length: 24}).map((): DivergentBarData => {
+      return Array.from({length: 24}).map((_, index): DivergentBarData => {
+        const hour = index.toString();
         return {
-          label: '0',
+          label: hour,
           value: 0,
+          commentCount: getCommentCountForDataPoint(ViewAnalysisWidgets.ImbalanceChargesByHour, hour),
         };
       });
     }
     return imablanceHourlyCharges?.hourly_breakdown?.map(item => ({
       label: item.hour,
       value: item.total_charges,
+      commentCount: getCommentCountForDataPoint(ViewAnalysisWidgets.ImbalanceChargesByHour, item.hour),
     }));
-  })();
+  }, [imablanceHourlyCharges, imablanceHourlyChargesLoading, allComments]);
 
   /**
    * ==============================
@@ -281,7 +320,15 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
     dispatch(getAssetImbalanceTopWorstDaysRequest({assetId, month, year}));
     dispatch(getAssetImbalanceDailyBreakdownRequest({assetId, month, year}));
     dispatch(getAssetImbalanceHourlyChargesRequest({assetId, month, year}));
-  }, [assetId, month, year]);
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.ImbalanceAnalysis,
+        context_year: year ?? undefined,
+      }),
+    );
+  }, [assetId, month, year, dispatch]);
 
   return (
     <div className="flex flex-col gap-8">
@@ -311,6 +358,21 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
         subtitle="Compare daily imbalance revenue and charges to identify high-impact dates.">
         <GroupedBarChartV2
           showTooltip
+          tooltipInteractionMode="item"
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.ImbalanceAnalysis}
+              contextWidget={ViewAnalysisWidgets.DailyImbalanceRevenue}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`${assetSystemGenerationId}_${month}_${year}_daily_imbalance_breakdown.png`}
           header="Daily Imbalance Revenue vs Charges"
           enableHorizontalScroll
@@ -352,11 +414,32 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
                     {formatCurrencyToPound(tooltipMeta?.daily_net_imbalance ?? 0)}
                   </span>
                 </Text>{' '}
+                <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+                  <CommentTrigger
+                    contextModule={CommentModule.ViewAnalysis}
+                    contextTab={ViewAnalysisTabs.ImbalanceAnalysis}
+                    contextWidget={ViewAnalysisWidgets.DailyImbalanceRevenue}
+                    contextType={CommentContextType.DataPoint}
+                    contextAssetId={assetId}
+                    contextYear={year}
+                    contextMonth={date.getMonth() + 1}
+                    contextDataPoint={category}
+                  
+                      variant="icon-with-text"
+                      label="Add Comment"
+                      className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                      iconClassName="w-4 h-4 text-[#088477]"
+                      labelClassName="text-[#088477]"
+                    />
+                </div>
               </div>
             );
           }}
           isLoading={imbalanceDailyBreakdownLoading || assetLoading}
           data={dailyBreakdownChartData}
+          onBadgeClick={(categoryId, _seriesId) => {
+            handleBadgeClick(ViewAnalysisWidgets.DailyImbalanceRevenue, String(categoryId));
+          }}
           formatXAxisTick={item => formatDate(new Date(item), 'MMM d')}
           series={[
             {
@@ -384,6 +467,20 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
       <TopWorstDays
         data={worstDaysData}
         columns={worstDaysColums}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.ImbalanceAnalysis}
+            contextWidget={ViewAnalysisWidgets.Top5WorstImbalance}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+              contextMonth={month}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
         onDownload={handleDownloadTop5WorstDays}
         isLoading={imbalanceTopWorstDaysLoading || assetLoading}
       />
@@ -394,7 +491,22 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
         subtitle="Analyze charge patterns by hour to identify peak imbalance periods.">
         <DivergentBarChartV2
           data={hourlyChargesData}
+          onBadgeClick={(label) => handleBadgeClick(ViewAnalysisWidgets.ImbalanceChargesByHour, label)}
           title="Imbalance Charges by Hour of Day"
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.ImbalanceAnalysis}
+              contextWidget={ViewAnalysisWidgets.ImbalanceChargesByHour}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           headerNote={
             <div className="border flex my-1 items-center gap-2 border-warning bg-[#FFFAF4] rounded-md px-4 py-3">
               <Icon name="activity" className="text-warning" />
@@ -439,6 +551,24 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
                     {formatCurrencyToPound(data.value)}
                   </span>
                 </Text>
+                <div className="mt-1 border-t pt-2">
+                  <CommentTrigger
+                    contextModule={CommentModule.ViewAnalysis}
+                    contextTab={ViewAnalysisTabs.ImbalanceAnalysis}
+                    contextWidget={ViewAnalysisWidgets.ImbalanceChargesByHour}
+                    contextType={CommentContextType.DataPoint}
+                    contextAssetId={assetId}
+                    contextYear={year}
+              contextMonth={month}
+                    contextDataPoint={data.label}
+                  
+                      variant="icon-with-text"
+                      label="Add Comment"
+                      className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                      iconClassName="w-4 h-4 text-[#088477]"
+                      labelClassName="text-[#088477]"
+                    />
+                </div>
               </div>
             );
           }}

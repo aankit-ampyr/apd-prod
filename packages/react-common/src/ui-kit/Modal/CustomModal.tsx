@@ -1,5 +1,10 @@
-import { cn } from '../../utils/common.utils';
-import { type PropsWithChildren, useRef, useEffect, type MouseEvent } from 'react';
+import { cn } from "../../utils/common.utils";
+import {
+  type PropsWithChildren,
+  useRef,
+  useEffect,
+  type MouseEvent,
+} from "react";
 
 /**
  * CustomModal component
@@ -44,7 +49,7 @@ export const CustomModal: React.FC<CustomModalProps> = ({
       <div
         style={{ maxWidth: `min(calc(100% - 1.5rem), ${maxWidth}px)` }}
         className={cn(
-          'bg-white overflow-visible w-full m-auto py-6 px-8 rounded-xl box-border',
+          "bg-white overflow-visible w-full m-auto py-6 px-8 rounded-xl box-border",
           className,
         )}
         data-testid="custom-modal-content"
@@ -60,16 +65,24 @@ interface ModalProps extends PropsWithChildren {
   onClose?: () => void;
   className?: string;
   maxWidth: number;
+  closeOnBackdropClick?: boolean;
 }
-export const Modal: React.FC<ModalProps> = props => {
-  const {children, open, onClose, className, maxWidth} = props;
+export const Modal: React.FC<ModalProps> = (props) => {
+  const {
+    children,
+    open,
+    onClose,
+    className,
+    maxWidth,
+    closeOnBackdropClick = true,
+  } = props;
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     if (open) {
       dialogRef.current?.showModal();
 
       // Blur whatever the browser auto-focused inside the dialog
-      const focused = dialogRef.current?.querySelector<HTMLElement>(':focus');
+      const focused = dialogRef.current?.querySelector<HTMLElement>(":focus");
       focused?.blur();
     } else {
       dialogRef.current?.close();
@@ -78,6 +91,7 @@ export const Modal: React.FC<ModalProps> = props => {
 
   const handleBackdropClick = (e: React.MouseEvent<HTMLDialogElement>) => {
     // Close modal when clicking on the backdrop (the dialog element itself)
+    if (!closeOnBackdropClick) return;
     if (e.target === dialogRef.current) {
       onClose?.();
     }
@@ -86,13 +100,17 @@ export const Modal: React.FC<ModalProps> = props => {
   return (
     <dialog
       autoFocus={false}
-      style={{display: open ? undefined : 'none', maxWidth: `min(calc(100% - 1.5rem), ${maxWidth}px)`}}
+      style={{
+        display: open ? undefined : "none",
+        maxWidth: `min(calc(100% - 1.5rem), ${maxWidth}px)`,
+      }}
       className={cn(
         `bg-white overflow-visible w-full m-auto py-6 px-8 rounded-xl box-border backdrop:bg-black/25`,
         className,
       )}
       ref={dialogRef}
-      onClick={handleBackdropClick}>
+      onClick={handleBackdropClick}
+    >
       {children}
     </dialog>
   );

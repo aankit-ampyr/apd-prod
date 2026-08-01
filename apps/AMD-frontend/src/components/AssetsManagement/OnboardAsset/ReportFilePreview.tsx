@@ -1,7 +1,7 @@
 import {Badge, Icon, Text} from '@/ui-kits';
 import {cn, formatDate, formatFileSize} from '@/utils';
 import {Images} from '@lazarus/react-common/assets';
-import {useEffect, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {FileRemovalConfirmModal} from './FileRemovalConfirmModal';
 import {Divider} from '@lazarus/react-common/components';
 import {useConfirm} from '@/hooks';
@@ -80,7 +80,7 @@ export function FilePreview(props: FilePreview) {
           </div>
           {isValidated && (
             <button disabled={disabled} onClick={handleRemoveClick} className="cursor-pointer group">
-              <Icon name="cross" className="absolute top-0 right-0 z-999 group-disabled:cursor-not-allowed!" />
+              <Icon name="cross" className="absolute top-0 right-0 z-10 group-disabled:cursor-not-allowed!" />
             </button>
           )}
           {isValidated && (
@@ -141,7 +141,7 @@ export function FilePreview(props: FilePreview) {
 
             {!disabled && (
               <button disabled={disabled} onClick={handleRemoveClick} className="cursor-pointer">
-                <Icon name="cross" className="absolute top-0 right-0 z-999" />
+                <Icon name="cross" className="absolute top-0 right-0 z-10" />
               </button>
             )}
           </div>
@@ -263,14 +263,14 @@ export function FilePreview2<T>(props: FilePreview2<T>) {
           {fileInfoPoints.map((point, index) => {
             const value = point.value(file);
             return (
-              <>
+              <React.Fragment key={index}>
                 <div key={index} className="flex gap-1">
                   <Text variant="14M">{point.label} : </Text>
                   {typeof value === 'string' ? <Text variant="14R">{value}</Text> : value}
                 </div>
 
                 {index !== fileInfoPoints.length - 1 && <Divider orientation="vertical" className="bg-disabled" />}
-              </>
+              </React.Fragment>
             );
           })}
         </div>

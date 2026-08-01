@@ -17,5 +17,6 @@ STATIC_SOLAR_PROFILES = {
 STATIC_INPUTS_DIR = "inputs"
 
 SIMULATION_UPDATES_CHANEL = "simulaton_progress_update"
+LOGS_STREAM_CHANEL = "audit_logs_update"
 
 SIZING_STRATEGY = (1, 10, 20)

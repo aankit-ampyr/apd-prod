@@ -66,6 +66,8 @@ dependencies = [
     "pdfplumber==0.11.5",
     "pytesseract==0.3.13",
     "pdf2image==1.17.0",
+    "taskiq-redis>=1.2.2",
+    "websockets>=12.0",
 ]
 
 [dependency-groups]

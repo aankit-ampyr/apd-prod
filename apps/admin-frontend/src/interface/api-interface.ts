@@ -1,7 +1,12 @@
 import type {AuditLogModules, AuditLogScenario, UserRole} from '@/constants';
-import type { ENV, User} from './common-interface';
-import type { SortType, APIResponse, AuditLog } from '@lazarus/react-common/interface';
-export type {APIResponse, LoginRequest, VerifyOtpRequest} from '@lazarus/react-common/interface/api-interface'
+import type {ENV, User} from './common-interface';
+import type {SortType, APIResponse, AuditLog} from '@lazarus/react-common/interface';
+export type {
+  APIResponse,
+  LoginRequest,
+  VerifyOtpRequest,
+  LogoutRequest,
+} from '@lazarus/react-common/interface/api-interface';
 
 export interface ApiConfigInterface {
   currentEnv: string | undefined;
@@ -13,6 +18,8 @@ export interface ApiConfigInterface {
     verifyOtp: string;
   };
   authUrls: {
+    logout: string;
+    refresh: string;
     users: string;
     user_id: (id: number) => string;
     user_organization: (id: number) => string;
@@ -21,6 +28,10 @@ export interface ApiConfigInterface {
     organization_id: (id: number) => string;
 
     audit_logs: string;
+
+    // websocket
+    ws_token: string;
+    ws: string;
   };
 }
 
@@ -34,6 +45,14 @@ export interface AddUserRequest {
     status: User['status'];
   };
   response: APIResponse<User>;
+}
+
+// =============================== Websocket ===============================
+export interface GetWsTokenRequest {
+  response: APIResponse<{
+    user_id: number;
+    ephemeral_token: string;
+  }>;
 }
 
 export interface UserListRequest {

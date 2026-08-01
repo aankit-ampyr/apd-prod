@@ -1,21 +1,26 @@
-import {AssetFileUploadError, Invoice, InvoiceSettlement, MonthYear} from '@/interface';
+import {AssetFileUploadError, Invoice, InvoiceSettlement, MonthYear, InvoiceStatementSummary} from '@/interface';
 import {Routes} from '@/navigation/Routes';
+import {AssetStatus} from '@/constants';
 import {
   assetInvoiceUploadErrorMessage,
   currentSelectedAsset,
   assetInvoiceUploadLoading,
   assetInvoiceSettlementUploadLoading,
   assetInvoiceSettlementUploadErrorMessage,
+  assetInvoiceSummaryStatementUploadErrorMessage,
+  assetInvoiceSummaryStatementUploadLoading,
 } from '@/services/redux/selectors';
 import {useDispatch, useSelector} from 'react-redux';
 import {useNavigate} from 'react-router-dom';
-import {Badge, Icon, Text} from '@/ui-kits';
+import {Alert, Badge, Icon, Text} from '@/ui-kits';
 import {DragAndDrop2} from '../DragDropFileUpload';
 import {
   deleteInvoiceRequest,
   deleteInvoiceSettlementRequest,
   uploadInvoiceSettlementRequest,
   uploadInvoicesRequest,
+  uploadInvoiceSummaryStatementRequest,
+  deleteInvoiceSummaryStatementRequest,
 } from '@/services/redux/slice';
 import {formatCurrencyToPound, getErrorMessage} from '@/utils';
 import {Accept} from 'react-dropzone';
@@ -64,7 +69,10 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
    * Derived States
    * =============================
    */
-  const bothFilePresent = currentAsset?.invoice_file && currentAsset?.invoice_settlement_file;
+  const bothFilePresent = Boolean(currentAsset?.invoice_file) && Boolean(currentAsset?.invoice_settlement_file);
+  const summaryStatementFilePresent = Boolean(currentAsset?.invoice_summary_statement);
+  const analysisCtaVisible = bothFilePresent || summaryStatementFilePresent;
+  const isUploadDisabled = currentAsset?.status !== AssetStatus.Active || !monthYearReportingPeriod;
 
   /**
    * =============================
@@ -86,7 +94,6 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
     formData.append('month', String(monthYearReportingPeriod.month));
     formData.append('year', String(monthYearReportingPeriod.year));
 
-    // TODO: dispatch function to upload invoice file
     dispatch(uploadInvoicesRequest({assetId: currentAsset.id, formData}));
   }
 
@@ -112,10 +119,29 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
     dispatch(uploadInvoiceSettlementRequest({assetId: currentAsset.id, formData}));
   }
 
+  function uploadInvoiceSummaryStatement(file: File) {
+    if (!currentAsset?.id) return;
+    if (!monthYearReportingPeriod) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('month', String(monthYearReportingPeriod.month));
+    formData.append('year', String(monthYearReportingPeriod.year));
+
+    dispatch(uploadInvoiceSummaryStatementRequest({assetId: currentAsset.id, formData}));
+  }
+
+  function removeSummaryStatement(statementId: number) {
+    if (!currentAsset?.id) return;
+
+    dispatch(deleteInvoiceSummaryStatementRequest({assetId: currentAsset.id, statementId}));
+  }
+
   return (
     <div className="gap-10 flex-col flex">
       <InvoiceUpload<Invoice>
         title="Invoice Upload"
+        disabled={isUploadDisabled}
         onUpload={uploadInvoice}
         onRemove={removeInvoice}
         fileUploadLoadingSelector={assetInvoiceUploadLoading}
@@ -144,7 +170,8 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
         ]}
       />
       <InvoiceUpload<InvoiceSettlement>
-        title="Invoice Settlement File Upload"
+        title="Settlement File Upload"
+        disabled={isUploadDisabled}
         onUpload={uploadInvoiceSettle}
         onRemove={removeInvoiceSettlement}
         fileUploadLoadingSelector={assetInvoiceSettlementUploadLoading}
@@ -165,9 +192,50 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
         ]}
       />
 
-      {bothFilePresent && (
+      <InvoiceUpload<InvoiceStatementSummary>
+        title="Summary Statement File Upload"
+        notice="Summary Statement file is optional for opening Invoice Analysis. If not uploaded, Revenue Reconciliation data will remain unavailable until the file is uploaded."
+        disabled={isUploadDisabled}
+        onUpload={uploadInvoiceSummaryStatement}
+        onRemove={removeSummaryStatement}
+        fileUploadLoadingSelector={assetInvoiceSummaryStatementUploadLoading}
+        fileUploadErrorSelector={assetInvoiceSummaryStatementUploadErrorMessage}
+        file={currentAsset?.invoice_summary_statement ?? undefined}
+        fileNameSelector={file => file?.file_name ?? ''}
+        fileSizeSelector={file => file?.file_size ?? 0}
+        allowedFileTypes={{
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
+        }}
+        invaliFileFormatErrorMessage={getErrorMessage('E-10250')}
+        fileSizeExceedErrorMessage={getErrorMessage('E-10249')}
+        filePoints={[
+          {
+            label: 'Energy Revenue',
+            value: settlement =>
+              settlement?.revenue_values.total_energy_revenue
+                ? formatCurrencyToPound(settlement?.revenue_values.total_energy_revenue)
+                : missingBadge,
+          },
+          {
+            label: 'Ancillary Revenue',
+            value: settlement =>
+              settlement?.revenue_values.total_ancillary_revenue
+                ? formatCurrencyToPound(settlement?.revenue_values.total_ancillary_revenue)
+                : missingBadge,
+          },
+          {
+            label: 'Reported Net Revenue',
+            value: settlement =>
+              settlement?.revenue_values.reported_net_revenue
+                ? formatCurrencyToPound(settlement?.revenue_values.reported_net_revenue)
+                : missingBadge,
+          },
+        ]}
+      />
+
+      {analysisCtaVisible && (
         <button
-          disabled={!bothFilePresent}
+          disabled={!analysisCtaVisible}
           onClick={viewAnalysis}
           className="flex w-1/2 cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed items-center gap-3 rounded-md bg-white shadow-sm justify-between border-border border px-6 py-4">
           <Text variant="18M" className={`text-primary!`}>
@@ -183,6 +251,7 @@ export function InvoiceUploadSection(props: InvoiceUploadSectionProps) {
 
 interface InvoiceUploadProps<T extends {id: number}> {
   title?: string;
+  notice?: string;
   disabled?: boolean;
   onUpload?: (file: File) => void;
   onRemove: (invoiceId: number) => void;
@@ -202,6 +271,7 @@ interface InvoiceUploadProps<T extends {id: number}> {
 function InvoiceUpload<T extends {id: number}>(props: InvoiceUploadProps<T>) {
   const {
     title,
+    notice,
     disabled,
     onUpload,
     onRemove,
@@ -237,6 +307,10 @@ function InvoiceUpload<T extends {id: number}>(props: InvoiceUploadProps<T>) {
   return (
     <div className="flex flex-col gap-3">
       <Text variant="16SB">{title}</Text>
+
+      {notice && (
+        <Alert message={notice} className="w-full" textClassName="whitespace-normal break-words" />
+      )}
 
       <DragAndDrop2<T>
         onFileAccepted={onUpload}

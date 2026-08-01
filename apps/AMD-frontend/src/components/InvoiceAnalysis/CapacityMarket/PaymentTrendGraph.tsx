@@ -1,14 +1,30 @@
 import {CompositeChart, formatCurrencyToPound, CompositeChartSeries} from '@lazarus/react-common';
 import {SectionHeader} from '@/components/common';
 import {useWindowDimensions} from '@/hooks';
-import {TABLET_SCREEN_BREAKPOINT, CALENDAR_MONTH_NAMES} from '@/constants';
-import type {AssetCapacityMarketAnalytics} from '@/interface';
+import {CALENDAR_MONTH_NAMES, InvoiceAnalysisTabs, InvoiceAnalysisWidgets, TABLET_SCREEN_BREAKPOINT} from '@/constants';
+import type {AssetCapacityMarketAnalytics2} from '@/interface';
 import {Text} from '@/ui-kits';
 
+import {CommentTrigger} from '@/components';
+import {CommentContextType, CommentModule, WidgetDataPointPayload} from '@/constants';
+
 interface PaymentTrendGraphProps {
-  data?: AssetCapacityMarketAnalytics['payment_trend'];
+  data: AssetCapacityMarketAnalytics2['payment_trend']['payment_trend'];
   isLoading?: boolean;
   year?: number | null;
+  assetId?: number | null;
+  domainMaxMultiplier?: number;
+  customActions?: React.ReactNode;
+  handleBadgeClick?: (
+    widgetId: InvoiceAnalysisWidgets.PaymentTrend,
+    categoryId: Extract<WidgetDataPointPayload, {context_widget: InvoiceAnalysisWidgets.PaymentTrend}>['context_data_point'],
+    monthIndex?: number
+  ) => void;
+  getCommentCountForDataPoint?: (
+    widget: InvoiceAnalysisWidgets.PaymentTrend,
+    dataPointId: Extract<WidgetDataPointPayload, {context_widget: InvoiceAnalysisWidgets.PaymentTrend}>['context_data_point'],
+    month?: number
+  ) => number;
 }
 
 const series: CompositeChartSeries<any>[] = [
@@ -33,7 +49,7 @@ const series: CompositeChartSeries<any>[] = [
 ];
 
 export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
-  const {data = [], isLoading = false, year} = props;
+  const {data = [], isLoading = false, year, assetId, domainMaxMultiplier, customActions, handleBadgeClick, getCommentCountForDataPoint} = props;
   const {width} = useWindowDimensions();
   const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
 
@@ -41,10 +57,15 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
     data?.map(item => {
       const monthStrRaw = typeof item.month === 'number' ? CALENDAR_MONTH_NAMES[item.month - 1] : item.month || '';
       const monthStr = monthStrRaw.substring(0, 3);
-      const resolvedYear = item.year || year || '';
+      const resolvedYear = year || '';
+      const label = `${monthStr}\n${resolvedYear}`.trim();
+      const monthIndex = typeof item.month === 'number' ? item.month : 0;
       return {
         ...item,
-        month_year: `${monthStr}\n${resolvedYear}`.trim(),
+        month_year: label,
+        commentCounts: {
+          _category: getCommentCountForDataPoint?.(InvoiceAnalysisWidgets.PaymentTrend, String(monthIndex) as Extract<WidgetDataPointPayload, {context_widget: InvoiceAnalysisWidgets.PaymentTrend}>['context_data_point']) ?? 0,
+        },
       };
     }) || [];
 
@@ -89,6 +110,27 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
             );
           })}
         </div>
+        <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+          <CommentTrigger
+            contextModule={CommentModule.InvoiceAnalysis}
+            contextTab={InvoiceAnalysisTabs.CapacityMarket}
+            contextWidget={InvoiceAnalysisWidgets.PaymentTrend}
+            contextType={CommentContextType.DataPoint}
+            contextAssetId={assetId ?? 0}
+            contextYear={year ?? 0}
+            contextDataPoint={(() => {
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const [monthStr] = title.split(' ');
+              const monthIdx = months.indexOf(monthStr) + 1;
+              return monthIdx ? String(monthIdx) : title;
+            })()}
+            variant="icon-with-text"
+            label="Add Comment"
+            className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+            iconClassName="w-4 h-4 text-[#088477]"
+            labelClassName="text-[#088477]"
+          />
+        </div>
       </div>
     );
   };
@@ -96,12 +138,12 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
   return (
     <>
       <style>{`
-        .payment-trend-chart .recharts-bar-rectangle path,
-        .payment-trend-chart .recharts-bar-rectangle rect {
+        .payment-trend-chart .recharts-bar-rectangle path.recharts-rectangle,
+        .payment-trend-chart .recharts-bar-rectangle rect.recharts-rectangle {
           transition: fill 0.2s ease;
         }
-        .payment-trend-chart .recharts-bar-rectangle:hover path,
-        .payment-trend-chart .recharts-bar-rectangle:hover rect {
+        .payment-trend-chart .recharts-bar-rectangle:hover path.recharts-rectangle,
+        .payment-trend-chart .recharts-bar-rectangle:hover rect.recharts-rectangle {
           fill: #f6be17ff !important;
         }
       `}</style>
@@ -109,6 +151,7 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
         className="payment-trend-chart"
         header={header}
         data={chartData}
+        customActions={customActions}
         isLoading={isLoading}
         tooltipRenderer={customTooltipRenderer}
         xAxisKey="month_year"
@@ -118,11 +161,18 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
         showLinePointValues={false}
         showTooltipCursor={false}
         tooltipInteractionMode="item"
+        onBadgeClick={(categoryId, _seriesId) => {
+          const [monthStr] = String(categoryId).split('\n');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthIndex = months.indexOf(monthStr) + 1;
+          handleBadgeClick?.(InvoiceAnalysisWidgets.PaymentTrend, String(monthIndex || categoryId) as Extract<WidgetDataPointPayload, {context_widget: InvoiceAnalysisWidgets.PaymentTrend}>['context_data_point']);
+        }}
         axes={{
           left: {
             label: 'Monthly Payment(£)',
             tickFormatter: val => formatCurrencyToPound(val, false, true),
             width: isTablet ? 60 : 75,
+            ...(domainMaxMultiplier ? {domainMaxMultiplier} : {}),
           },
           right: {
             label: 'Cumulative(£)',

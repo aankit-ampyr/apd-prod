@@ -7,8 +7,9 @@ import {
   DivergentBarChart,
   Divider,
   SectionHeader,
+  CommentTrigger,
 } from '@/components';
-import {AssetMarketUtilizationTypes} from '@/constants';
+import {AssetMarketUtilizationTypes, CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
 import {
   assetDetailsFetchLoading,
   assetBestMarketsAnalysisError,
@@ -32,7 +33,10 @@ import {
   assetMarketStatisticsRequest,
   assetMarketRevenueDistributionRequest,
 } from '@/services/redux/slice';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
 import {cn, formatCurrencyToPound} from '@/utils';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 import {DataTableColumn, SelectInputItem, AssetMarketAnalytics} from '@/interface';
 import {Icon, SelectInput, Text, Tooltip} from '@/ui-kits';
 import {AssetAnalysisTabProps} from '../types';
@@ -82,7 +86,7 @@ function getMarketColor(marketLabel: string) {
     imbalance: '#C99D35',
     ida1: '#6ABECF',
     epex: '#FF859F',
-    
+
     // sell columns
     sell_ssp: '#14A155',
     sell_sbp: 'var(--color-success)',
@@ -90,7 +94,7 @@ function getMarketColor(marketLabel: string) {
     sell_isem: '#ACD65A',
     sell_da_hh: '#33DE83',
     sell_ida1: '#ACD65A',
-    
+
     // buys colums
     buy_ssp: '#F38A00',
     buy_sbp: '#FF7681',
@@ -121,6 +125,8 @@ export function AssetMarket(props: MarketOptimizationProps) {
   // hooks
   // =================
   const dispatch = useDispatch();
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
 
   // =================
   // selectors
@@ -242,7 +248,17 @@ export function AssetMarket(props: MarketOptimizationProps) {
     return acc;
   }, 0);
 
-  const renderUtilizationLegend = useCallback((items: CalloutDonutLegendItemProps[]) => {
+  const renderUtilizationLegend = useCallback((items: CalloutDonutLegendItemProps[], isFullScreen?: boolean) => {
+    if (isFullScreen) {
+      return (
+        <div className="w-full flex flex-wrap gap-x-8 gap-y-8 pt-2 min-[1026px]:pl-10">
+          {items.map(item => (
+            <CalloutDonutLegendItem {...item} key={item.label} className="w-[calc(20%-1.6rem)] min-w-0! shrink-0" />
+          ))}
+        </div>
+      );
+    }
+
     const isBuyItem = (item: CalloutDonutLegendItemProps) => item.label.toLowerCase().startsWith('buy');
     const isSellItem = (item: CalloutDonutLegendItemProps) => item.label.toLowerCase().startsWith('sell');
 
@@ -261,9 +277,11 @@ export function AssetMarket(props: MarketOptimizationProps) {
     const columns = [buyItems, sellItems, ...chunkIntoColumns(remainingItems, 4)].filter(column => column.length > 0);
 
     return (
-      <div className="flex flex-wrap items-start justify-start gap-x-10 gap-y-8">
+      <div className={cn('flex flex-wrap items-start justify-start gap-x-10 gap-y-8', isTablet && 'gap-x-4 gap-y-4')}>
         {columns.map((column, columnIndex) => (
-          <div key={`${columnIndex}-${column[0]?.label ?? 'legend'}`} className="flex flex-col gap-8">
+          <div
+            key={`${columnIndex}-${column[0]?.label ?? 'legend'}`}
+            className={cn('flex flex-col gap-8', isTablet && 'gap-4')}>
             {column.map(item => (
               <CalloutDonutLegendItem {...item} key={item.label} />
             ))}
@@ -309,7 +327,7 @@ export function AssetMarket(props: MarketOptimizationProps) {
               Percentage
             </Text>
             <div className="relative group">
-              <Icon className="text-primary!" name="infoCircle" />
+              <Icon className="text-primary!" name="circle-info" />
               {
                 <Tooltip
                   portal
@@ -428,6 +446,18 @@ export function AssetMarket(props: MarketOptimizationProps) {
     dispatch(assetMarketSummaryAnalysisRequest({assetId, month, year}));
   }, [assetId, month, year, dispatch]);
 
+  useEffect(() => {
+    if (!assetId) return;
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.MarketOptimization,
+        context_year: year ?? undefined,
+      }),
+    );
+  }, [assetId, dispatch, year]);
+
   // =================
   // render guards
   // =================
@@ -467,10 +497,24 @@ export function AssetMarket(props: MarketOptimizationProps) {
         />
       </div>
 
-      <div className={cn('grid gap-4', isEpexOnlyView ? 'xl:grid-cols-[1.1fr_0.9fr]' : 'grid-cols-1')}>
+      <div className={cn('grid gap-4', isEpexOnlyView ? 'md:grid-cols-2 xl:grid-cols-[1.1fr_0.9fr]' : 'grid-cols-1')}>
         <CalloutDonut
           data={utilizationDonutData}
           title="Market Selection Distribution"
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketOptimization}
+              contextWidget={ViewAnalysisWidgets.MarketSelectionDistribution}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`${assetSystemGenerationId}_${month}_${year}_Market_Utilization.png`}
           isLoading={utilizationLoading || assetLoading}
           orientation={!isEpexOnlyView ? 'horizontal' : 'vertical'}
@@ -523,6 +567,20 @@ export function AssetMarket(props: MarketOptimizationProps) {
         <DivergentBarChart
           title="Revenue Distribution"
           data={revenueChartData}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketOptimization}
+              contextWidget={ViewAnalysisWidgets.RevenueDistribution}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`market_utilization_${assetSystemGenerationId ?? assetId ?? 'asset'}_${month}_${year}_${selectedStrategy}_revenue_distribution.png`}
           isLoading={revenueDistributionLoading || assetLoading}
           className={cn(!isEpexOnlyView && 'mt-4', 'shadow-none! pt-6 pb-2 px-4 rounded-md')}
@@ -547,6 +605,20 @@ export function AssetMarket(props: MarketOptimizationProps) {
           market_strategy={selectedStrategy}
           rows={computedMarketStatistics ?? []}
           columns={statisTicsColums}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketOptimization}
+              contextWidget={ViewAnalysisWidgets.MarketStatistics}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           loading={marketStatisticsLoading || assetLoading}
           assetId={assetId}
           month={month}
@@ -563,6 +635,20 @@ export function AssetMarket(props: MarketOptimizationProps) {
               title="Market Selected for Charging (Buying)"
               rows={buyingMarkets}
               columns={bestMarketColumns('buy')}
+              customActions={
+                <CommentTrigger
+                  contextModule={CommentModule.ViewAnalysis}
+                  contextTab={ViewAnalysisTabs.MarketOptimization}
+                  contextWidget={ViewAnalysisWidgets.MarketSelectedCharging}
+                  contextType={CommentContextType.Widget}
+                  contextAssetId={assetId}
+                  contextYear={year}
+              contextMonth={month}
+                  variant="icon-only"
+                  className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                  iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                />
+              }
               loading={bestMarketsLoading || assetLoading}
               marketType="buy"
               assetId={assetId}
@@ -574,6 +660,20 @@ export function AssetMarket(props: MarketOptimizationProps) {
               title="Markets Selected for Discharging (selling)"
               rows={sellingMarkets}
               columns={bestMarketColumns('sell')}
+              customActions={
+                <CommentTrigger
+                  contextModule={CommentModule.ViewAnalysis}
+                  contextTab={ViewAnalysisTabs.MarketOptimization}
+                  contextWidget={ViewAnalysisWidgets.MarketSelectedDischarging}
+                  contextType={CommentContextType.Widget}
+                  contextAssetId={assetId}
+                  contextYear={year}
+              contextMonth={month}
+                  variant="icon-only"
+                  className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                  iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                />
+              }
               loading={bestMarketsLoading || assetLoading}
               marketType="sell"
               assetId={assetId}

@@ -380,110 +380,113 @@ export default function EnergyAnalyticsChart({
 
       {chartData.length ? (
         hasVisiblePlottedSeries ? (
-          <div ref={scrollContainerRef} onScroll={handleHorizontalScroll} className="overflow-x-auto overflow-y-hidden">
-            <div style={{width: chartWidth}}>
-              <ResponsiveContainer width="100%" height={410}>
-                <LineChart data={chartData} margin={{top: 0, right: 26, left: 0, bottom: 36}}>
-                  <CartesianGrid stroke="#E5E7EB" strokeDasharray="4 4" vertical={false} />
+          <>
+            <div ref={scrollContainerRef} onScroll={handleHorizontalScroll} className="overflow-x-auto overflow-y-hidden">
+              <div style={{width: chartWidth}}>
+                <ResponsiveContainer width="100%" height={410}>
+                  <LineChart data={chartData} margin={{top: 0, right: 26, left: 0, bottom: 36}}>
+                    <CartesianGrid stroke="#E5E7EB" strokeDasharray="4 4" vertical={false} />
 
-                  <XAxis
-                    dataKey="index"
-                    axisLine={{stroke: '#CBD5E1'}}
-                    tickLine={false}
-                    interval={0}
-                    ticks={xTicks}
-                    tickFormatter={value => {
-                      const point = chartData[Number(value)];
-                      return viewMode === 'day' ? point?.hourLabel : point?.dayLabel;
-                    }}
-                    tick={{fontSize: 11, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
-                    tickMargin={12}
-                    label={{
-                      value: viewMode === 'day' ? 'Hours' : 'Dates',
-                      position: 'insideBottom',
-                      offset: -22,
-                      style: {fill: '#111827', fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
-                    }}
-                  />
-
-                  {visibleMwKeys.length > 0 && (
-                    <YAxis
-                      yAxisId="left"
-                      domain={leftDomain}
+                    <XAxis
+                      dataKey="index"
                       axisLine={{stroke: '#CBD5E1'}}
                       tickLine={false}
-                      tick={{fontSize: 12, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
+                      interval={0}
+                      ticks={xTicks}
+                      tickFormatter={value => {
+                        const point = chartData[Number(value)];
+                        return viewMode === 'day' ? point?.hourLabel : point?.dayLabel;
+                      }}
+                      tick={{fontSize: 11, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
+                      tickMargin={12}
                       label={{
-                        value: 'Power (MW)',
-                        angle: -90,
-                        position: 'insideLeft',
-                        offset: 6.5,
+                        // value: viewMode === 'day' ? 'Hours' : 'Dates',
+                        position: 'insideBottom',
+                        offset: -22,
                         style: {fill: '#111827', fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
                       }}
                     />
-                  )}
 
-                  {hasVisibleRightAxis && (
-                    <YAxis
-                      yAxisId="right"
-                      orientation="right"
-                      domain={rightDomain}
-                      ticks={hasSocOnlyAxis ? [0, 25, 50, 75, 100] : undefined}
-                      axisLine={{stroke: '#CBD5E1'}}
-                      tickLine={false}
-                      tick={{fontSize: 12, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
-                      label={{
-                        value: 'Battery (%)',
-                        angle: 90,
-                        position: 'insideRight',
-                        offset: -4,
-                        style: {fill: '#111827', fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
-                      }}
-                    />
-                  )}
+                    {visibleMwKeys.length > 0 && (
+                      <YAxis
+                        yAxisId="left"
+                        domain={leftDomain}
+                        axisLine={{stroke: '#CBD5E1'}}
+                        tickLine={false}
+                        tick={{fontSize: 12, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
+                        label={{
+                          value: 'Power (MW)',
+                          angle: -90,
+                          position: 'insideLeft',
+                          offset: 6.5,
+                          style: {fill: '#111827', fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
+                        }}
+                      />
+                    )}
 
-                  <Tooltip content={props => <CustomTooltip {...props} />} cursor={{stroke: '#9CA3AF', strokeWidth: 2}} />
+                    {hasVisibleRightAxis && (
+                      <YAxis
+                        yAxisId="right"
+                        orientation="right"
+                        domain={rightDomain}
+                        ticks={hasSocOnlyAxis ? [0, 25, 50, 75, 100] : undefined}
+                        axisLine={{stroke: '#CBD5E1'}}
+                        tickLine={false}
+                        tick={{fontSize: 12, fill: '#475569', fontFamily: 'Inter, sans-serif'}}
+                        label={{
+                          value: 'Battery (%)',
+                          angle: 90,
+                          position: 'insideRight',
+                          offset: -4,
+                          style: {fill: '#111827', fontSize: 12, fontWeight: 600, textAnchor: 'middle'},
+                        }}
+                      />
+                    )}
 
-                  {visibleMwKeys.length > 0 && loadMw !== null && (
-                    <ReferenceLine yAxisId="left" y={loadMw} stroke={colors.load} strokeDasharray="4 4">
-                      <Label value={`Load ${loadMw} MW`} dy={-18} position="insideTopLeft" fill="#475569" fontSize={9} offset={6} />
-                    </ReferenceLine>
-                  )}
-                  {visibleMwKeys.length > 0 && selectedLegendIds.includes('bessPower') && (
-                    <ReferenceLine yAxisId="left" y={0} stroke={colors.zero} strokeDasharray="4 4">
-                      <Label value="0 MW" position="insideTopLeft" fill={colors.zero} fontSize={9} offset={6} />
-                    </ReferenceLine>
-                  )}
-                  {hasVisibleSoc && showThresholdLines && dgOffThreshold !== null && (
-                    <ReferenceLine yAxisId="right" y={dgOffThreshold} stroke={colors.dgOff} strokeDasharray="4 4">
-                      <Label value={`DG OFF ${dgOffThreshold}%`} position="insideTopLeft" fill={colors.dgOff} fontSize={9} offset={6} />
-                    </ReferenceLine>
-                  )}
-                  {hasVisibleSoc && showThresholdLines && dgOnThreshold !== null && (
-                    <ReferenceLine yAxisId="right" y={dgOnThreshold} stroke={colors.dgOn} strokeDasharray="4 4">
-                      <Label value={`DG ON ${dgOnThreshold}%`} position="insideTopLeft" fill={colors.dgOn} fontSize={9} offset={6} />
-                    </ReferenceLine>
-                  )}
+                    <Tooltip content={props => <CustomTooltip {...props} />} cursor={{stroke: '#9CA3AF', strokeWidth: 2}} />
 
-                  {visibleSeries.map(series => (
-                    <Line
-                      key={series.id}
-                      yAxisId={series.yAxisId}
-                      type={series.type}
-                      dataKey={series.id}
-                      name={series.label}
-                      stroke={series.color}
-                      strokeWidth={1}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      dot={false}
-                      activeDot={{r: 4}}
-                    />
-                  ))}
-                </LineChart>
-              </ResponsiveContainer>
+                    {visibleMwKeys.length > 0 && loadMw !== null && (
+                      <ReferenceLine yAxisId="left" y={loadMw} stroke={colors.load} strokeDasharray="4 4">
+                        <Label value={`Load ${loadMw} MW`} dy={-18} position="insideTopLeft" fill="#475569" fontSize={9} offset={6} />
+                      </ReferenceLine>
+                    )}
+                    {visibleMwKeys.length > 0 && selectedLegendIds.includes('bessPower') && (
+                      <ReferenceLine yAxisId="left" y={0} stroke={colors.zero} strokeDasharray="4 4">
+                        <Label value="0 MW" position="insideTopLeft" fill={colors.zero} fontSize={9} offset={6} />
+                      </ReferenceLine>
+                    )}
+                    {hasVisibleSoc && showThresholdLines && dgOffThreshold !== null && (
+                      <ReferenceLine yAxisId="right" y={dgOffThreshold} stroke={colors.dgOff} strokeDasharray="4 4">
+                        <Label value={`DG OFF ${dgOffThreshold}%`} position="insideTopLeft" fill={colors.dgOff} fontSize={9} offset={6} />
+                      </ReferenceLine>
+                    )}
+                    {hasVisibleSoc && showThresholdLines && dgOnThreshold !== null && (
+                      <ReferenceLine yAxisId="right" y={dgOnThreshold} stroke={colors.dgOn} strokeDasharray="4 4">
+                        <Label value={`DG ON ${dgOnThreshold}%`} position="insideTopLeft" fill={colors.dgOn} fontSize={9} offset={6} />
+                      </ReferenceLine>
+                    )}
+
+                    {visibleSeries.map(series => (
+                      <Line
+                        key={series.id}
+                        yAxisId={series.yAxisId}
+                        type={series.type}
+                        dataKey={series.id}
+                        name={series.label}
+                        stroke={series.color}
+                        strokeWidth={1}
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        dot={false}
+                        activeDot={{r: 4}}
+                      />
+                    ))}
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-          </div>
+            <div className="mt-3 text-center text-sm font-semibold text-[#111827]">{viewMode === 'day' ? 'Hours' : 'Dates'}</div>
+          </>
         ) : (
           <div className="flex h-90 items-center justify-center rounded-sm border border-dashed border-border bg-bg-card/40">
             <Text variant="14R" className="text-text-secondary!">

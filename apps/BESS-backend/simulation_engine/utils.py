@@ -1,7 +1,11 @@
+import calendar
 from typing import List, Any, Optional
 import numpy as np
+import pandas as pd
 from redis.asyncio import Redis
 from datetime import datetime, timedelta, timezone
+
+from dtos.simulation_dto import MonthlySimulationMetrics
 
 
 def create_constant_load(load_mw: float):
@@ -109,3 +113,101 @@ def is_within_march_to_october(
     hours_to_add = hour_of_year if zero_indexed else (hour_of_year - 1)
     target_date = base_date + timedelta(hours=hours_to_add)
     return 3 <= target_date.month <= 10
+
+
+def aggregate_monthly_data(
+    simulation_id: int, job_id: int, hourly_data: list[dict]
+) -> list[MonthlySimulationMetrics]:
+
+    data = []
+    year: int = 1990
+
+    for row in hourly_data:
+        data.append(
+            {
+                "timestamp": row.get("timestamp"),
+                "is_dg_running": row.get("is_dg_running"),
+                "dg_to_load": row.get("dg_to_load"),
+                "load_mw": row.get("load_mw"),
+                "solar_curtailed": row.get("solar_curtailed"),
+                "solar_mw": row.get("solar_mw"),
+                "delivery": row.get("delivery"),
+                "green_energy_to_load_mwh": row.get("green_energy_to_load_mwh"),
+            }
+        )
+
+    # Load into DataFrame
+    df = pd.DataFrame(data)
+
+    # Handle empty results gracefully
+    if df.empty:
+        return []
+
+    df["timestamp"] = pd.to_datetime(df["timestamp"])
+    df["month_int"] = df["timestamp"].dt.month
+    year = int(df["timestamp"].dt.year.iloc[0])
+
+    # Booleans for fast counting
+    df["load_active"] = (df["load_mw"] > 0).astype(int)
+    df["delivery_int"] = df["delivery"].astype(int)
+    df["dg_running_int"] = df["is_dg_running"].astype(int)
+    df["delivery_dg_off"] = (df["delivery"] & ~df["is_dg_running"]).astype(int)
+
+    grouped = (
+        df.groupby("month_int")
+        .agg(
+            hours_fully_served=("delivery_int", "sum"),
+            total_load_hours=("load_active", "sum"),
+            green_delivery_hours=("delivery_dg_off", "sum"),
+            generator_hours=("dg_running_int", "sum"),
+            sum_solar_mw=("solar_mw", "sum"),
+            green_energy_to_load_mwh=("green_energy_to_load_mwh", "sum"),
+            dg_to_load_mwh=("dg_to_load", "sum"),
+            curtailed_mwh=("solar_curtailed", "sum"),
+        )
+        .reset_index()
+    )
+
+    # 4. Perform final percentage calculations (with safe division to prevent divide-by-zero errors)
+    grouped["load_met_pct"] = np.where(
+        grouped["total_load_hours"] > 0,
+        (grouped["hours_fully_served"] / grouped["total_load_hours"]) * 100,
+        0.0,
+    )
+
+    grouped["green_energy_pct"] = np.where(
+        grouped["hours_fully_served"] > 0,
+        (grouped["green_delivery_hours"] / grouped["hours_fully_served"]) * 100,
+        0.0,
+    )
+
+    grouped["wastage_energy_pct"] = np.where(
+        grouped["sum_solar_mw"] > 0,
+        (grouped["curtailed_mwh"] / grouped["sum_solar_mw"]) * 100,
+        0.0,
+    )
+
+    grouped["month"] = grouped["month_int"].apply(lambda x: calendar.month_name[x])
+
+    metrics_list = []
+
+    for row in grouped.itertuples(index=False):
+        metric = MonthlySimulationMetrics(
+            simulation_id=simulation_id,
+            job_id=job_id,
+            month=row.month,  # type: ignore
+            load_met_pct=row.load_met_pct,  # type: ignore
+            green_energy_pct=row.green_energy_pct,  # type: ignore
+            wastage_energy_pct=row.wastage_energy_pct,  # type: ignore
+            hours_fully_served=int(row.hours_fully_served),  # type: ignore
+            total_load_hours=int(row.total_load_hours),  # type: ignore
+            generator_hours=int(row.generator_hours),  # type: ignore
+            green_energy_to_load_mwh=row.green_energy_to_load_mwh,  # type: ignore
+            dg_to_load_mwh=row.dg_to_load_mwh,  # type: ignore
+            curtailed_mwh=row.curtailed_mwh,  # type: ignore
+            month_int=row.month_int,  # type: ignore
+            year_int=year,
+        )
+        metrics_list.append(metric)
+
+    return metrics_list

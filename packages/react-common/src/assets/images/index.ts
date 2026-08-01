@@ -22,6 +22,8 @@ import Windmills from "./windmills.png";
 import Zap from "./zap.png";
 import PdfInvoices from "./pdf-invoices.png";
 import CalenderTicket from "./calender-ticket.png";
+import Loading2 from "./loading-2.gif";
+import Verfied from "./verified.gif";
 
 export const Images = {
   authBg: AuthBackground,
@@ -48,4 +50,6 @@ export const Images = {
   zap: Zap,
   pdfInvoices: PdfInvoices,
   calenderTicket: CalenderTicket,
+  loading2: Loading2,
+  verified: Verfied,
 };

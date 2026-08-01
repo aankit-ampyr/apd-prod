@@ -4,3 +4,7 @@ export * from './assetSlice';
 export * from './authSlice';
 export * from './digestSlice';
 export * from './auditLogSlice';
+export * from './invoiceSlice';
+export * from './commentSlice';
+export * from './notificationSlice';
+export * from './analyticsFilterSlice';

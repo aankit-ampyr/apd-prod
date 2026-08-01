@@ -1,15 +1,16 @@
-import {useEffect, useState, type ReactNode} from 'react';
+import {useEffect, useRef, useState, type ReactNode} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {DataTable, FilterGroup} from '@/components';
 import {Badge, Text, Tooltip} from '@/ui-kits';
-import {auditLogs, auditLogTotalPages, auditLogSuccess, auditLogFailure, totalAuditLogResults} from '@/services/redux/selectors';
+import {auditLogs, auditLogTotalPages, auditLogSuccess, auditLogFailure, totalAuditLogResults, auditLogLoading} from '@/services/redux/selectors';
 import {resetAuditLogMessage, auditLogListRequest} from '@/services/redux/slice';
 import type {AuditLog as AuditLogType, DataTableColumn, AuditLogListRequest, SelectInputItem} from '@/interface';
 import {UserRole, NA, AuditModuleLabel, AuditActionLabel, ModuleBadgeColors, AuditLogModules, AuditLogScenario, BESS_USER_ROLES} from '@/constants';
 import {useToast} from '@/hooks';
-import {enumToSelectOptions, formatDate, getErrorMessage, getSuccessMessage, type ErrorCodes, type SuccessCodes} from '@/utils';
+import {enumToSelectOptionsWithValue, formatDate, getErrorMessage, getSuccessMessage, type ErrorCodes, type SuccessCodes} from '@/utils';
 import {format, isValid} from 'date-fns';
-
+import {useContext} from 'react';
+import {WebSocketContext} from '@/context/WebsocketContext';
 /**
  * Page Size for pagination - 100 records per page as per requirements
  */
@@ -23,7 +24,7 @@ const ROLE_OPTIONS = BESS_USER_ROLES.filter(role => role.id !== UserRole.Admin);
 /**
  * Module options for dropdown - Only Project Management and Simulation for BESS
  */
-const MODULE_OPTIONS: SelectInputItem[] = enumToSelectOptions(AuditLogModules, AuditModuleLabel).filter(
+const MODULE_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(AuditLogModules, AuditModuleLabel).filter(
   option => option.id === AuditLogModules.PROJECT_MANAGEMENT_BESS || option.id === AuditLogModules.SIMULATION,
 );
 
@@ -48,11 +49,49 @@ const SIMULATION_ACTIONS = new Set([
   AuditLogScenario.SIZING_SIMULATION_RERAN,
   AuditLogScenario.SIZING_SIMULATION_STOPED,
   AuditLogScenario.SIZING_SIMULATION_RESULT_VIEWED,
+  AuditLogScenario.SIMULATION_CREATED,
+  AuditLogScenario.SIMULATION_DELETED,
+  AuditLogScenario.SIMULATION_EDITED,
+  AuditLogScenario.SIZING_SIMULATION_RAN,
+  AuditLogScenario.SIZING_SIMULATION_RERAN,
+  AuditLogScenario.SIZING_SIMULATION_STOPED,
+  AuditLogScenario.SIZING_SIMULATION_RESULT_VIEWED,
+  // New simulation actions
+  AuditLogScenario.CUSTOM_CONF_EDITED,
+  AuditLogScenario.CUSTOM_CONF_SIMULATION_RUN,
+  AuditLogScenario.CUSTOM_CONF_SIMULATION_RERUN,
+  AuditLogScenario.CUSTOM_CONF_RESULT_VIEWED,
+  AuditLogScenario.CUSTOM_CONF_HOURLY_EXPORTED,
+  AuditLogScenario.CUSTOM_CONF_MONTHLY_EXPORTED,
+  AuditLogScenario.MULTI_YEAR_CONF_EDITED,
+  AuditLogScenario.MULTI_YEAR_SIMULATION_RUN,
+  AuditLogScenario.MULTI_YEAR_SIMULATION_RERUN,
+  AuditLogScenario.MULTI_YEAR_SIMULATION_STOP,
+  AuditLogScenario.MULTI_YEAR_RESULT_VIEWED,
+  AuditLogScenario.MULTI_YEAR_RESULT_EXPORTED,
+  AuditLogScenario.GREEN_ENERGY_CONF_EDITED,
+  AuditLogScenario.GREEN_ENERGY_SIMULATION_RUN,
+  AuditLogScenario.GREEN_ENERGY_SIMULATION_RERUN,
+  AuditLogScenario.GREEN_ENERGY_SIMULATION_STOP,
+  AuditLogScenario.GREEN_ENERGY_RESULT_VIEWED,
+  AuditLogScenario.GREEN_ENERGY_RESULT_EXPORTED,
+  AuditLogScenario.CUSTOM_CONF_CREATED,
+  AuditLogScenario.MULTI_YEAR_CONF_CREATED,
+  AuditLogScenario.GREEN_ENERGY_CONF_CREATED,
+  AuditLogScenario.SOLAR_PROFILE_CREATED,
+  AuditLogScenario.SOLAR_PROFILE_UPDATED,
+  AuditLogScenario.SIZING_SIMULATION_RESULT_EXPORTED,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_CONF_CREATED,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_CONF_UPDATED,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RUN,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RERUN,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_MONTHLY_EXPORTED,
+  AuditLogScenario.DETAILED_GREEN_ENERGY_HOURLY_EXPORTED,
 ]);
-const ACTION_OPTIONS: SelectInputItem[] = enumToSelectOptions(AuditLogScenario, AuditActionLabel).filter(
+
+const ACTION_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(AuditLogScenario, AuditActionLabel).filter(
   option => PROJECT_ACTIONS.has(Number(option.id)) || SIMULATION_ACTIONS.has(Number(option.id)),
 );
-
 /**
  * Filter type for audit log filtering
  */
@@ -71,6 +110,7 @@ type FilterType = {
 };
 
 export function AuditLog() {
+  const {subscribe} = useContext(WebSocketContext);
   // =================
   // hooks
   // =================
@@ -83,6 +123,7 @@ export function AuditLog() {
   const auditLogsData = useSelector(auditLogs);
   const totalPagesData = useSelector(auditLogTotalPages);
   const totalResult = useSelector(totalAuditLogResults);
+  const isLoading = useSelector(auditLogLoading);
   const success = useSelector(auditLogSuccess) as SuccessCodes;
   const failure = useSelector(auditLogFailure) as ErrorCodes;
 
@@ -90,6 +131,9 @@ export function AuditLog() {
   // states
   // =================
   const [page, setPage] = useState(1);
+  const [showGhostLoader, setShowGhostLoader] = useState(true);
+  const hasObservedLoading = useRef(false);
+  const pendingAuditLogList = useRef<typeof auditLogsData | null>(null);
   const [tableMessage, setTableMessage] = useState<string>('');
   const [filter, setFilter] = useState<FilterType>({});
 
@@ -205,6 +249,17 @@ export function AuditLog() {
     return AuditActionLabel[row.action.id] || NA;
   };
 
+  useEffect(() => {
+    const unsubscribe = subscribe(event => {
+      // Audit Log resource
+      if (Number(event.resource_type) !== 14) return;
+
+      fetchAuditLogs();
+    });
+
+    return () => unsubscribe();
+  }, [subscribe, page, filter]);
+
   // =================
   // data
   // =================
@@ -212,7 +267,7 @@ export function AuditLog() {
     {
       name: 'log_id',
       title: 'Log ID',
-      width: {minWidth: '80px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-text-secondary!">
@@ -223,7 +278,7 @@ export function AuditLog() {
     {
       name: 'user_id',
       title: 'User ID',
-      width: {minWidth: '100px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-text-secondary!">
@@ -234,7 +289,7 @@ export function AuditLog() {
     {
       name: 'role',
       title: 'Role',
-      width: {minWidth: '100px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-secondary!">
@@ -245,7 +300,7 @@ export function AuditLog() {
     {
       name: 'resource_id',
       title: 'Resource ID',
-      width: {minWidth: '180px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-secondary!">
@@ -256,14 +311,14 @@ export function AuditLog() {
     {
       name: 'module',
       title: 'Module',
-      width: {minWidth: '180px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => <Badge message={AuditModuleLabel[row.module.id]} color={ModuleBadgeColors[row.module.id] as any} />,
     },
     {
       name: 'action',
       title: 'Action',
-      width: {minWidth: '100px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-text-secondary!">
@@ -274,7 +329,7 @@ export function AuditLog() {
     {
       name: 'before',
       title: 'Before',
-      width: {minWidth: '200px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => {
         const {label, tooltip} = formatAuditData(row.before);
@@ -291,7 +346,7 @@ export function AuditLog() {
     {
       name: 'after',
       title: 'After',
-      width: {minWidth: '200px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => {
         const {label, tooltip} = formatAuditData(row.after);
@@ -308,7 +363,7 @@ export function AuditLog() {
     {
       name: 'timestamp',
       title: 'Date & Time',
-      width: {minWidth: '150px'},
+      width: {minWidth: '170px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-text-secondary! whitespace-pre-wrap">
@@ -348,12 +403,41 @@ export function AuditLog() {
   // side effects
   // =================
   useEffect(() => {
+    if (isLoading) {
+      hasObservedLoading.current = true;
+      return;
+    }
+
+    if (hasObservedLoading.current) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [isLoading]);
+
+  useEffect(() => {
+    pendingAuditLogList.current = auditLogsData;
+    setShowGhostLoader(true);
     fetchAuditLogs();
   }, [filter, page]);
 
   useEffect(() => {
+    if (pendingAuditLogList.current !== auditLogsData) {
+      pendingAuditLogList.current = null;
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [auditLogsData]);
+
+  useEffect(() => {
+    if (hasObservedLoading.current && (success || failure)) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [success, failure]);
+
+  useEffect(() => {
     if (success) {
-      if (!['S-10014'].includes(success)) {
+      if (!['S-10014', 'S-20036'].includes(success)) {
         showToast(getSuccessMessage(success), 'success');
       }
     }
@@ -443,6 +527,9 @@ export function AuditLog() {
         errorMessage={tableMessage}
         onPageChange={setPage}
         stickyHeader
+        loading={showGhostLoader}
+        ghostRowCount={9}
+        tableHeightWhenScrollable={700}
       />
     </div>
   );

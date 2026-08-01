@@ -1,17 +1,27 @@
 from datetime import timedelta, datetime, timezone
 import asyncio
 import traceback
-from typing import Generic, Type, TypeVar, Callable, Awaitable
+from typing import Generic, Optional, Type, TypeVar, Callable, Awaitable
 from sqlalchemy import func, select
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import status
 from python_common.constants.enums import (
     Platform,
     UserRole,
     AuditLogModules,
     AuditLogScenario,
 )
-from python_common.constants.defaults import DUMMY_OTP
+from python_common.constants.defaults import (
+    ACCESS_TOKEN_NAME,
+    DUMMY_OTP,
+    REFRESH_TOKEN_NAME,
+)
 from python_common.dto import OTPRequestPayload, OTPLoginPayload
+from python_common.exceptions.auth_exception import (
+    InvalidPlatformAccess,
+    UserNotAuthenticated,
+)
 from python_common.utils import Res
 from python_common.models.users_models import UserMixin
 from python_common.utils.common_utils import generate_otp
@@ -36,14 +46,13 @@ class AuthService(Generic[T]):
         user_model: Type[T],
         allowed_roles: list[UserRole],
         allowed_platforms: list[Platform],
-        # jwt_life_seconds: int = 900,
-        jwt_life_seconds: int = 86400,
-        refresh_life_seconds: int = 1800,
+        jwt_life_seconds: int = 900,
+        refresh_life_seconds: int = 43200,
         otp_ttl_seconds: int = 300,
         attempts: int = 3,
-        log_func: LoggerType = None,
-        mail_function: Callable[..., Awaitable[None]] = None,
-        template_model: Type = None,
+        log_func: Optional[LoggerType] = None,
+        mail_function: Callable[..., Awaitable[None]] | None = None,
+        template_model: Optional[Type] = None,
     ):
         self.user_model = user_model
         self.template_model = template_model
@@ -62,7 +71,7 @@ class AuthService(Generic[T]):
     def _normalize_email(self, email: str) -> str:
         return email.strip().lower()
 
-    def _check_role_authorized(self, user_role: int):      
+    def _check_role_authorized(self, user_role: int):
         allowed_values = [role.value for role in self.allowed_roles]
         return user_role in allowed_values
 
@@ -135,7 +144,9 @@ class AuthService(Generic[T]):
 
         return attempts, prev_otps
 
-    async def get_otp(self, data: OTPRequestPayload, user_db: AsyncSession):
+    async def get_otp(
+        self, data: OTPRequestPayload, user_db: AsyncSession, redis: Redis
+    ):
         normalized_email = self._normalize_email(data.email)
 
         filters = [
@@ -148,12 +159,16 @@ class AuthService(Generic[T]):
 
         if not user:
             return Res.error(
-                "E-10038", message="User with the given email does not exist"
+                "E-10038",
+                message="User with the given email does not exist",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
-        
+
         if user.role not in [role.value for role in self.allowed_roles]:
-            return Res.error("E-10011", message="You are not authorized to access this platform.")
-        
+            raise InvalidPlatformAccess(
+                "You are not authorized to access this platform"
+            )
+
         # skip role based platform based access check for super admin
         if self.allowed_platform is not None:
             allowed_platform_ids = (
@@ -163,12 +178,14 @@ class AuthService(Generic[T]):
             )
             if not (set(user.platform or []) & set(allowed_platform_ids or [])):
                 return Res.error(
-                    "E-10038", message="User with the given email does not exist"
+                    "E-10038",
+                    message="User with the given email does not exist",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
 
         email = user.email
-        # for super admin do not pass super admin as the role, modify it as admin role so that he/she can access all the admin related apis 
-        # we are disguising super admin as admin 
+        # for super admin do not pass super admin as the role, modify it as admin role so that he/she can access all the admin related apis
+        # we are disguising super admin as admin
         role = user.role
         name = user.name
         user_id = user.user_id
@@ -179,6 +196,7 @@ class AuthService(Generic[T]):
             return Res.error(
                 "E-10011",
                 message="Unauthorized Access! Sorry, we could not verify the user",
+                http_status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
         await self._restore_if_block_expired(user, user_db)
@@ -187,6 +205,7 @@ class AuthService(Generic[T]):
             return Res.error(
                 "E-10039",
                 message="User account is temporarily blocked. Please try again later.",
+                http_status_code=status.HTTP_403_FORBIDDEN,
             )
 
         cache_key = self.format_otp_label(email)  # type: ignore
@@ -207,6 +226,7 @@ class AuthService(Generic[T]):
                     action=AuditLogScenario.USER_DEACTIVATED.value,
                     before=None,
                     after=f"User: {name} exceededs login attempt",
+                    redis=redis,
                 )
 
             try:
@@ -220,6 +240,7 @@ class AuthService(Generic[T]):
             return Res.error(
                 status_code="E-10044",
                 message="Maximum OTP verification attempts exceeded",
+                http_status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             )
 
         otp = DUMMY_OTP if DEBUG else generate_otp()
@@ -257,6 +278,7 @@ class AuthService(Generic[T]):
                 action=AuditLogScenario.OTP_SENT.value,
                 before=None,
                 after=f"OTP sent to registered email",
+                redis=redis,
             )
 
         return Res.success(
@@ -267,7 +289,9 @@ class AuthService(Generic[T]):
             },
         )
 
-    async def verify_otp(self, data: OTPLoginPayload, user_db: AsyncSession):
+    async def verify_otp(
+        self, data: OTPLoginPayload, user_db: AsyncSession, redis: Redis
+    ):
         normalized_email = self._normalize_email(data.email)
         cache_key = self.format_otp_label(normalized_email)
 
@@ -276,6 +300,7 @@ class AuthService(Generic[T]):
             return Res.error(
                 status_code="E-10001",
                 message="cache expired",
+                http_status_code=status.HTTP_410_GONE,
             )
 
         otp = existing_cache.get("otp")
@@ -293,7 +318,9 @@ class AuthService(Generic[T]):
         user = result.scalars().first()
         if not user:
             return Res.error(
-                "E-10038", message="User with the given email does not exist"
+                status_code="E-10038",
+                message="User with the given email does not exist",
+                http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
         if self.allowed_platform is not None:
@@ -304,13 +331,16 @@ class AuthService(Generic[T]):
             )
             if not (set(user.platform or []) & set(allowed_platform_ids or [])):
                 return Res.error(
-                    "E-10038", message="User with the given email does not exist"
+                    status_code="E-10038",
+                    message="User with the given email does not exist",
+                    http_status_code=status.HTTP_404_NOT_FOUND,
                 )
-            
+
         if not user.status:
             return Res.error(
                 "E-10039",
                 message="User account is temporarily blocked. Please try again later.",
+                http_status_code=status.HTTP_403_FORBIDDEN,
             )
 
         await self._restore_if_block_expired(user, user_db)
@@ -333,6 +363,7 @@ class AuthService(Generic[T]):
                     action=AuditLogScenario.USER_DEACTIVATED.value,
                     before=None,
                     after=f"User {email} exceededs login attempt",
+                    redis=redis,
                 )
 
             try:
@@ -345,8 +376,9 @@ class AuthService(Generic[T]):
             return Res.error(
                 status_code="E-10044",
                 message="Maximum OTP verification attempts exceeded",
+                http_status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             )
-        
+
         is_dummy_debug_otp = DEBUG and data.otp == DUMMY_OTP
         if (otp != data.otp) and not is_dummy_debug_otp:
             # reduce the attempts
@@ -369,6 +401,7 @@ class AuthService(Generic[T]):
                     before="OTP verification pending",
                     resource_id=user_id,
                     after="Invalid OTP entered",
+                    redis=redis,
                 )
 
             return Res.error(
@@ -376,7 +409,8 @@ class AuthService(Generic[T]):
                 data={
                     "otp_attempts": attempts,
                 },
-                message="OTP expired",
+                message="OTP is invalid",
+                http_status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
         expires_in = existing_cache.get("expires_in")
@@ -400,19 +434,28 @@ class AuthService(Generic[T]):
                     "otp_attempts": attempts,
                 },
                 message="OTP expired",
+                http_status_code=status.HTTP_410_GONE,
             )
 
         if not self._check_role_authorized(user.role):
             return Res.error(
-                "E-10011",
+                status_code="E-10011",
                 message="Unauthorized Access! Sorry, we could not verify the user",
+                http_status_code=status.HTTP_401_UNAUTHORIZED,
             )
+
+        a_expires = datetime.now(timezone.utc) + timedelta(
+            seconds=self.jwt_life_seconds
+        )
+        r_expires = datetime.now(timezone.utc) + timedelta(
+            seconds=self.refresh_life_seconds
+        )
 
         access_token = create_access_token(
             email=user.email,
             user_id=user.id,
             name=user.name,
-            role = user.role,
+            role=user.role,
             platform=user.platform,
             expires_delta=timedelta(seconds=self.jwt_life_seconds),
         )
@@ -421,7 +464,7 @@ class AuthService(Generic[T]):
             email=user.email,
             user_id=user.id,
             name=user.name,
-            role =user.role,
+            role=user.role,
             platform=user.platform,
             expires_delta=timedelta(seconds=self.refresh_life_seconds),
         )
@@ -454,23 +497,46 @@ class AuthService(Generic[T]):
                 action=AuditLogScenario.LOGIN_SUCCESS.value,
                 before="Not logged in",
                 after=f"User: {user_name} logged in successfully",
+                redis=redis,
             )
 
         await user_db.commit()
 
-        return Res.success(
+        response = Res.success(
             "S-10018",
             data=data,
         )
 
-    async def refresh_token(self, refresh_token: str):
+        response.set_cookie(
+            key=ACCESS_TOKEN_NAME,
+            value=access_token,
+            httponly=True,
+            expires=a_expires,
+            samesite="lax",
+        )
+
+        response.set_cookie(
+            key=REFRESH_TOKEN_NAME,
+            value=refresh_token,
+            httponly=True,
+            expires=r_expires,
+            samesite="lax",
+        )
+
+        return response
+
+    async def refresh_token(self, refresh_token: Optional[str]):
         try:
+            if not refresh_token:
+                raise UserNotAuthenticated("Authorization header missing or invalid")
+
             payload = decode_token(refresh_token)
             email = payload.get("sub")
-            user_id = payload.get("user_id")
+            user_id = payload.get("id")
             role = payload.get("role")
             platform = payload.get("platform")
             name = payload.get("name")
+
             access_token = create_access_token(
                 email=email,
                 user_id=user_id,
@@ -480,7 +546,11 @@ class AuthService(Generic[T]):
                 expires_delta=timedelta(seconds=self.jwt_life_seconds),
             )
 
-            return Res.success(
+            a_expires = datetime.now(timezone.utc) + timedelta(
+                seconds=self.jwt_life_seconds
+            )
+
+            response = Res.success(
                 status="success",
                 status_code="S-10035",
                 data={
@@ -488,23 +558,27 @@ class AuthService(Generic[T]):
                     "email": email,
                     "username": name,
                     "platform": platform,
-                    "access_token": access_token,
-                    "expiry_for_access_token": int(
-                        (
-                            datetime.now(timezone.utc)
-                            + timedelta(seconds=self.jwt_life_seconds)
-                        ).timestamp()
-                    ),
                 },
             )
+
+            response.set_cookie(
+                key=ACCESS_TOKEN_NAME,
+                value=access_token,
+                httponly=True,
+                expires=a_expires,
+                samesite="lax",
+            )
+
+            return response
 
         except Exception:
             return Res.error(
                 status_code="E-10106",
                 message="Invalid or expired refresh token",
+                http_status_code=status.HTTP_401_UNAUTHORIZED,
             )
 
-    async def logout(self, current_user: dict, db: AsyncSession):
+    async def logout(self, current_user: dict, db: AsyncSession, redis: Redis):
         user_id = current_user.get("user_id")
         user_role = current_user.get("role")
         user_name = current_user.get("name")
@@ -519,9 +593,25 @@ class AuthService(Generic[T]):
                 before="Logged in",
                 after=f"User: {user_name} logged out successfully",
                 db=db,
+                redis=redis,
             )
             await db.commit()
 
-        return Res.success("S-10092",
+        response = Res.success(
+            "S-10092",
             message="Logged out successfully",
         )
+
+        response.delete_cookie(
+            key=ACCESS_TOKEN_NAME,
+            httponly=True,
+            samesite="lax",
+        )
+
+        response.delete_cookie(
+            key=REFRESH_TOKEN_NAME,
+            httponly=True,
+            samesite="lax",
+        )
+
+        return response

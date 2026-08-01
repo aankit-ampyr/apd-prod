@@ -18,7 +18,7 @@ export const useDetailedGreenEnergySimulation = ({simulationId, onSimulationComp
   const dispatch = useDispatch();
 
   const {subscribe} = useContext(WebSocketContext);
-  const {isAnySimulationRunning, setIsDetailedGreenAnalysisRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, setIsDetailedGreenAnalysisRunning, runningSimulationId} = useSimulationStatus() ?? {};
 
   const CUSTOM_SIMULATION_JOB_STORAGE_KEY = `${SIMULATION_JOB_STORAGE_KEY}_custom_simulation`;
 
@@ -43,8 +43,6 @@ export const useDetailedGreenEnergySimulation = ({simulationId, onSimulationComp
 
   useEffect(() => {
     const unsubscribe = subscribe(event => {
-      console.log('CUSTOM HOOK', event.resource_type, ActionType[event.action_id] || event.action_id);
-
       if (Number(event.resource_type) !== 13) {
         return;
       }
@@ -132,5 +130,6 @@ export const useDetailedGreenEnergySimulation = ({simulationId, onSimulationComp
     handleRunSimulation,
     isBlocked,
     isSimulationRunning,
+    setIsSimulationRunning,
   };
 };

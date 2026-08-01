@@ -41,6 +41,7 @@ app.add_middleware(
         "/debug/simulation/export",
         "/api/v1/auth/login/send-otp",
         "/api/v1/auth/login/verify-otp",
+        "/api/v1/auth/refresh",
     },
 )
 

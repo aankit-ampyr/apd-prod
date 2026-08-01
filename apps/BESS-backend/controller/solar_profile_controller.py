@@ -1,5 +1,7 @@
 from fastapi import Depends, UploadFile, File
+from redis.asyncio import Redis
 
+from context.dependency import get_redis_conn
 from db.dependencies import get_bess_db, allowed_roles
 from constants.enums import UserRole
 from dtos.solar_profile_dto import SolarProfileComputeRequest
@@ -47,6 +49,7 @@ class SolarProfileController:
         bess_db=Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.compute_and_save_solar_profile(
             bess_db=bess_db,
@@ -54,6 +57,7 @@ class SolarProfileController:
             payload=payload,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_details(

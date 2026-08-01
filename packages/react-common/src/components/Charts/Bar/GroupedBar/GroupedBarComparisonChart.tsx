@@ -48,6 +48,7 @@ export type GroupedBarComparisonDataPoint = {
   categoryId: ChartId;
   filterId: ChartId;
   values: Record<string, number | undefined>;
+  commentCounts?: Record<string, number>;
 };
 
 export type GroupedBarComparisonData = {
@@ -64,8 +65,10 @@ export type GroupedBarComparisonTooltipSeries = {
 
 export type GroupedBarComparisonTooltipDetails = {
   baseLabel: string;
+  categoryId: string;
   baseSeries: GroupedBarComparisonTooltipSeries | null;
   comparisonSeries: GroupedBarComparisonTooltipSeries | null;
+  filterId: string;
 };
 
 export interface GroupedBarComparisonChartProps {
@@ -85,6 +88,7 @@ export interface GroupedBarComparisonChartProps {
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
   showBarValues?: boolean;
+  tooltipInteractionMode?: "hover" | "item";
   customTooltipRenderer?: (
     props: GroupedBarComparisonTooltipDetails,
   ) => React.ReactNode;
@@ -124,6 +128,12 @@ export interface GroupedBarComparisonChartProps {
     offset?: number;
     angle?: number;
   };
+  customActions?: React.ReactNode;
+  onBadgeClick?: (
+    categoryId: string,
+    seriesId: string,
+    filterId: string,
+  ) => void;
 }
 
 const DEFAULT_SERIES_COLORS = ["#8376C9", "#F5A62A", "#1C7ED6", "#49A078"];
@@ -277,6 +287,7 @@ export function GroupedBarComparisonChart(
     isLoading = false,
     isFullScreenOverride = false,
     showBarValues = false,
+    tooltipInteractionMode = "hover",
     barGap = 8,
     barCategoryGap = 24,
     xAxisLabelProps,
@@ -289,6 +300,8 @@ export function GroupedBarComparisonChart(
     comparisonNegativeColor = DEFAULT_COMPARISON_NEGATIVE_COLOR,
     comparisonPositiveHoverColor,
     comparisonNegativeHoverColor,
+    customActions,
+    onBadgeClick,
   } = props;
 
   /**
@@ -337,12 +350,16 @@ export function GroupedBarComparisonChart(
             item.filterId === selectedFilterId,
         );
 
-        return data.series.reduce<Record<string, string | number>>(
+        return data.series.reduce<Record<string, any>>(
           (row, series) => ({
             ...row,
             [series.id]: point?.values?.[series.id] ?? emptyValue,
           }),
-          { label: category.label },
+          {
+            label: category.label,
+            categoryId: category.id,
+            commentCounts: point?.commentCounts,
+          },
         );
       }),
     [data, emptyValue, selectedFilterId],
@@ -610,11 +627,13 @@ export function GroupedBarComparisonChart(
       baseLabel: String(
         rawTooltipProps.label ?? tooltipPayload[0]?.payload?.label ?? "",
       ),
+      categoryId: String(tooltipPayload[0]?.payload?.categoryId ?? ""),
       baseSeries: buildTooltipSeries(resolvedBaseSeriesId, tooltipPayload),
       comparisonSeries: buildTooltipSeries(
         resolvedComparisonSeriesId,
         tooltipPayload,
       ),
+      filterId: String(selectedFilterId),
     };
 
     if (customTooltipRenderer) {
@@ -643,6 +662,45 @@ export function GroupedBarComparisonChart(
     }
   }, [defaultFilterId, filters, selectedFilterId]);
 
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    left: number;
+    top: number;
+    payload: any[];
+  } | null>(null);
+  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showComparisonTooltip = (
+    event: React.MouseEvent<SVGPathElement>,
+    payload: any[],
+  ) => {
+    if (tooltipInteractionMode !== "item") return;
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+      tooltipTimeout.current = null;
+    }
+    // Use chartHostRef (the relative div containing the chart and tooltip overlay)
+    // This stays correct even when the chart is scrolled horizontally
+    const containerRect = chartHostRef.current?.getBoundingClientRect();
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    if (!containerRect || !targetRect) return;
+    setHoverTooltip({
+      left: targetRect.left - containerRect.left + targetRect.width / 2,
+      top: targetRect.top - containerRect.top - 8,
+      payload,
+    });
+  };
+
+  const hideComparisonTooltip = () => {
+    if (tooltipInteractionMode !== "item") return;
+    if (onBadgeClick) {
+      tooltipTimeout.current = setTimeout(() => {
+        setHoverTooltip(null);
+      }, 300);
+    } else {
+      setHoverTooltip(null);
+    }
+  };
+
   return (
     <div
       ref={chartRef}
@@ -658,6 +716,7 @@ export function GroupedBarComparisonChart(
         {!isLoading && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-4">
             <div className="flex items-center gap-3 chart-actions">
+              {customActions}
               <IconButton
                 name="download"
                 size={20}
@@ -724,7 +783,10 @@ export function GroupedBarComparisonChart(
         isLoading={isLoading}
         fallback={<GroupedBarChartSkeleton />}
       >
-        <div ref={chartHostRef} className={cn("h-105 w-full", chartClassName)}>
+        <div
+          ref={chartHostRef}
+          className={cn("h-105 w-full relative", chartClassName)}
+        >
           <ResponsiveContainer width="100%" height="100%">
             <BarChart
               data={chartData}
@@ -787,13 +849,15 @@ export function GroupedBarComparisonChart(
                   }}
                 />
               </YAxis>
-              <Tooltip
-                animationDuration={0}
-                content={renderTooltip as any}
-                shared={false}
-                cursor={{ fill: "transparent" }}
-                wrapperStyle={{ outline: "none", pointerEvents: "none" }}
-              />
+              {tooltipInteractionMode === "hover" && (
+                <Tooltip
+                  animationDuration={0}
+                  content={renderTooltip as any}
+                  shared={false}
+                  cursor={{ fill: "transparent" }}
+                  wrapperStyle={{ outline: "none", pointerEvents: "none" }}
+                />
+              )}
               {data.series.map((series, index) => {
                 return (
                   <Bar
@@ -849,17 +913,107 @@ export function GroupedBarComparisonChart(
                         isHovered,
                       );
 
+                      const categoryId = shapeProps?.payload?.categoryId;
+                      const commentCount =
+                        shapeProps?.payload?.commentCounts?.[series.id];
+                      const categoryCommentCount =
+                        shapeProps?.payload?.commentCounts?._category;
+
+                      const baseValue = baseSeriesId
+                        ? Number(shapeProps?.payload?.[baseSeriesId] ?? 0)
+                        : 0;
+                      const compValue = comparisonSeriesId
+                        ? Number(shapeProps?.payload?.[comparisonSeriesId] ?? 0)
+                        : 0;
+                      const highestSeriesId =
+                        compValue > baseValue
+                          ? comparisonSeriesId
+                          : baseSeriesId;
+
+                      const showCategoryBadge =
+                        categoryCommentCount &&
+                        categoryCommentCount > 0 &&
+                        series.id === highestSeriesId;
+                      const displayCommentCount = showCategoryBadge
+                        ? categoryCommentCount
+                        : commentCount;
+                      const hasBadge =
+                        (commentCount && commentCount > 0) || showCategoryBadge;
+
+                      const badgeXOffset = showCategoryBadge
+                        ? series.id === baseSeriesId
+                          ? numericWidth + barGap / 2
+                          : -barGap / 2
+                        : numericWidth / 2;
+
+                      // Build payload for tooltip
+                      const tooltipPayload = [
+                        {
+                          dataKey: series.id,
+                          payload: shapeProps.payload,
+                          value: numericValue,
+                          name: series.label,
+                        },
+                      ];
+
                       return (
-                        <path
-                          d={path}
-                          fill={barColor}
-                          onMouseEnter={() => setHoveredBar(barKey)}
-                          onMouseLeave={() => setHoveredBar(null)}
-                          style={{
-                            cursor: "pointer",
-                            transition: "fill 0.15s ease",
-                          }}
-                        />
+                        <g>
+                          <path
+                            d={path}
+                            fill={barColor}
+                            onMouseEnter={(e) => {
+                              setHoveredBar(barKey);
+                              showComparisonTooltip(e, tooltipPayload);
+                            }}
+                            onMouseLeave={() => {
+                              setHoveredBar(null);
+                              hideComparisonTooltip();
+                            }}
+                            style={{
+                              cursor: "pointer",
+                              transition: "fill 0.15s ease",
+                            }}
+                          />
+                          {hasBadge ? (
+                            <g
+                              transform={`translate(${numericX + badgeXOffset}, ${numericY - (showBarValues ? 44 : 20)})`}
+                              className={cn("pointer-events-none", {
+                                "cursor-pointer pointer-events-auto":
+                                  !!onBadgeClick,
+                              })}
+                              onClick={(e) => {
+                                if (onBadgeClick && categoryId) {
+                                  e.stopPropagation();
+                                  onBadgeClick(
+                                    String(categoryId),
+                                    String(series.id),
+                                    String(selectedFilterId),
+                                  );
+                                }
+                              }}
+                            >
+                              <foreignObject
+                                x={-15}
+                                y={-15}
+                                width="30"
+                                height="30"
+                                className="overflow-visible"
+                              >
+                                <div className="relative flex items-center justify-center w-full h-full rounded-full border-[0.8px] border-[#E5F2F0] bg-white shadow-sm group hover:opacity-80 transition-opacity">
+                                  <Icon
+                                    name="message"
+                                    className="w-[14px] h-[14px] text-[#088477]"
+                                  />
+                                  <span className="absolute -top-1.5 -right-1.5 bg-[#2F9C8F] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm z-10 leading-none">
+                                    {displayCommentCount > 99
+                                      ? "99+"
+                                      : displayCommentCount}
+                                  </span>
+                                </div>
+                              </foreignObject>
+                            </g>
+                          ) : null}
+                        </g>
                       );
                     }}
                   >
@@ -879,6 +1033,33 @@ export function GroupedBarComparisonChart(
               })}
             </BarChart>
           </ResponsiveContainer>
+
+          {tooltipInteractionMode === "item" && hoverTooltip && (
+            <div
+              className="absolute z-50"
+              style={{
+                left: hoverTooltip.left,
+                top: hoverTooltip.top,
+                transform: "translate(-50%, -100%)",
+                pointerEvents: onBadgeClick ? "auto" : "none",
+              }}
+              onMouseEnter={() => {
+                if (tooltipTimeout.current) {
+                  clearTimeout(tooltipTimeout.current);
+                  tooltipTimeout.current = null;
+                }
+              }}
+              onMouseLeave={() => {
+                setHoverTooltip(null);
+              }}
+            >
+              {renderTooltip({
+                active: true,
+                payload: hoverTooltip.payload,
+                label: hoverTooltip.payload[0]?.payload?.label,
+              })}
+            </div>
+          )}
         </div>
       </WithFallback>
     </div>
@@ -965,6 +1146,7 @@ export interface RevenueStreamComparisonChartProps {
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
   showBarValues?: boolean;
+  tooltipInteractionMode?: "hover" | "item";
 }
 
 export function RevenueStreamComparisonChart({
@@ -1012,5 +1194,3 @@ export function RevenueStreamComparisonChart({
     />
   );
 }
-
-

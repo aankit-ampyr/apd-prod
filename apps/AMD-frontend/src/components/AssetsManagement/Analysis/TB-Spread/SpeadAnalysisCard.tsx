@@ -1,5 +1,7 @@
 import {Icon, Skeleton, Text, Tooltip, TooltipPosition} from '@/ui-kits';
 import {cn, WithFallback} from '@lazarus/react-common';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 
 type TBSpreadAnalysisCardColorVariants = 'orange' | 'blue' | 'green' | 'yellow' | 'purple';
 type TBSpreadAnalysisCardColorPallette = Pick<
@@ -88,6 +90,8 @@ export function TBSpreadAnalysisCards(TBSpreadAnalysisCardProps: TBSpreadAnalysi
   }
 
   const pallete = getResolvedColorPallette();
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
 
   return (
     <div
@@ -99,10 +103,15 @@ export function TBSpreadAnalysisCards(TBSpreadAnalysisCardProps: TBSpreadAnalysi
               background: `linear-gradient(to bottom, ${pallete.backgroundGradientStart}, ${pallete.backgroundGradientEnd})`,
             }
       }
-      className="px-6 py-4 border gap-4 shrink-0 flex flex-col border-border rounded-lg">
+      className={cn('py-4 border gap-4 shrink-0 flex flex-col border-border rounded-lg', isTablet ? 'px-3' : 'px-6')}>
       <WithFallback isLoading={isLoading} fallback={<Skeleton className="h-5! w-[50%] rounded-full" />}>
         <div className="flex items-start justify-between gap-1">
-          <Text variant="16M" className="text-text-secondary!">
+          <Text
+            variant="free"
+            className={cn(
+              'text-text-secondary! font-InterMedium',
+              isTablet ? 'text-[13px] leading-snug' : 'text-[16px]',
+            )}>
             {title}
           </Text>
           <div className="relative group mt-1">
@@ -113,12 +122,18 @@ export function TBSpreadAnalysisCards(TBSpreadAnalysisCardProps: TBSpreadAnalysi
       </WithFallback>
       <WithFallback isLoading={isLoading} fallback={<Skeleton className="h-5! w-[70%] rounded-full mt-2" />}>
         {typeof value === 'string' && (
-          <div className={cn("flex gap-2 items-center", renderUnitToBottom && "flex-col items-start gap-0")}>
-            <Text variant="h3" className="font-InterBold!" style={{color: pallete.valueColor}}>
+          <div className={cn('flex items-baseline', (isTablet || renderUnitToBottom) ? 'gap-1 flex-wrap' : 'gap-2')}>
+            <Text
+              variant="free"
+              className={cn('font-InterBold!', isTablet ? 'text-[22px]' : 'text-[28px]')}
+              style={{color: pallete.valueColor}}>
               {value}
             </Text>
             {unit && (
-              <Text variant="18R" style={{color: pallete.valueColor}}>
+              <Text
+                variant="free"
+                className={cn(isTablet ? 'text-[14px]' : 'text-[18px]')}
+                style={{color: pallete.valueColor}}>
                 {unit}
               </Text>
             )}

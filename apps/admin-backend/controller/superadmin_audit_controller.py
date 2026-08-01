@@ -43,10 +43,10 @@ class SuperAdminAuditController:
                 end_day = datetime.strptime(end_date, "%Y-%m-%d")
                 parsed_end = end_day + timedelta(days=1) - timedelta(microseconds=1)
         except ValueError:
-            return Res.error("E-10026", message="Invalid date format. Use YYYY-MM-DD")
+            return Res.error("E-10026", message="Invalid date format. Use YYYY-MM-DD", http_status_code=400)
 
         if parsed_start and parsed_end and parsed_start > parsed_end:
-            return Res.error("E-10026", message="Invalid date range")
+            return Res.error("E-10026", message="Invalid date range", http_status_code=400)
 
         # 2. Call Service
         return await self.service.get_audit_logs(

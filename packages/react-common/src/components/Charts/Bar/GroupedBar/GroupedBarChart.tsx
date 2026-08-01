@@ -1,5 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -15,7 +14,7 @@ import {
 
 import { useChartsActionV2 } from "../../../../hooks";
 import type { SelectInputItem } from "../../../../interface";
-import { IconButton, SelectInput, Skeleton, Text } from "../../../../ui-kit";
+import { IconButton, SelectInput, Skeleton, Text, Icon } from "../../../../ui-kit";
 import { cn } from "../../../../utils";
 import { WithFallback } from "../../../SkelatonWrapper";
 
@@ -42,6 +41,7 @@ export type GroupedBarChartDataPoint = {
   categoryId: ChartId;
   filterId?: ChartId;
   values: Record<string, number | undefined>;
+  commentCounts?: Record<string, number>;
 };
 
 export type GroupedBarChartData = {
@@ -83,6 +83,7 @@ export interface GroupedBarChartProps {
   emptyValue?: number;
   formatValue?: (value: number) => string;
   formatYAxisTick?: (value: string | number) => string;
+  customActions?: React.ReactNode;
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
   showBarValues?: boolean;
@@ -124,6 +125,7 @@ export interface GroupedBarChartProps {
     offset?: number;
     angle?: number;
   };
+  onBadgeClick?: (categoryId: ChartId, seriesId: string) => void;
 }
 
 const EMPTY_FILTERS: GroupedBarChartFilter[] = [];
@@ -258,6 +260,7 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
     formatYAxisTick = (v) => v,
     isLoading = false,
     isFullScreenOverride = false,
+    customActions,
     showBarValues = false,
     tooltipMode = "bar",
     renderTooltip,
@@ -272,6 +275,7 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
     minCategoryWidth = 72,
     xAxisLabelProps,
     yAxisLabelProps,
+    onBadgeClick,
   } = props;
 
   const { chartRef, handleDownLoad, onMaximize, onMinimize } =
@@ -320,13 +324,15 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
         return item.filterId === selectedFilterId;
       });
 
-      return data.series.reduce<Record<string, string | number>>(
+      return data.series.reduce<Record<string, any>>(
         (row, series) => {
           if (!hasOwnValue(point?.values, series.id)) return row;
 
           return {
             ...row,
             [series.id]: point?.values?.[series.id] ?? emptyValue,
+            commentCounts: point?.commentCounts,
+            categoryId: category.id,
           };
         },
         { label: category.label },
@@ -610,31 +616,22 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
   }
 
   function getTooltipDetails(
-    rawTooltipProps: any,
+    payload: any,
+    activeSeriesId?: string,
   ): GroupedBarChartTooltipDetails {
-    const payload = rawTooltipProps.payload ?? [];
-    const categoryLabel = String(
-      rawTooltipProps.label ?? payload[0]?.payload?.label ?? "",
-    );
+    const categoryLabel = String(payload?.label ?? "");
     const category = categoryByLabel.get(categoryLabel);
-    const activeSeriesId = String(payload[0]?.dataKey ?? "");
 
     const items = data.series.flatMap((series) => {
-      const payloadItem = payload.find(
-        (item: any) => String(item?.dataKey) === series.id,
-      );
-      if (!hasOwnValue(payloadItem?.payload, series.id)) return [];
-
-      const value = Number(
-        payloadItem?.payload?.[series.id] ?? payloadItem?.value ?? 0,
-      );
+      const value = Number(payload?.[series.id] ?? 0);
+      if (!Number.isFinite(value)) return [];
 
       return [
         {
           seriesId: series.id,
           label: series.label,
           color: series.color,
-          value: Number.isFinite(value) ? value : 0,
+          value,
         },
       ];
     });
@@ -651,7 +648,10 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
   function renderTooltipContent(rawTooltipProps: any) {
     if (!rawTooltipProps?.active) return null;
 
-    const details = getTooltipDetails(rawTooltipProps);
+    const details = getTooltipDetails(
+      rawTooltipProps.payload[0]?.payload,
+      rawTooltipProps.payload[0]?.dataKey,
+    );
     if (renderTooltip) return renderTooltip(details);
 
     return (
@@ -751,10 +751,11 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
         {header}
         {!isLoading && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-4">
-            <div className="flex items-center gap-3 chart-actions">
+            <div className="flex shrink-0 items-center gap-3 flex-nowrap chart-actions">
+              {customActions}
               <IconButton
                 name="download"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={handleDownLoad}
@@ -762,7 +763,7 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
               {!isFullScreenOverride ? (
                 <IconButton
                   name="maximize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMaximize}
@@ -818,7 +819,6 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
       >
         <div className="flex w-full h-105">
           <div
-            // style={{ width: Y_AXIS_WIDTH }}
             className="relative flex mt-3 pb-3.5 gap-3"
           >
             <div className="absolute bg-border top-0 bottom-6.5 w-px right-0" />
@@ -847,14 +847,6 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
               chartClassName,
             )}
             onMouseLeave={clearBarTooltip}
-            onMouseMove={(event) => {
-              if (tooltipMode !== "bar") return;
-
-              const target = event.target as HTMLElement | null;
-              if (target?.tagName?.toLowerCase() === "path") return;
-
-              clearBarTooltip();
-            }}
           >
             <div
               className="relative h-full"
@@ -892,7 +884,7 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
                       cursor={{ fill: "transparent" }}
                       wrapperStyle={{
                         outline: "none",
-                        pointerEvents: "none",
+                        pointerEvents: "auto",
                       }}
                     />
                   ) : null}
@@ -935,53 +927,83 @@ export function GroupedBarChart(props: GroupedBarChartProps) {
                         );
 
                         if (!path) return <g />;
-
+  
+                        const commentCount = shapeProps.payload?.commentCounts?.[series.id];
+  
                         return (
-                          <path
-                            d={path}
-                            fill={
-                              hoveredBar === barKey
-                                ? (series.hoverColor ?? series.color)
-                                : series.color
-                            }
-                            onMouseEnter={() => {
-                              setHoveredBar(barKey);
-                              if (tooltipMode === "bar") {
-                                const details = buildTooltipDetailsFromRow(
-                                  shapeProps.payload ?? {},
-                                  series.id,
-                                );
-                                setHoveredTooltipDetails(details);
-                                setHoveredTooltipPosition(
-                                  getBarTooltipPosition(shapeProps),
-                                );
+                          <g>
+                            <path
+                              d={path}
+                              fill={
+                                hoveredBar === barKey
+                                  ? (series.hoverColor ?? series.color)
+                                  : series.color
                               }
-                            }}
-                            onMouseMove={() => {
-                              if (tooltipMode === "bar") {
-                                const details = buildTooltipDetailsFromRow(
-                                  shapeProps.payload ?? {},
-                                  series.id,
-                                );
-                                setHoveredTooltipDetails(details);
+                              onMouseEnter={() => {
                                 setHoveredBar(barKey);
-                                setHoveredTooltipPosition(
-                                  getBarTooltipPosition(shapeProps),
-                                );
-                              }
-                            }}
-                            onMouseLeave={() => {
-                              setHoveredBar(null);
-                              if (tooltipMode === "bar") {
-                                setHoveredTooltipDetails(null);
-                                setHoveredTooltipPosition(null);
-                              }
-                            }}
-                            style={{
-                              cursor: "pointer",
-                              transition: "fill 0.15s ease",
-                            }}
-                          />
+                                if (tooltipMode === "bar") {
+                                  const details = getTooltipDetails(
+                                    shapeProps.payload,
+                                    series.id,
+                                  );
+                                  setHoveredTooltipDetails(details);
+                                  setHoveredTooltipPosition(
+                                    getBarTooltipPosition(shapeProps),
+                                  );
+                                }
+                              }}
+                              onMouseMove={() => {
+                                if (tooltipMode === "bar") {
+                                  const details = getTooltipDetails(
+                                    shapeProps.payload,
+                                    series.id,
+                                  );
+                                  setHoveredTooltipDetails(details);
+                                  setHoveredBar(barKey);
+                                  setHoveredTooltipPosition(
+                                    getBarTooltipPosition(shapeProps),
+                                  );
+                                }
+                              }}
+                              onMouseLeave={() => {
+                                setHoveredBar(null);
+                                if (tooltipMode === "bar") {
+                                  setHoveredTooltipDetails(null);
+                                  setHoveredTooltipPosition(null);
+                                }
+                              }}
+                              style={{
+                                cursor: "pointer",
+                                transition: "fill 0.15s ease",
+                              }}
+                            />
+                            {commentCount && commentCount > 0 ? (
+                              <g
+                                transform={`translate(${geometry.x + geometry.width / 2}, ${geometry.y - 20})`}
+                                className={cn("pointer-events-none", {
+                                  "cursor-pointer pointer-events-auto": !!props.onBadgeClick,
+                                })}
+                                onClick={(e) => {
+                                  if (props.onBadgeClick) {
+                                    e.stopPropagation();
+                                    props.onBadgeClick(shapeProps.payload.categoryId, series.id);
+                                  }
+                                }}
+                              >
+                                <foreignObject x={-15} y={-15} width="30" height="30" className="overflow-visible">
+                                  <div className="relative flex items-center justify-center w-full h-full rounded-full border-[0.8px] border-[#E5F2F0] bg-white shadow-sm group hover:opacity-80 transition-opacity">
+                                    <Icon
+                                      name="message"
+                                      className="w-[14px] h-[14px] text-[#088477]"
+                                    />
+                                    <span className="absolute -top-1.5 -right-1.5 bg-[#2F9C8F] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm z-10 leading-none">
+                                      {commentCount > 99 ? "99+" : commentCount}
+                                    </span>
+                                  </div>
+                                </foreignObject>
+                              </g>
+                            ) : null}
+                          </g>
                         );
                       }}
                     >

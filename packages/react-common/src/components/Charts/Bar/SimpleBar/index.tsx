@@ -55,13 +55,12 @@ interface SimpleBarChartProps {
   yAxisProps?: YAxisProps;
   xAxisProps?: XAxisProps;
   tickCount?: number;
-  refferenceLine?:
-    | boolean
-    | {
-        value: number;
-        label: string;
-        color: string;
-      };
+  refferenceLine?: {
+    value: number;
+    label: string;
+    color: string;
+  };
+  customActions?: React.ReactNode;
   yDomainMax?: number;
   yDomainUpperPadding?: number;
   xTickFormatter?: (value: string) => string;
@@ -93,7 +92,8 @@ export function SimpleBarChart(props: SimpleBarChartProps) {
     chartMargins,
     xAxisProps,
     yAxisProps,
-    refferenceLine = false,
+    refferenceLine,
+    customActions,
     yDomainMax = 1,
     yDomainUpperPadding = 0,
     xTickFormatter = v => v,
@@ -124,7 +124,7 @@ export function SimpleBarChart(props: SimpleBarChartProps) {
   const yAxisDomain: [number, number] = [0, yMax];
   const yTicks = getNiceTickValues(yAxisDomain, tickCount);
   const showRefferenceLine =
-    refferenceLine !== false && typeof refferenceLine === "object";
+    refferenceLine !== undefined && typeof refferenceLine === "object";
 
   /**
    * ====================================
@@ -190,13 +190,14 @@ export function SimpleBarChart(props: SimpleBarChartProps) {
         {!isLoading && (
           <div
             className={cn(
-              "flex items-center gap-4 chart-actions",
+              "flex items-center flex-nowrap gap-3 shrink-0 chart-actions",
               actionWrapperClassName,
             )}
           >
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleDownLoad}
@@ -204,7 +205,7 @@ export function SimpleBarChart(props: SimpleBarChartProps) {
             {!isFullScreen ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -212,7 +213,7 @@ export function SimpleBarChart(props: SimpleBarChartProps) {
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}

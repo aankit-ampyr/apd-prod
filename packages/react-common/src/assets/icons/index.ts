@@ -4,6 +4,7 @@ import CapPayment from "./cap_payment.svg?react";
 import ReceiveMoney from "./receive-money.svg?react";
 import Tick from "./tick.svg?react";
 import Cross from "./cross.svg?react";
+import Bell from "./bell.svg?react";
 import Exclamation from "./exclamation.svg?react";
 import User from "./user.svg?react";
 import InfoCircle from "./info-circle.svg?react";
@@ -149,6 +150,15 @@ import TableGbp from "./table-gbp.svg?react";
 import Files2 from "./files-2.svg?react";
 import DottedClock from "./dotted-clock.svg?react";
 import RetryNumber from "./retry-number.svg?react";
+import Warning2 from "./warning-2.svg?react";
+import Message from "./message.svg?react";
+import ChartWidget from "./chart-widget.svg?react";
+import Reply from "./reply.svg?react";
+import MessageSquareX from "./message-square-X.svg?react";
+import MessageSquare from "./message-square.svg?react";
+import TextBox from "./text-box.svg?react";
+import ContextLink from "./context-link.svg?react";
+import InvoiceUpload from "./invoice-upload.svg?react";
 import {
   Battery as EmptyCell,
   Plus,
@@ -194,13 +204,19 @@ import {
   Star,
   FoldHorizontal,
   UnfoldHorizontal,
+  Send,
 } from "lucide-react";
 
 export const Icons = {
-  'cap_payment': CapPayment,
-  'receive-money': ReceiveMoney,
+  cap_payment: CapPayment,
+  "receive-money": ReceiveMoney,
+  message: Message,
+  'message-square-x': MessageSquareX,
+  "chart-widget": ChartWidget,
+  reply: Reply,
   "fold-horizontal": FoldHorizontal,
   "unfold-horizontal": UnfoldHorizontal,
+  send: Send,
   globe: Globe,
   ellipsis: Ellipsis,
   cpu: Cpu,
@@ -244,6 +260,7 @@ export const Icons = {
   info: Info,
   tick: Tick,
   cross: Cross,
+  bell: Bell,
   exclamation: Exclamation,
   user: User,
   infoCircle: InfoCircle,
@@ -392,6 +409,11 @@ export const Icons = {
   "files-2": Files2,
   "dotted-clock": DottedClock,
   "retry-number": RetryNumber,
+  "warning-2": Warning2,
+  "message-square": MessageSquare,
+  "text-box": TextBox,
+  "context-link": ContextLink,
+  "invoice-upload": InvoiceUpload,
 } as const;
 
 export type IconName = keyof typeof Icons;

@@ -123,6 +123,7 @@ export const generatorData = (state: RootState) => state.simulationWizard.genera
 export const generatorFuelCurveData = (state: RootState) => state.simulationWizard.generatorFuelCurveData;
 
 export const dispatchRuleData = (state: RootState) => state.simulationWizard.dispatchRuleData;
+export const dispatchRuleDataLoading = (state: RootState) => state.simulationWizard.getDispatchRuleLoading;
 
 export const dispatchRuleDataSuccess = (state: RootState) => state.simulationWizard.dispatchRuleSuccess;
 
@@ -157,7 +158,7 @@ export const runSimulationData = (state: RootState) => state.simulationWizard.ru
 export const simulationProgressSuccess = (state: RootState) => state.simulationWizard.simulationProgressSuccess;
 export const simulationProgressError = (state: RootState) => state.simulationWizard.simulationProgressError;
 export const simulationProgressData = (state: RootState) => state.simulationWizard.simulationProgressData;
-
+export const simulationProgressLoading = (state: RootState) => state.simulationWizard.simulationProgressLoading;
 export const simulationResultError = (state: RootState) => state.simulationWizard.simulationResultsError;
 export const simulationResultSuccess = (state: RootState) => state.simulationWizard.simulationResultsSuccess;
 
@@ -169,6 +170,7 @@ export const showDetailedAnalysisSelector = (state: RootState) => state.simulati
 
 export const customConfigSuccess = (state: RootState) => state.simulationWizard.customConfigSuccess;
 export const customConfigError = (state: RootState) => state.simulationWizard.customConfigError;
+export const customConfigRunError = (state: RootState) => state.simulationWizard.runCustomSimulationError;
 export const customConfigData = (state: RootState) => state.simulationWizard.customConfigData;
 
 export const customConfigLoading = (state: RootState) => state.simulationWizard.getCustomConfigLoading;
@@ -180,7 +182,7 @@ export const customSimulationError = (state: RootState) => state.simulationWizar
 export const customSimulationResults = (state: RootState) => state.simulationWizard.customSimulationResultData;
 
 export const customHourlySimulationResults = (state: RootState) => state.simulationWizard.hourlySimulationResultsData;
-
+export const customMonthlySuccess = (state: RootState) => state.simulationWizard.monthlySimulationResultsSuccess;
 export const customMonthlySimulationResults = (state: RootState) => state.simulationWizard.monthlySimulationResultsData;
 
 export const customHourlyChart = (state: RootState) => state.simulationWizard.hourlyChartData;
@@ -193,6 +195,8 @@ export const multiYearProjectionResultError = (state: RootState) => state.simula
 export const multiYearProjectionData = (state: RootState) => state.simulationWizard.multiYearProjectionData;
 export const multiYearProjectionComputeData = (state: RootState) => state.simulationWizard.multiYearProjectionComputeData;
 export const multiYearProjectionResultLoading = (state: RootState) => state.simulationWizard.multiYearProjectionResultLoading;
+export const multiYearSaveError = (state: RootState) => state.simulationWizard.multiYearProjectionError;
+export const multiYearRunError = (state: RootState) => state.simulationWizard.runMultiYearProjectionError;
 
 export const multiYearProjectionResultData = (state: RootState) => state.simulationWizard.multiYearProjectionResultData;
 export const multiYearProjectionProgressLoading = (state: RootState) => state.simulationWizard.multiYearProjectionProgressLoading;
@@ -201,7 +205,7 @@ export const multiYearResults = (state: RootState) => state.simulationWizard.mul
 export const multiYearResultsLoading = (state: RootState) => state.simulationWizard.multiYearProjectionResultsLoading;
 export const multiYearProgressData = (state: RootState) => state.simulationWizard.multiYearProjectionProgressData;
 export const multiYearRunSuccess = (state: RootState) => state.simulationWizard.runMultiYearProjectionSuccess;
-export const simulationProgressLoading = (state: RootState) => state.simulationWizard.projectSimulationLoading;
+export const simulationProjectLoading = (state: RootState) => state.simulationWizard.projectSimulationLoading;
 export const greenAnalysisSuccess = (state: RootState) => state.simulationWizard.greenAnalysisSuccess;
 export const greenAnalysisData = (state: RootState) => state.simulationWizard.greenAnalysisData;
 export const showGreenAnalysisResults = (state: RootState) => state.simulationWizard.showGreenAnalysisResults;
@@ -209,6 +213,8 @@ export const greenaAnalysisResultsData = (state: RootState) => state.simulationW
 export const greenAnalysisProgressData = (state: RootState) => state.simulationWizard.greenAnalysisProgressData;
 export const greenAnalysisRunSuccess = (state: RootState) => state.simulationWizard.runGreenAnalysisSuccess;
 export const detailedGreenAnalysis = (state: RootState) => state.simulationWizard.showDetailedGreenAnalysis;
+export const detailedGreenError = (state: RootState) => state.simulationWizard.detailedGreenAnalysisError;
+export const detailedGreenRunError = (state: RootState) => state.simulationWizard.runDetailedGreenAnalysisError;
 export const detailedGreenAnalysisSuccess = (state: RootState) => state.simulationWizard.detailedGreenAnalysisSuccess;
 export const detailedGreenAnalysisData = (state: RootState) => state.simulationWizard.detailedGreenAnalysisData;
 export const detailedGreenAnalysisProgressData = (state: RootState) => state.simulationWizard.detailedGreenAnalysisProgressData;
@@ -216,3 +222,5 @@ export const detailedGreenAnalysisResultData = (state: RootState) => state.simul
 export const detailedGreenRunSuccess = (state: RootState) => state.simulationWizard.runDetailedGreenAnalysisSuccess;
 export const detailedResultSuccess = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultSuccess;
 export const detailedResultLoading = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultLoading;
+export const editedStepData = (state: RootState) => state.simulationWizard.editedStepSimulationData;
+export const detailedLoading = (state: RootState) => state.simulationWizard.detailedGreenAnalysisDataLoading;

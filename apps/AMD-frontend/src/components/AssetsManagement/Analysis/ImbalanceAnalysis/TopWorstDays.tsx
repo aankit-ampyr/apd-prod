@@ -9,9 +9,10 @@ interface TopWorstDaysProps {
   isFullScreenOverride?: boolean;
   columns: DataTableColumn<AssetImbalanceAnalytics['worst_days']['worst_days'][number]>[];
   data: AssetImbalanceAnalytics['worst_days']['worst_days'];
+  customActions?: React.ReactNode;
 }
 export function TopWorstDays(props: TopWorstDaysProps) {
-  const {onDownload, isLoading, isFullScreenOverride: isFullScreen, columns, data} = props;
+  const {onDownload, isLoading, isFullScreenOverride: isFullScreen = false, columns, data, customActions} = props;
   /**
    * ================================
    * Hooks
@@ -31,10 +32,11 @@ export function TopWorstDays(props: TopWorstDaysProps) {
         />
         {!isLoading && (
           <div className="flex shrink-0 flex-wrap items-center justify-end gap-4">
-            <div className="flex items-center gap-3 chart-actions">
+            <div className="flex shrink-0 items-center gap-3 flex-nowrap chart-actions">
+              {customActions}
               <IconButton
                 name="download"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onDownload}
@@ -42,7 +44,7 @@ export function TopWorstDays(props: TopWorstDaysProps) {
               {!isFullScreen ? (
                 <IconButton
                   name="maximize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMaximize}
@@ -50,7 +52,7 @@ export function TopWorstDays(props: TopWorstDaysProps) {
               ) : (
                 <IconButton
                   name="minimize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMinimize}

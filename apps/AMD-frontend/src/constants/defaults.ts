@@ -75,14 +75,13 @@ export const AuditLogModuleLabels: Record<APDAuditLogModules, string> = {
   [APDAuditLogModules.AUTHENTICATION]: AuditModuleLabel[APDAuditLogModules.AUTHENTICATION],
   [APDAuditLogModules.USER_MANAGEMENT]: 'Users',
   [APDAuditLogModules.ASSET_MANAGEMENT_AMD]: 'Asset Management',
-  [APDAuditLogModules.DIGEST_MANAGEMENT_AMD]: 'Digest Management',
+  // [APDAuditLogModules.DIGEST_MANAGEMENT_AMD]: 'Digest Management',
   [APDAuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: 'Organization Management',
-  [APDAuditLogModules.BENCHMARK_CONFIGURATION]: AuditModuleLabel[APDAuditLogModules.BENCHMARK_CONFIGURATION],
-  [APDAuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]: 'Monthly Values',
+  [APDAuditLogModules.SETTINGS]: 'Settings',
+  [APDAuditLogModules.EXECUTIVE_ANALYSIS]: 'Executive Analysis',
   [APDAuditLogModules.ASSET_ONBOARDING]: AuditModuleLabel[APDAuditLogModules.ASSET_ONBOARDING],
   [APDAuditLogModules.ASSET_ANALYSIS]: AuditModuleLabel[APDAuditLogModules.ASSET_ANALYSIS],
   [APDAuditLogModules.BENCHMARK_ANALYSIS]: AuditModuleLabel[APDAuditLogModules.BENCHMARK_ANALYSIS],
-  [APDAuditLogModules.FILE_HISTORY]: AuditModuleLabel[APDAuditLogModules.FILE_HISTORY],
   [APDAuditLogModules.INVOICE]: AuditModuleLabel[APDAuditLogModules.INVOICE],
 };
 
@@ -90,14 +89,13 @@ export const APDAuditLogModuleColors: Record<APDAuditLogModules, string> = {
   [APDAuditLogModules.AUTHENTICATION]: ModuleBadgeColors[APDAuditLogModules.AUTHENTICATION],
   [APDAuditLogModules.USER_MANAGEMENT]: ModuleBadgeColors[APDAuditLogModules.USER_MANAGEMENT],
   [APDAuditLogModules.ASSET_MANAGEMENT_AMD]: ModuleBadgeColors[APDAuditLogModules.ASSET_MANAGEMENT_AMD],
-  [APDAuditLogModules.DIGEST_MANAGEMENT_AMD]: ModuleBadgeColors[APDAuditLogModules.DIGEST_MANAGEMENT_AMD],
+  // [APDAuditLogModules.DIGEST_MANAGEMENT_AMD]: ModuleBadgeColors[APDAuditLogModules.DIGEST_MANAGEMENT_AMD],
   [APDAuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: ModuleBadgeColors[APDAuditLogModules.ORGANIZATION_MANAGEMENT_AMD],
-  [APDAuditLogModules.BENCHMARK_CONFIGURATION]: ModuleBadgeColors[APDAuditLogModules.BENCHMARK_CONFIGURATION],
-  [APDAuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]: ModuleBadgeColors[APDAuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD],
+  [APDAuditLogModules.SETTINGS]: ModuleBadgeColors[APDAuditLogModules.SETTINGS],
+  [APDAuditLogModules.EXECUTIVE_ANALYSIS]: ModuleBadgeColors[APDAuditLogModules.EXECUTIVE_ANALYSIS],
   [APDAuditLogModules.ASSET_ONBOARDING]: ModuleBadgeColors[APDAuditLogModules.ASSET_ONBOARDING],
   [APDAuditLogModules.ASSET_ANALYSIS]: ModuleBadgeColors[APDAuditLogModules.ASSET_ANALYSIS],
   [APDAuditLogModules.BENCHMARK_ANALYSIS]: ModuleBadgeColors[APDAuditLogModules.BENCHMARK_ANALYSIS],
-  [APDAuditLogModules.FILE_HISTORY]: ModuleBadgeColors[APDAuditLogModules.FILE_HISTORY],
   [APDAuditLogModules.INVOICE]: ModuleBadgeColors[APDAuditLogModules.INVOICE],
 };
 
@@ -174,10 +172,7 @@ export const AssetFileBadgeVariants: Record<AssetFileType, string> = {
   [AssetFileType.OptimizedDataset]: 'navy',
 };
 
-export const InvoiceTypeBadgeVariants: Record<
-  InvoiceType,
-  string 
-> = {
+export const InvoiceTypeBadgeVariants: Record<InvoiceType, string> = {
   [InvoiceType.HartreePV]: 'link',
   [InvoiceType.HartreeBESS]: 'green',
   [InvoiceType.EMR]: 'voilet',

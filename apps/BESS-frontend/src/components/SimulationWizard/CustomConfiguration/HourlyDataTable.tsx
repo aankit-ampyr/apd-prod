@@ -201,7 +201,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
   const simulation_id = customConfig?.simulation_id ?? simulData?.id ?? proSimulData?.id;
   // Get project name and simulation name
   const project_id = proSimulData?.project_id;
-  const projectName = currentProject?.name || allProjects?.find(p => p.id === project_id)?.name || '';
+  const projectName = currentProject?.name || allProjects?.find((p: any) => p.id === project_id)?.name || '';
   const simulationName = proSimulData?.name || '';
 
   // Build API request params
@@ -287,20 +287,13 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     </Text>
   );
 
-  const handleSortChange = (field: string) => {
+  const handleSortChange = (field: string, direction: 'asc' | 'desc' | null) => {
     setSortFields(prev => {
-      const existingIndex = prev.findIndex(f => f.field === field);
-      if (existingIndex >= 0) {
-        const existing = prev[existingIndex];
-        if (existing.direction === 'asc') {
-          return prev.map((f, i) => (i === existingIndex ? {...f, direction: 'desc'} : f));
-        } else {
-          return prev.filter((_, i) => i !== existingIndex);
-        }
-      } else {
-        return [...prev, {field, direction: 'asc'}];
-      }
+      const others = prev.filter(f => f.field !== field);
+
+      return direction ? [...others, {field, direction}] : others;
     });
+
     setCurrentPage(1);
   };
 
@@ -346,14 +339,23 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
   const columns: DataTableColumn<HourlyDataRow>[] = [
     {
       name: 'hour',
-      title: <ColumnHeader label="Hour" sort={getSortDirection('hour')} onSortChange={() => handleSortChange('hour')} tooltip="Hour of simulation" />,
+      title: (
+        <ColumnHeader
+          label="Hour"
+          sort={getSortDirection('hour')}
+          onSortChange={direction => handleSortChange('hour', direction)}
+          tooltip="Hour of simulation"
+        />
+      ),
       width: {minWidth: '80px'},
       align: 'center',
       render: row => renderCell(row.hour),
     },
     {
       name: 'day',
-      title: <ColumnHeader label="Day" sort={getSortDirection('day')} onSortChange={() => handleSortChange('day')} tooltip="Day of simulation" />,
+      title: (
+        <ColumnHeader label="Day" sort={getSortDirection('day')} onSortChange={direction => handleSortChange('day', direction)} tooltip="Day of simulation" />
+      ),
       width: {minWidth: '80px'},
       align: 'center',
       render: row => renderCell(row.day),
@@ -364,7 +366,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Hour of Day"
           sort={getSortDirection('hour_of_day')}
-          onSortChange={() => handleSortChange('hour_of_day')}
+          onSortChange={direction => handleSortChange('hour_of_day', direction)}
           tooltip="Hour of day (0-23)"
         />
       ),
@@ -374,7 +376,14 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     },
     {
       name: 'loadMW',
-      title: <ColumnHeader label="Load (MW)" sort={getSortDirection('load_mw')} onSortChange={() => handleSortChange('load_mw')} tooltip="Load power demand" />,
+      title: (
+        <ColumnHeader
+          label="Load (MW)"
+          sort={getSortDirection('load_mw')}
+          onSortChange={direction => handleSortChange('load_mw', direction)}
+          tooltip="Load power demand"
+        />
+      ),
       width: {minWidth: '100px'},
       align: 'center',
       render: row => renderCell(row.loadMW),
@@ -382,7 +391,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'solarMW',
       title: (
-        <ColumnHeader label="Solar (MW)" sort={getSortDirection('solar_mw')} onSortChange={() => handleSortChange('solar_mw')} tooltip="Solar power output" />
+        <ColumnHeader
+          label="Solar (MW)"
+          sort={getSortDirection('solar_mw')}
+          onSortChange={direction => handleSortChange('solar_mw', direction)}
+          tooltip="Solar power output"
+        />
       ),
       width: {minWidth: '110px'},
       align: 'center',
@@ -394,7 +408,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Solar to Load (MW)"
           sort={getSortDirection('solar_to_load')}
-          onSortChange={() => handleSortChange('solar_to_load')}
+          onSortChange={direction => handleSortChange('solar_to_load', direction)}
           tooltip="Solar power directly to load"
         />
       ),
@@ -408,7 +422,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Solar to BESS (MW)"
           sort={getSortDirection('solar_to_bess')}
-          onSortChange={() => handleSortChange('solar_to_bess')}
+          onSortChange={direction => handleSortChange('solar_to_bess', direction)}
           tooltip="Solar power to battery"
         />
       ),
@@ -422,7 +436,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="BESS to Load (MW)"
           sort={getSortDirection('bess_to_load')}
-          onSortChange={() => handleSortChange('bess_to_load')}
+          onSortChange={direction => handleSortChange('bess_to_load', direction)}
           tooltip="Battery power to load"
         />
       ),
@@ -433,7 +447,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'bessMW',
       title: (
-        <ColumnHeader label="BESS (MW)" sort={getSortDirection('bess_mw')} onSortChange={() => handleSortChange('bess_mw')} tooltip="Battery power capacity" />
+        <ColumnHeader
+          label="BESS (MW)"
+          sort={getSortDirection('bess_mw')}
+          onSortChange={direction => handleSortChange('bess_mw', direction)}
+          tooltip="Battery power capacity"
+        />
       ),
       width: {minWidth: '110px'},
       align: 'center',
@@ -442,7 +461,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'bessState',
       title: (
-        <ColumnHeader label="BESS State" sort={getSortDirection('bess_state')} onSortChange={() => handleSortChange('bess_state')} tooltip="Battery state" />
+        <ColumnHeader
+          label="BESS State"
+          sort={getSortDirection('bess_state')}
+          onSortChange={direction => handleSortChange('bess_state', direction)}
+          tooltip="Battery state"
+        />
       ),
       width: {minWidth: '110px'},
       align: 'center',
@@ -465,7 +489,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="DG Output (MW)"
           sort={getSortDirection('dg_output_mw')}
-          onSortChange={() => handleSortChange('dg_output_mw')}
+          onSortChange={direction => handleSortChange('dg_output_mw', direction)}
           tooltip="Generator output power"
         />
       ),
@@ -479,7 +503,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="DG State"
           sort={getSortDirection('is_dg_running')}
-          onSortChange={() => handleSortChange('is_dg_running')}
+          onSortChange={direction => handleSortChange('is_dg_running', direction)}
           tooltip="Generator running state"
         />
       ),
@@ -497,7 +521,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="DG to Load (MW)"
           sort={getSortDirection('dg_to_load')}
-          onSortChange={() => handleSortChange('dg_to_load')}
+          onSortChange={direction => handleSortChange('dg_to_load', direction)}
           tooltip="Generator power to load"
         />
       ),
@@ -511,7 +535,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="DG to BESS (MW)"
           sort={getSortDirection('dg_to_bess')}
-          onSortChange={() => handleSortChange('dg_to_bess')}
+          onSortChange={direction => handleSortChange('dg_to_bess', direction)}
           tooltip="Generator power to battery"
         />
       ),
@@ -525,7 +549,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="DG Curtailed (MW)"
           sort={getSortDirection('dg_curtailed')}
-          onSortChange={() => handleSortChange('dg_curtailed')}
+          onSortChange={direction => handleSortChange('dg_curtailed', direction)}
           tooltip="Generator curtailed power"
         />
       ),
@@ -536,7 +560,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'socMWh',
       title: (
-        <ColumnHeader label="SOC (MWh)" sort={getSortDirection('soc_mwh')} onSortChange={() => handleSortChange('soc_mwh')} tooltip="State of charge in MWh" />
+        <ColumnHeader
+          label="SOC (MWh)"
+          sort={getSortDirection('soc_mwh')}
+          onSortChange={direction => handleSortChange('soc_mwh', direction)}
+          tooltip="State of charge in MWh"
+        />
       ),
       width: {minWidth: '110px'},
       align: 'center',
@@ -548,7 +577,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="SOC (%)"
           sort={getSortDirection('soc_percent')}
-          onSortChange={() => handleSortChange('soc_percent')}
+          onSortChange={direction => handleSortChange('soc_percent', direction)}
           tooltip="State of charge percentage"
         />
       ),
@@ -561,8 +590,8 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
       title: (
         <ColumnHeader
           label="Charging Loss (MW)"
-          sort={getSortDirection('soc_percent')}
-          onSortChange={() => handleSortChange('soc_percent')}
+          sort={getSortDirection('charging_loss')}
+          onSortChange={direction => handleSortChange('charging_loss', direction)}
           tooltip="State of charge percentage"
         />
       ),
@@ -576,7 +605,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Discharging Loss (MW)"
           sort={getSortDirection('discharging_loss')}
-          onSortChange={() => handleSortChange('discharging_loss')}
+          onSortChange={direction => handleSortChange('discharging_loss', direction)}
           tooltip="State of charge percentage"
         />
       ),
@@ -587,7 +616,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'unmetMW',
       title: (
-        <ColumnHeader label="Unmet (MW)" sort={getSortDirection('unmet_mw')} onSortChange={() => handleSortChange('unmet_mw')} tooltip="Unmet energy demand" />
+        <ColumnHeader
+          label="Unmet (MW)"
+          sort={getSortDirection('unmet_mw')}
+          onSortChange={direction => handleSortChange('unmet_mw', direction)}
+          tooltip="Unmet energy demand"
+        />
       ),
       width: {minWidth: '110px'},
       align: 'center',
@@ -600,7 +634,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     {
       name: 'delivery',
       title: (
-        <ColumnHeader label="Delivery" sort={getSortDirection('delivery')} onSortChange={() => handleSortChange('delivery')} tooltip="Load delivery status" />
+        <ColumnHeader
+          label="Delivery"
+          sort={getSortDirection('delivery')}
+          onSortChange={direction => handleSortChange('delivery', direction)}
+          tooltip="Load delivery status"
+        />
       ),
       width: {minWidth: '100px'},
       align: 'center',
@@ -616,7 +655,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Solar Curtailed (MW)"
           sort={getSortDirection('solar_curtailed')}
-          onSortChange={() => handleSortChange('solar_curtailed')}
+          onSortChange={direction => handleSortChange('solar_curtailed', direction)}
           tooltip="Solar curtailed power"
         />
       ),
@@ -630,7 +669,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="BESS Daily Cycles"
           sort={getSortDirection('daily_cycles')}
-          onSortChange={() => handleSortChange('daily_cycles')}
+          onSortChange={direction => handleSortChange('daily_cycles', direction)}
           tooltip="Battery daily cycles"
         />
       ),
@@ -644,7 +683,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
         <ColumnHeader
           label="Green Energy to Load (MWh)"
           sort={getSortDirection('green_energy_to_load_mwh')}
-          onSortChange={() => handleSortChange('green_energy_to_load_mwh')}
+          onSortChange={direction => handleSortChange('green_energy_to_load_mwh', direction)}
           tooltip="Green energy delivered to load"
         />
       ),
@@ -654,7 +693,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
     },
   ];
 
-  if (isLoading) {
+  if (isLoading && resultRows.length === 0) {
     return <HourlyDataTableGhostLoader />;
   }
 
@@ -699,12 +738,12 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
               onClear={handleDateClear}
               onApply={handleDateApply}
               usePortal
-              className="min-w-58"
+              className="min-w-64"
               minDate={minDate}
               maxDate={maxDate}
               defaultYear={apiYear}
             />
-            {(!!dateFilter.date_range?.start || !!dateFilter.date_range?.end || sortFields.length > 0) && (
+            {(!!dateFilter.date_range?.start || !!dateFilter.date_range?.end) && (
               <button
                 type="button"
                 onClick={() => {
@@ -715,7 +754,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
                 }}
                 className="border-primary cursor-pointer hover:border-primary-hover active:border-primary-active border self-stretch rounded-sm px-4 py-1 flex items-center gap-2 disabled:cursor-not-allowed disabled:opacity-50">
                 <Icon name="cross" className="text-text-secondary size-3" />
-                <Text variant="caption" className="text-text-secondary!">
+                <Text variant="caption" className="text-text-secondary! whitespace-nowrap!">
                   Clear filters
                 </Text>
               </button>
@@ -752,6 +791,7 @@ export const HourlyDataTable = (props: HourlyDataTableProps) => {
           onPageChange={setCurrentPage}
           pageSize={PAGE_SIZE}
           stickyHeader
+          tableHeightWhenScrollable={700}
           persistHorizontalScrollKey={simulation_id ? `bess-hourly-results-${simulation_id}` : undefined}
         />
       </div>

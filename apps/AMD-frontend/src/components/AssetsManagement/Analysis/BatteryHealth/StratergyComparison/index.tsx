@@ -10,7 +10,11 @@ import {
   SimpleBarChart,
   HorizontalBarData,
   LineChart,
+  CommentTrigger,
 } from '@/components/common';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 import {
   AssetBatteryCycleCalculationMethod,
   AssetMarketFullLabels,
@@ -42,6 +46,7 @@ import {GradientKPI, GradientKPIObject} from '../../../common';
 import {AnnualProjectionReportKPIObject, AnnualProjectionReportKpi} from './AnnualProjectionReportKpi';
 import {useContainerDimentions} from '@/hooks';
 import {WrrantyLimitExcedance} from './WrrantyLimitExcedance';
+import { exportStrategyEnergyThroughputSummaryExport } from '@/services/api';
 
 interface AssetBatteryCycleStrategyComparisonProps extends AssetAnalysisTabProps {}
 export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonProps) {
@@ -72,6 +77,9 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
   const {width: visualizationContainerWidth} = useContainerDimentions(visualizationContainer, {
     method: 'contentRect',
   });
+
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
 
   /**
    * ===============================
@@ -114,7 +122,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
     Actual: 'Actual',
     'EPEX Daily': 'Daily',
     'EPEX EFA': 'EFA',
-    'Optimized': 'Opt',
+    Optimized: 'Opt',
   };
 
   /**
@@ -138,11 +146,11 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       id: item.strategy,
       title: AssetMarketFullLabels[item.strategy],
       badgeText: (
-        <p className="text-center!">
+        <span className="block text-center!">
           {item.projected_annual_degradation.toFixed(2)}%
           <br />
           <span style={{position: 'relative', top: '-6px'}}>degradation/yr</span>
-        </p>
+        </span>
       ),
       value: item.projected_annual_cycles.toLocaleString(),
       unit: 'proj. annual cycles',
@@ -271,14 +279,30 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       value: dailyCycleData?.actual?.max_cycles?.toString() ?? '0',
       variant: 'yellow',
       icon: 'zap',
-      subLabel: (
+      subLabel: isTablet ? (
+        <Text variant="14R" className="-mt-0.5 text-text-secondary!">
+          cycle
+        </Text>
+      ) : (
         <Badge
           className="ml-auto border-[#D0BB00] border bg-[#FFFED3]!"
           textClassName="text-text-secondary!"
-          message={formatDate(parseDate(dailyCycleData?.actual?.max_cycles_date ?? '', 'dd-MM-yyyy') ?? '', 'dd-MMM yyyy')}
+          message={formatDate(
+            parseDate(dailyCycleData?.actual?.max_cycles_date ?? '', 'dd-MM-yyyy') ?? '',
+            'dd-MMM yyyy',
+          )}
         />
       ),
-      helperLabel: (
+      helperLabel: isTablet ? (
+        <Badge
+          className="mt-2 border-[#D0BB00] border bg-[#FFFED3]! w-fit"
+          textClassName="text-text-secondary!"
+          message={formatDate(
+            parseDate(dailyCycleData?.actual?.max_cycles_date ?? '', 'dd-MM-yyyy') ?? '',
+            'dd-MMM yyyy',
+          )}
+        />
+      ) : (
         <Text variant="14R" className="-mt-0.5 text-text-secondary!">
           cycle
         </Text>
@@ -289,7 +313,11 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       value: dailyCycleData?.multi_market?.max_cycles?.toString() ?? '0',
       variant: 'green',
       icon: 'trending-up',
-      subLabel: (
+      subLabel: isTablet ? (
+        <Text variant="14R" className="-mt-0.5 text-text-secondary!">
+          cycle
+        </Text>
+      ) : (
         <Badge
           className="ml-auto border-[#05CC59] border bg-[#EAFFE1]!"
           textClassName="text-text-secondary!"
@@ -299,7 +327,16 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
           )}
         />
       ),
-      helperLabel: (
+      helperLabel: isTablet ? (
+        <Badge
+          className="mt-2 border-[#05CC59] border bg-[#EAFFE1]! w-fit"
+          textClassName="text-text-secondary!"
+          message={formatDate(
+            parseDate(dailyCycleData?.multi_market?.max_cycles_date ?? '', 'dd-MM-yyyy') ?? '',
+            'dd-MMM yyyy',
+          )}
+        />
+      ) : (
         <Text variant="14R" className="-mt-0.5 text-text-secondary!">
           cycle
         </Text>
@@ -320,52 +357,94 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
     {
       align: 'left',
       name: 'stratergy',
-      title: <Text variant="14M">Strategy</Text>,
-      render: row => <Text variant="14M">{AssetMarketFullLabels[row.strategy]}</Text>,
-      width: {minWidth: '150px'},
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px]')}>
+          Strategy
+        </Text>
+      ),
+      render: row => (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-nowrap')}>
+          {AssetMarketFullLabels[row.strategy]}
+        </Text>
+      ),
+      width: {minWidth: isTablet ? '100px' : '150px'},
     },
     {
       align: 'center',
       name: 'total_discharge',
-      title: <Text variant="14M">Total Discharge</Text>,
-      render: row => <Text variant="14R">{row.total_discharge_mwh} MWh</Text>,
-      width: {minWidth: '150px'},
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-normal')}>
+          Total Discharge
+        </Text>
+      ),
+      render: row => (
+        <Text variant="14R" className={cn(isTablet && 'text-[12px]')}>
+          {row.total_discharge_mwh} MWh
+        </Text>
+      ),
+      width: {minWidth: isTablet ? '90px' : '150px'},
     },
     {
       align: 'center',
       name: 'total_cycle',
-      title: <Text variant="14M">Total Cycle</Text>,
-      render: row => <Text variant="14R">{row.total_cycle}</Text>,
-      width: {minWidth: '150px'},
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-normal')}>
+          Total Cycle
+        </Text>
+      ),
+      render: row => (
+        <Text variant="14R" className={cn(isTablet && 'text-[12px]')}>
+          {row.total_cycle}
+        </Text>
+      ),
+      width: {minWidth: isTablet ? '80px' : '150px'},
     },
     {
       align: 'center',
       name: 'daily_cycle',
-      title: <Text variant="14M">Daily Cycle</Text>,
-      render: row => <Text variant="14R">{row.daily_cycle}</Text>,
-      width: {minWidth: '150px'},
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-normal')}>
+          Daily Cycle
+        </Text>
+      ),
+      render: row => (
+        <Text variant="14R" className={cn(isTablet && 'text-[12px]')}>
+          {row.daily_cycle}
+        </Text>
+      ),
+      width: {minWidth: isTablet ? '80px' : '150px'},
     },
     {
       align: 'center',
       name: 'degradation',
-      title: <Text variant="14M">Degradation %</Text>,
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-normal')}>
+          Degradation %
+        </Text>
+      ),
       render: row => (
-        <Text variant="14R" className="text-error-text!">
+        <Text variant="14R" className={cn('text-error-text!', isTablet && 'text-[12px]')}>
           {row.degradation_percent}
         </Text>
       ),
-      width: {minWidth: '150px'},
+      width: {minWidth: isTablet ? '90px' : '150px'},
     },
     {
       align: 'center',
       name: 'warranty',
-      title: <Text variant="14M">Warranty Status</Text>,
+      title: (
+        <Text variant="14M" className={cn(isTablet && 'text-[12px] whitespace-normal')}>
+          Warranty Status
+        </Text>
+      ),
       render: row => (
-        <Text variant="14R" className={cn(row.is_warranty_exceeded && 'text-error-text!')}>
+        <Text
+          variant="14R"
+          className={cn(row.is_warranty_exceeded && 'text-error-text!', isTablet && 'text-[12px] whitespace-nowrap')}>
           {row.is_warranty_exceeded ? 'Limit Exceeded' : 'Within Limit'}
         </Text>
       ),
-      width: {minWidth: '200px'},
+      width: {minWidth: isTablet ? '110px' : '200px'},
     },
   ];
   /**
@@ -376,6 +455,18 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
 
   const getCurrentStratergyLabel = (stratergy: AssetBatteryCycleCalculationMethod) =>
     `${BatteryCycleCalculationMethodLabels[stratergy].formulaCodeName} — ${BatteryCycleCalculationMethodLabels[stratergy].label}`;
+
+  async function handleStrategyEnergyThroughputSummaryDownLoad() {
+    if (!assetId || !year || !month || !stratergy) return;
+
+    await exportStrategyEnergyThroughputSummaryExport({
+      assetId,
+      year,
+      cycle_method: stratergy,
+      fileName: `${assetSystemGenerationId}_${getCurrentStratergyLabel(stratergy)}_${month}_${year}_strategy_energy_throughput_summary.csv`,
+      month,
+    });
+  }
 
   /**
    * ===============================
@@ -394,20 +485,21 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
   return (
     <div className="flex flex-col gap-3 bg-white px-4 py-3 rounded-lg border border-border">
       {/* header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center gap-4 justify-between">
+      <div className={cn('flex flex-col items-start gap-4 justify-between', !isTablet && 'flex-row items-center')}>
         <SectionHeader
           icon="scale"
           title="Strategy Cycling Comparison"
           subtitle="Select a cycle calculation method to update strategy data"
         />
 
-        <div className="flex gap-2 self-end lg:self-auto">
+        <div className={cn('flex gap-2', isTablet ? 'self-start' : 'self-auto')}>
           {[
             AssetBatteryCycleCalculationMethod.DISCHARGE_BASED,
             AssetBatteryCycleCalculationMethod.FULL_EQUIVALENT,
             AssetBatteryCycleCalculationMethod.THROUGHPUT_BASED,
           ].map(item => (
             <Button
+              key={item}
               size="sm"
               onClick={() => setStratergy(item)}
               variant={stratergy !== item ? 'tab-secondary' : 'tab-primary'}
@@ -426,7 +518,6 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
       <div
         ref={visualizationContainer}
         className="flex @container min-h-100 border-l-2 flex-col gap-8 border-[#9CA0AB]">
-
         {/* header pill */}
         <div className="border-disabled border mx-5 rounded-full w-fit px-4 py-1 bg-linear-to-r from-[#F3F6F9] to-[#F7F7F7] flex gap-2 items-center">
           <Icon name="chevron-right" className="size-2.5 text-text-secondary!" />
@@ -443,7 +534,11 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
               icon="search-analysis"
               title="Visual Comparisons"
               subtitle="Daily cycling and monthly degradation across strategies ">
-              <div className="grid grid-cols-1 @[780px]:grid-cols-2 gap-4">
+              <div
+                className={cn(
+                  'grid grid-cols-1 gap-4',
+                  !isTablet ? '@[780px]:grid-cols-2' : 'px-4 @[600px]:px-16 @[800px]:px-24',
+                )}>
                 {/* Daily Cycling Comparison */}
                 <SimpleBarChart
                   tickCount={4}
@@ -456,6 +551,20 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                   className="bg-[#FBFBFC]"
                   header={<Text variant="16SB">Daily Cycle Comparison</Text>}
                   data={dailyCycleComparisonData}
+                  customActions={
+                    <CommentTrigger
+                      contextModule={CommentModule.ViewAnalysis}
+                      contextTab={ViewAnalysisTabs.BatteryHealth}
+                      contextWidget={ViewAnalysisWidgets.DailyCycleComparison}
+                      contextType={CommentContextType.Widget}
+                      contextAssetId={assetId}
+                      contextYear={year}
+              contextMonth={month}
+                      variant="icon-only"
+                      className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                      iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                    />
+                  }
                   barColor="#4D9CD1"
                   chartClassName={
                     'max-h-80! @[780px]:max-h-60! @[880px]:max-h-65! @[980px]:max-h-70! @[1040px]:max-h-75! @[1080px]:max-h-80! @[1110px]:max-h-85! @[1200px]:max-h-90! @[1300px]:max-h-95! @[1390px]:max-h-100! @[1470px]:max-h-105! @[1570px]:max-h-110! @[1680px]:max-h-115!'
@@ -490,6 +599,20 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                 <HorizontalBarChart
                   header={<Text variant="16SB">Monthly Degradation Comparison</Text>}
                   data={monthlyDegradationData}
+                  customActions={
+                    <CommentTrigger
+                      contextModule={CommentModule.ViewAnalysis}
+                      contextTab={ViewAnalysisTabs.BatteryHealth}
+                      contextWidget={ViewAnalysisWidgets.MonthlyDegradationComparison}
+                      contextType={CommentContextType.Widget}
+                      contextAssetId={assetId}
+                      contextYear={year}
+              contextMonth={month}
+                      variant="icon-only"
+                      className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                      iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                    />
+                  }
                   className="bg-[#FBFBFC]"
                   xDomainUpperPadding={0.1}
                   xAxisTickCount={5}
@@ -554,6 +677,20 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
               subtitle={`Total discharge energy by strategy · ${CALENDAR_MONTH_NAMES[month ? month - 1 : 0]} ${year}`}>
               <SimpleBarChart
                 data={energyThroughputData}
+                customActions={
+                  <CommentTrigger
+                    contextModule={CommentModule.ViewAnalysis}
+                    contextTab={ViewAnalysisTabs.BatteryHealth}
+                    contextWidget={ViewAnalysisWidgets.EnergyThroughputAnalysis}
+                    contextType={CommentContextType.Widget}
+                    contextAssetId={assetId}
+                    contextYear={year}
+              contextMonth={month}
+                    variant="icon-only"
+                    className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                    iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                  />
+                }
                 className="bg-[#FBFBFC]"
                 barWidth={energyThroughputGraphBarWidth}
                 yDomainUpperPadding={50}
@@ -596,7 +733,22 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
             columns={stratergyEnergtThroughputSummary}
             data={currentStratergyData}
             isLoading={stratergyCompasionSummaryLoading || assetLoading}
-            downloadFileName={`${assetSystemGenerationId}_${getCurrentStratergyLabel(stratergy)}_${month}_${year}_strategy_energy_throughput_summary.png`}
+            handleDownload={handleStrategyEnergyThroughputSummaryDownLoad}
+            // downloadFileName={`${assetSystemGenerationId}_${getCurrentStratergyLabel(stratergy)}_${month}_${year}_strategy_energy_throughput_summary.png`}
+            customActions={
+              <CommentTrigger
+                contextModule={CommentModule.ViewAnalysis}
+                contextTab={ViewAnalysisTabs.BatteryHealth}
+                contextWidget={ViewAnalysisWidgets.StrategyEnergyThroughput}
+                contextType={CommentContextType.Widget}
+                contextAssetId={assetId}
+                contextYear={year}
+              contextMonth={month}
+                variant="icon-only"
+                className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+              />
+            }
           />
         </VisualizationWrapper>
 
@@ -610,7 +762,11 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
               subtitle="Projected annual cycles, degradation, and estimated battery lifespan by strategy"
             />
 
-            <div className="grid grid-cols-2 @[965px]:grid-cols-4 gap-2 @[920px]:gap-4 ">
+            <div
+              className={cn(
+                'grid gap-2 @[920px]:gap-4',
+                isTablet ? 'grid-cols-4' : 'grid-cols-2 @[965px]:grid-cols-4',
+              )}>
               {annualProjectionReportKpis.map(item => (
                 <AnnualProjectionReportKpi
                   {...item}
@@ -632,11 +788,24 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                 </div>
               }
               scale="yrs"
-              isLoading={annualProjectionReportResultLoading || assetLoading}
               downloadFileName={`${assetSystemGenerationId}_${getCurrentStratergyLabel(stratergy)}_${month}_${year}_Estimated_battery_lifespan.png`}
               barColor="#56D4D7"
               valueTextColor="#00A4A7"
               data={estimatedLifespanData}
+              customActions={
+                <CommentTrigger
+                  contextModule={CommentModule.ViewAnalysis}
+                  contextTab={ViewAnalysisTabs.BatteryHealth}
+                  contextWidget={ViewAnalysisWidgets.EstimatedBatteryLifespan}
+                  contextType={CommentContextType.Widget}
+                  contextAssetId={assetId}
+                  contextYear={year}
+              contextMonth={month}
+                  variant="icon-only"
+                  className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                  iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                />
+              }
             />
           </div>
         </VisualizationWrapper>
@@ -644,11 +813,8 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
         {/* Daily Cycles Analysis */}
         <VisualizationWrapper>
           <div className="bg-white @container flex flex-col px-4 py-3 gap-4 border border-border rounded-lg">
-            <Section
-              title="Daily Cycles Analysis"
-              icon="chart-trend-up"
-              subtitle="Actual Operation vs Optimized">
-              <div className="grid grid-cols-2 min-[1136px]:grid-cols-4 gap-3">
+            <Section title="Daily Cycles Analysis" icon="chart-trend-up" subtitle="Actual Operation vs Optimized">
+              <div className={cn('grid gap-3', isTablet ? 'grid-cols-4' : 'grid-cols-2 min-[1136px]:grid-cols-4')}>
                 {cycleAnalaysisKpis.map(item => (
                   <GradientKPI className="pb-1.5! px-4" key={item.title} {...item} isLoading={dailyCycleDataLoading} />
                 ))}
@@ -657,6 +823,20 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
               <LineChart
                 title="Actual Operation vs Optimized"
                 data={dailyCycleChartData ?? []}
+                customActions={
+                  <CommentTrigger
+                    contextModule={CommentModule.ViewAnalysis}
+                    contextTab={ViewAnalysisTabs.BatteryHealth}
+                    contextWidget={ViewAnalysisWidgets.ActualOperationVsOptimized}
+                    contextType={CommentContextType.Widget}
+                    contextAssetId={assetId}
+                    contextYear={year}
+              contextMonth={month}
+                    variant="icon-only"
+                    className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+                    iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+                  />
+                }
                 chartMargin={{left: 40}}
                 isLoading={dailyCycleDataLoading || assetLoading}
                 downloadFileName={`${assetSystemGenerationId}_${getCurrentStratergyLabel(stratergy)}_${month}_${year}_daily_cycles_analysis.png`}
@@ -666,17 +846,26 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                   const [actual, multimarket] = payload;
                   return (
                     <div className="bg-white! p-4 flex flex-col gap-1 rounded-md border border-border">
-                      <Text variant="16M" className='mb-1'>
+                      <Text variant="16M" className="mb-1">
                         {formatDate(parseDate(label?.toString() ?? '', 'dd-MM-yyyy')!, 'dd MMM yyyy')}
                       </Text>
                       <Text variant="14R" className="text-text-secondary!">
-                        Actual Daily Cycle : <span style={{color: actual?.color}} className='font-InterBold!'>{Number(actual?.value).toFixed(2) ?? 0} cycles/day</span>
+                        Actual Daily Cycle :{' '}
+                        <span style={{color: actual?.color}} className="font-InterBold!">
+                          {Number(actual?.value).toFixed(2) ?? 0} cycles/day
+                        </span>
                       </Text>
                       <Text variant="14R" className="text-text-secondary!">
-                        Optimized Daily Cycle : <span style={{color: multimarket?.color}} className='font-InterBold!'>{Number(multimarket?.value).toFixed(2) ?? 0} cycles/day</span>
+                        Optimized Daily Cycle :{' '}
+                        <span style={{color: multimarket?.color}} className="font-InterBold!">
+                          {Number(multimarket?.value).toFixed(2) ?? 0} cycles/day
+                        </span>
                       </Text>
                       <Text variant="14R" className="text-text-secondary!">
-                        Method : <span className='font-InterBold! text-text-primary!'>{getCurrentStratergyLabel(stratergy)}</span>
+                        Method :{' '}
+                        <span className="font-InterBold! text-text-primary!">
+                          {getCurrentStratergyLabel(stratergy)}
+                        </span>
                       </Text>
                     </div>
                   );
@@ -693,11 +882,13 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
                       value: 1.5,
                       label: '',
                       color: 'var(--color-error)',
-                      legendLabel: <Text variant="14R" className="text-text-secondary!">
-                        Warranty Limit: <span className='font-InterBold! text-error!'>(1.5 cycles/day)</span>
-                      </Text>,
-                      lineStyle: 'dotted'
-                    }
+                      legendLabel: (
+                        <Text variant="14R" className="text-text-secondary!">
+                          Warranty Limit: <span className="font-InterBold! text-error!">(1.5 cycles/day)</span>
+                        </Text>
+                      ),
+                      lineStyle: 'dotted',
+                    },
                   ],
                   yAxisLabel: 'Cycles per Day',
 
@@ -737,7 +928,7 @@ export function StratergyComparison(props: AssetBatteryCycleStrategyComparisonPr
 
         {/* Warranty Limit Exceedance Analysis */}
         <VisualizationWrapper>
-          <WrrantyLimitExcedance />
+          <WrrantyLimitExcedance assetId={assetId} year={year} />
         </VisualizationWrapper>
       </div>
     </div>

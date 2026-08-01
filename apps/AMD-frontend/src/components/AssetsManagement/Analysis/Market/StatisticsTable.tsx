@@ -1,8 +1,8 @@
-import { useChartsActionV2 } from "@/hooks";
-import { AssetMarketAnalytics, DataTableColumn } from "@/interface";
-import { downloadAssetMarketStatistics } from "@/services/api";
-import { AnalyticsTable } from "../../../common";
-import { IconButton, Text } from "@/ui-kits";
+import {useChartsActionV2} from '@/hooks';
+import {AssetMarketAnalytics, DataTableColumn} from '@/interface';
+import {downloadAssetMarketStatistics} from '@/services/api';
+import {AnalyticsTable} from '../../../common';
+import {IconButton, Text} from '@/ui-kits';
 
 type AssetMarketStrategy = AssetMarketAnalytics['utilization']['market_strategy'];
 type MarketStatisticsRow = NonNullable<AssetMarketAnalytics['statistics']['rows']>[number];
@@ -17,6 +17,7 @@ interface StatisticsTableProps {
   market_strategy: AssetMarketStrategy;
   assetSystemGenerationId?: string;
   isFullScreen?: boolean;
+  customActions?: React.ReactNode;
 }
 export function StatisticsTable(props: StatisticsTableProps) {
   const {
@@ -29,6 +30,7 @@ export function StatisticsTable(props: StatisticsTableProps) {
     year,
     assetSystemGenerationId,
     isFullScreen = false,
+    customActions,
   } = props;
   // ====================
   // hooks
@@ -74,34 +76,38 @@ export function StatisticsTable(props: StatisticsTableProps) {
   return (
     <AnalyticsTable
       title={
-        <div className="flex items-center gap-3">
-          <Text variant="h4" className="text-text-primary! grow font-InterRegular!">
+        <div className="flex items-center justify-between gap-3 px-1 border-b border-border py-4">
+          <Text variant="h4" className="text-text-primary! font-InterRegular!">
             Market Statistics
           </Text>
-          <IconButton
-            name="download"
-            onClick={handleDownload}
-            disabled={loading || displayRows.length === 0}
-            className="hover:bg-primary-tint-2! cursor-pointer"
-            iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
-          />
-          {!isFullScreen ? (
+          <div className="flex items-center shrink-0 flex-nowrap gap-3">
+            {customActions}
             <IconButton
-              name="maximize"
-              size={20}
-              className="hover:bg-primary-tint-2! cursor-pointer"
-              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-              onClick={isFullScreen ? undefined : onMaximize}
+              name="download"
+              onClick={handleDownload}
+              size={16}
+              disabled={loading || rows.length === 0}
+              className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
             />
-          ) : (
-            <IconButton
-              name="minimize"
-              size={20}
-              className="hover:bg-primary-tint-2! cursor-pointer"
-              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-              onClick={onMinimize}
-            />
-          )}
+            {!isFullScreen ? (
+              <IconButton
+                name="maximize"
+                onClick={onMaximize}
+                size={16}
+                className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+                iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
+              />
+            ) : (
+              <IconButton
+                name="minimize"
+                onClick={onMinimize}
+                size={16}
+                className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+                iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
+              />
+            )}
+          </div>
         </div>
       }
       titleContainerClassName="px-5 py-4"

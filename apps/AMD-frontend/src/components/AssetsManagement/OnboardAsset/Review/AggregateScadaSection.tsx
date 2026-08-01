@@ -72,7 +72,7 @@ export function AggregateScadaSection(props: AggregatorScadaSectionProps) {
       <ScadaFileUpload
         disabled={isStepLocked || isAssetInactive || isAssetPendingApproval}
         variant="inline"
-        className="border-none! p-0!"
+        className="border-none! p-0! z-10"
         monthYearValidation={monthYearValidation}
       />
 

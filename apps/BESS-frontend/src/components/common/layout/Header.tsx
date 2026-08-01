@@ -6,17 +6,22 @@ import {useSelector, useDispatch} from 'react-redux';
 import {authDataSelector} from '@/services/redux/selectors';
 import {logoutRequest} from '@/services/redux/slice/authSlice';
 import {
+  detailedGreenAnalysis,
   initiateSimulationData,
   projectSimulationData,
   showDetailedAnalysisSelector,
   showDetailedMultiYearProjectionAnalysisSelector,
+  showGreenAnalysisResults,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {
   resetInitiateSimulation,
   resetProjectSimulation,
   setShowDetailedAnalysis,
+  setShowDetailedGreenAnalysis,
   setShowDetailedMultiYearProjectionAnalysis,
+  setShowGreenAnalysisResults,
 } from '@/services/redux/slice/simulationWizardSlice';
+import {useScreenOverride} from '@/hooks';
 
 export const Header = () => {
   const {id} = useParams();
@@ -28,11 +33,26 @@ export const Header = () => {
   const proSimulData = useSelector(projectSimulationData);
   const showDetailedAnalysis = useSelector(showDetailedAnalysisSelector);
   const showDetailedMultiYearProjectionAnalysis = useSelector(showDetailedMultiYearProjectionAnalysisSelector);
+  const showGreenResults = useSelector(showGreenAnalysisResults);
+  const showDetailedGreenResults = useSelector(detailedGreenAnalysis);
+  const {isFullscreenActive, exitFullscreen} = useScreenOverride();
   const isSimulationDetailPage = Boolean(id);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const dashboardHeaderTitle = useMemo(() => {
+    if (isFullscreenActive) {
+      return 'Exit Fullscreen';
+    }
+
+    if (showDetailedGreenResults && pathname.includes(Routes.SIMULATION_WIZARD)) {
+      return 'Simulation Result';
+    }
+
+    if (showGreenResults && pathname.includes(Routes.SIMULATION_WIZARD)) {
+      return 'Green Energy Analysis';
+    }
+
     // Show "View Detailed Analysis" when in detailed analysis mode
     if ((showDetailedAnalysis || showDetailedMultiYearProjectionAnalysis) && pathname.includes(Routes.SIMULATION_WIZARD)) {
       return 'View Detailed Analysis';
@@ -46,7 +66,16 @@ export const Header = () => {
     }
 
     return DashboardRouteHeaderTitles[normalizedRoute as keyof typeof DashboardRouteHeaderTitles] ?? 'Dashboard';
-  }, [pathname, simulData?.name, proSimulData?.name, showDetailedAnalysis, showDetailedMultiYearProjectionAnalysis]);
+  }, [
+    pathname,
+    simulData?.name,
+    proSimulData?.name,
+    showDetailedAnalysis,
+    showDetailedMultiYearProjectionAnalysis,
+    isFullscreenActive,
+    showGreenResults,
+    showDetailedGreenResults,
+  ]);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -65,22 +94,41 @@ export const Header = () => {
 
   return (
     <div className="py-4 px-8 shadow-md/10 flex items-center">
-      {(showDetailedAnalysis || showDetailedMultiYearProjectionAnalysis) && pathname.includes(Routes.SIMULATION_WIZARD) && (
+      {(showDetailedAnalysis || showDetailedMultiYearProjectionAnalysis || showGreenResults || showDetailedGreenResults) &&
+        pathname.includes(Routes.SIMULATION_WIZARD) && (
+          <button
+            onClick={() => {
+              if (isFullscreenActive) {
+                exitFullscreen?.();
+                return;
+              }
+              if (showDetailedGreenResults) {
+                dispatch(setShowDetailedGreenAnalysis(false));
+                return;
+              }
+              if (showGreenResults) {
+                dispatch(setShowGreenAnalysisResults(false));
+                return;
+              }
+              dispatch(setShowDetailedAnalysis(false));
+              if (showDetailedMultiYearProjectionAnalysis) {
+                dispatch(setShowDetailedMultiYearProjectionAnalysis(false));
+              }
+            }}
+            className="flex items-center gap-1 text-text-primary! mr-6 cursor-pointer">
+            <Icon name="arrow-left" size={20} />
+          </button>
+        )}
+      {isSimulationDetailPage && !(showDetailedAnalysis || showDetailedMultiYearProjectionAnalysis || showGreenResults || showDetailedGreenResults) && (
         <button
           onClick={() => {
-            dispatch(setShowDetailedAnalysis(false));
-            if (showDetailedMultiYearProjectionAnalysis) {
-              dispatch(setShowDetailedMultiYearProjectionAnalysis(false));
+            if (isFullscreenActive) {
+              exitFullscreen?.();
+              return;
             }
-          }}
-          className="flex items-center gap-1 text-text-primary! mr-6 cursor-pointer">
-          <Icon name="arrow-left" size={20} />
-        </button>
-      )}
-      {isSimulationDetailPage && !(showDetailedAnalysis || showDetailedMultiYearProjectionAnalysis) && (
-        <button
-          onClick={() => {
             dispatch(resetInitiateSimulation());
+            dispatch(setShowGreenAnalysisResults(false));
+            dispatch(setShowDetailedGreenAnalysis(false));
             dispatch(resetProjectSimulation());
             navigate(Routes.SIMULATION_WIZARD);
           }}

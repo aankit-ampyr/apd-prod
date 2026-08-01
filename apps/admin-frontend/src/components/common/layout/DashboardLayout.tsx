@@ -9,8 +9,8 @@ export const DashboardLayout: React.FC = () => {
       <SideNav />
       <div className="grow flex flex-col overflow-hidden">
         <Header />
-        <div className="bg-bg-card p-8 grow flex flex-col overflow-hidden">
-          <div className="bg-white rounded-lg shadow p-6 grow flex flex-col overflow-hidden">
+        <div className="bg-bg-card p-8 grow flex flex-col overflow-y-auto scroll-hidden">
+          <div className="bg-white rounded-lg shadow p-6 grow flex flex-col overflow-y-auto scroll-hidden">
             <Outlet />
           </div>
         </div>

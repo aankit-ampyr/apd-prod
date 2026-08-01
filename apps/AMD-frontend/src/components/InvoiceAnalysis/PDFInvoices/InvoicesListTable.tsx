@@ -38,14 +38,16 @@ interface InvoicesListTableProps {
   isFullScreenOverride?: boolean;
   assetId: number;
   year?: number[];
+  month?: number[];
   assetSystemGenerationId?: string;
+  customActions?: React.ReactNode;
 }
 
 const PAGE_SIZE = 20;
 const PREVIEW_PANEL_WIDTH = 400;
 
 export function InvoicesListTable(props: InvoicesListTableProps) {
-  const {isFullScreenOverride: isFullScreen, assetId, year = [], assetSystemGenerationId} = props;
+  const {isFullScreenOverride: isFullScreen, assetId, year = [], month, assetSystemGenerationId, customActions} = props;
 
   /**
    * ==============================
@@ -153,9 +155,12 @@ export function InvoicesListTable(props: InvoicesListTableProps) {
     {
       align: 'left',
       name: 'amount',
+      width: {
+        minWidth: '180px',
+      },
       title: <Text variant="14L">Amount</Text>,
       render: row => {
-        const formattedAmount = row.invoice_amount ? formatCurrencyToPound(row.invoice_amount) : null;
+        const formattedAmount = row.invoice_amount != null ? formatCurrencyToPound(row.invoice_amount) : null;
         return renderInvoiceDetailsWithFallback(formattedAmount);
       },
     },
@@ -255,6 +260,7 @@ export function InvoicesListTable(props: InvoicesListTableProps) {
       assetId,
       fileName: `${assetSystemGenerationId ?? assetId}_pdf_invoices_list.csv`,
       year,
+      month,
       limit: -1,
     };
 
@@ -296,7 +302,7 @@ export function InvoicesListTable(props: InvoicesListTableProps) {
   useEffect(() => {
     if (!assetId) return;
 
-    const payload: InvoiceListRequest['params'] = {page, limit: PAGE_SIZE, assetId, year};
+    const payload: InvoiceListRequest['params'] = {page, limit: PAGE_SIZE, assetId, year, month};
 
     if (filter.search) {
       payload.search = filter.search;
@@ -311,7 +317,7 @@ export function InvoicesListTable(props: InvoicesListTableProps) {
     }
 
     dispatch(getInvoicesListRequest(payload));
-  }, [dispatch, filter, page, sortFields, assetId, year]);
+  }, [dispatch, filter, page, sortFields, assetId, year, month]);
 
   useEffect(() => {
     if (invoicesData.length === 0) {
@@ -333,6 +339,7 @@ export function InvoicesListTable(props: InvoicesListTableProps) {
 
           {!isLoading && (
             <div className="flex items-center gap-3 chart-actions">
+              {customActions}
               <IconButton
                 name="download"
                 size={20}

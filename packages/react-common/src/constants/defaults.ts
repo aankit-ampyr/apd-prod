@@ -11,7 +11,7 @@ import {
 export const toastDuration = 5 * 1000; // 5 seconds;
 export const otpTimer = 45;
 export const otpLifeSpan = 5 * 60; // 5 mins
-export const sessionIdleTimeout = 2 * 60 * 60 * 1000; // 2 hours
+export const sessionIdleTimeout = 15 * 60 * 1000; // 15 minutes
 
 export const TABLET_SCREEN_BREAKPOINT = 1024;
 
@@ -75,37 +75,36 @@ export function getEnumKeysByValues<T extends Record<string, any>>(
 export const ModuleBadgeColors: Record<AuditLogModules, string> = {
   [AuditLogModules.AUTHENTICATION]: "red",
   [AuditLogModules.ASSET_MANAGEMENT_AMD]: "orange",
-  [AuditLogModules.DIGEST_MANAGEMENT_AMD]: "magenta",
-  [AuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: "green",
+  // [AuditLogModules.DIGEST_MANAGEMENT_AMD]: "magenta",
+  [AuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: "olive",
   [AuditLogModules.PROJECT_MANAGEMENT_BESS]: "sun",
   [AuditLogModules.USER_MANAGEMENT_BESS]: "blue",
-  [AuditLogModules.USER_MANAGEMENT_AMD]: "blue",
-  [AuditLogModules.BENCHMARK_CONFIGURATION]: "cyan",
-  [AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]: "green",
+  [AuditLogModules.USER_MANAGEMENT_AMD]: "indigo",
+  [AuditLogModules.SETTINGS]: "aqua",
   [AuditLogModules.SIMULATION]: "voilet",
   [AuditLogModules.ASSET_ONBOARDING]: "pink",
-  [AuditLogModules.ASSET_ANALYSIS]: "cyan",
-  [AuditLogModules.BENCHMARK_ANALYSIS]: "cyan",
-  [AuditLogModules.FILE_HISTORY]: "magenta",
-  [AuditLogModules.INVOICE]: "gray",
+  [AuditLogModules.ASSET_ANALYSIS]: "mustard",
+  [AuditLogModules.BENCHMARK_ANALYSIS]: "navy",
+  [AuditLogModules.INVOICE_ANALYSIS]: "gray",
+  // [AuditLogModules.COMMENTS_AMD]: "cyan",
+  [AuditLogModules.EXECUTIVE_ANALYSIS]: "green",
 };
 export const AuditModuleLabel: Record<AuditLogModules, string> = {
   [AuditLogModules.AUTHENTICATION]: "Authentication",
-  [AuditLogModules.ASSET_MANAGEMENT_AMD]: "Assets (APD)",
-  [AuditLogModules.DIGEST_MANAGEMENT_AMD]: "Digests (APD)",
+  [AuditLogModules.ASSET_MANAGEMENT_AMD]: "Asset Management",
+  // [AuditLogModules.DIGEST_MANAGEMENT_AMD]: "Digests (APD)",
   [AuditLogModules.ORGANIZATION_MANAGEMENT_AMD]: "Organizations (APD)",
   [AuditLogModules.PROJECT_MANAGEMENT_BESS]: "Project Management",
   [AuditLogModules.USER_MANAGEMENT_AMD]: "User Management (APD)",
   [AuditLogModules.USER_MANAGEMENT_BESS]: "User Management (PSP)",
-  [AuditLogModules.BENCHMARK_CONFIGURATION]: "Benchmark Configuration",
-  [AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD]:
-    "Monthly Value Management (APD)",
+  [AuditLogModules.SETTINGS]: "Settings (APD)",
+  [AuditLogModules.EXECUTIVE_ANALYSIS]: "Executive Analysis",
   [AuditLogModules.SIMULATION]: "Simulation",
   [AuditLogModules.ASSET_ONBOARDING]: "Asset Onboarding",
-  [AuditLogModules.ASSET_ANALYSIS]: "Asset Analysis",
+  [AuditLogModules.ASSET_ANALYSIS]: "View Analysis",
   [AuditLogModules.BENCHMARK_ANALYSIS]: "Benchmark Analysis",
-  [AuditLogModules.FILE_HISTORY]: "File History",
-  [AuditLogModules.INVOICE]: "Invoice (APD)",
+  [AuditLogModules.INVOICE_ANALYSIS]: "Invoice Analysis",
+  // [AuditLogModules.COMMENTS_AMD]: "Comments",
 };
 
 export const AuditActionLabel: Record<AuditLogScenario, string> = {
@@ -127,11 +126,11 @@ export const AuditActionLabel: Record<AuditLogScenario, string> = {
   [AuditLogScenario.ORG_ENABLED]: "Organization Enabled",
   [AuditLogScenario.ORG_UPDATED]: "Organization Updated",
   [AuditLogScenario.ASSET_REASSIGNED]: "Asset Reassigned",
-  [AuditLogScenario.DIGEST_CREATED]: "Digest Created",
-  [AuditLogScenario.DIGEST_UPDATED]: "Digest Updated",
-  [AuditLogScenario.DIGEST_ACTIVATED]: "Digest Activated",
-  [AuditLogScenario.DIGEST_DEACTIVATED]: "Digest Deactivated",
-  [AuditLogScenario.RECIPIENTS_UPDATED]: "Recipients Updated",
+  // [AuditLogScenario.DIGEST_CREATED]: "Digest Created",
+  // [AuditLogScenario.DIGEST_UPDATED]: "Digest Updated",
+  // [AuditLogScenario.DIGEST_ACTIVATED]: "Digest Activated",
+  // [AuditLogScenario.DIGEST_DEACTIVATED]: "Digest Deactivated",
+  // [AuditLogScenario.RECIPIENTS_UPDATED]: "Recipients Updated",
   [AuditLogScenario.PROJECT_REASSIGNED]: "Project Reassigned",
   [AuditLogScenario.PROJECT_VIEWED]: "Project Viewed",
   [AuditLogScenario.PROJECT_CREATED]: "Project Created",
@@ -234,6 +233,13 @@ export const AuditActionLabel: Record<AuditLogScenario, string> = {
     "Green Energy Configuration Result Viewed",
   [AuditLogScenario.GREEN_ENERGY_RESULT_EXPORTED]:
     "Green Energy Configuration Result Exported",
+  [AuditLogScenario.INVOICE_FILE_DOWNLOADED]: "Invoice File Downloaded",
+  [AuditLogScenario.SETTLEMENT_FILE_DOWNLOADED]: "Settle File Downloaded",
+  [AuditLogScenario.INVOICE_ANALYSIS_VIEWED]: "Invoice Analysis Viewed",
+  [AuditLogScenario.INVOICE_PREVIEW_DOWNLOADED]: "Invoice Preview Downloaded",
+  [AuditLogScenario.INVOICE_ANALYSIS_DATA_DOWNLOADED]:
+    "Invoice Analysis Data Downloaded",
+
   [AuditLogScenario.CUSTOM_CONF_CREATED]: "Custom Configuration Created",
   [AuditLogScenario.MULTI_YEAR_CONF_CREATED]:
     "Multi Year Configuration Created",
@@ -241,6 +247,29 @@ export const AuditActionLabel: Record<AuditLogScenario, string> = {
     "Green Energy Configuration Created",
   [AuditLogScenario.SOLAR_PROFILE_CREATED]: "Solar Profile Created",
   [AuditLogScenario.SOLAR_PROFILE_UPDATED]: "Solar Profile Updated",
+  [AuditLogScenario.SIZING_SIMULATION_RESULT_EXPORTED]:
+    "Sizing Simulation Result Exported",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_CONF_CREATED]:
+    "Detailed Green Configuration Created",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_CONF_UPDATED]:
+    "Detailed Green Configuration Updated",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RUN]:
+    "Detailed Green Simulation Run",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RERUN]:
+    "Detailed Green Simulation Re-Run",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_MONTHLY_EXPORTED]:
+    "Detailed Green Energy Monthly Result Exported",
+  [AuditLogScenario.DETAILED_GREEN_ENERGY_HOURLY_EXPORTED]:
+    "Detailed Green Energy Hourly Result Exported",
+  [AuditLogScenario.SUMMARY_STATEMENT_UPLOADED]: "Summary Statement Uploaded",
+  [AuditLogScenario.SUMMARY_STATEMENT_DOWNLOADED]:
+    "Summary Statement Downloaded",
+  [AuditLogScenario.SUMMARY_STATEMENT_DELETED]: "Summary Statement Deleted",
+  [AuditLogScenario.ADDED_COMMENT]: "Added Comment",
+  [AuditLogScenario.UPDATED_COMMENT]: "Updated Comment",
+  [AuditLogScenario.REMOVED_COMMENT]: "Removed Comment",
+  [AuditLogScenario.REPLIED_TO_COMMENT]: "Added Reply",
+  [AuditLogScenario.VIEWED_EXECUTIVE_ANALYSIS]: "Viewed Executive Analysis",
 };
 
 export const DigestScopeBadgeColors: Record<DigestScope, string> = {

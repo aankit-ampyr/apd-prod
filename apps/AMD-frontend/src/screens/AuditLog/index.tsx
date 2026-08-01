@@ -1,6 +1,7 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, useContext} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {DataTable, FilterGroup, ScreenWrapper} from '@/components';
+import {WebSocketContext} from '@/context';
 import {Badge, Text, Tooltip} from '@/ui-kits';
 import type {AuditLog, AuditLogListRequest, DataTableColumn, SelectInputItem} from '@/interface';
 import {
@@ -13,6 +14,7 @@ import {
   AuditActionLabel,
   UserRole,
   AuditLogModuleLabels,
+  SocketEventType,
 } from '@/constants';
 import {useToast} from '@/hooks';
 import {
@@ -24,10 +26,11 @@ import {
   type SuccessCodes,
 } from '@/utils';
 import {format, isValid} from 'date-fns';
-import {auditLogListRequest, resetAuditLogMessage} from '@/services/redux/slice';
+import {auditLogListRequest, resetAuditLogMessage, addRealtimeAuditLog} from '@/services/redux/slice';
 import {
   auditLogCurrentPage,
   auditLogFailure,
+  auditLogLoading,
   auditLogs,
   auditLogSuccess,
   auditLogTotalPages,
@@ -42,18 +45,22 @@ const PAGE_SIZE = 100;
 /**
  * Role options for dropdown
  */
-const ROLE_OPTIONS = AMD_USER_ROLES.filter(item => item.id !== UserRole.Admin);
-
+const ROLE_OPTIONS = AMD_USER_ROLES.filter(item => item.id !== UserRole.Admin).sort((a, b) =>
+  a.label.localeCompare(b.label),
+);
 /**
  * Module options for dropdown
  */
-const MODULE_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(APDAuditLogModules, AuditLogModuleLabels);
+const MODULE_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(APDAuditLogModules, AuditLogModuleLabels).sort(
+  (a, b) => a.label.localeCompare(b.label),
+);
 
 /**
  * Action options for dropdown
-*/
-const ACTION_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(APDAuditLogScenario, AuditActionLabel);
-
+ */
+const ACTION_OPTIONS: SelectInputItem[] = enumToSelectOptionsWithValue(APDAuditLogScenario, AuditActionLabel).sort(
+  (a, b) => a.label.localeCompare(b.label),
+);
 
 /**
  * Filter type for audit log filtering
@@ -88,8 +95,36 @@ function normalizePreviewText(value: string) {
   return value.trim().replace(/\s+/g, ' ');
 }
 
-function stringifyAuditValue(raw: unknown) {
+function stringifyAuditValue(raw: unknown, key?: string) {
   if (raw == null) return '-';
+
+  // Handle rich text comment content
+  if (key === 'Comment Content' || key === 'Reply Content') {
+    let parsedRaw = raw;
+    if (typeof raw === 'string') {
+      try {
+        parsedRaw = JSON.parse(raw);
+      } catch {
+        // ignore
+      }
+    }
+
+    if (Array.isArray(parsedRaw)) {
+      try {
+        return parsedRaw
+          .map((node: any) => {
+            if (node.type === 'mention' && node.user?.name) {
+              return `@${node.user.name}`;
+            }
+            return node.text || '';
+          })
+          .join('');
+      } catch {
+        // fallback
+      }
+    }
+  }
+
   if (typeof raw === 'string') return normalizePreviewText(raw);
   if (typeof raw === 'number' || typeof raw === 'boolean' || typeof raw === 'bigint') {
     return String(raw);
@@ -128,11 +163,19 @@ function AuditValueCell({value}: {value: AuditValue}) {
 
     if (isPlainObject(value)) {
       const entries = Object.entries(value)
-        .map(([key, raw]) => ({
-          key,
-          value: stringifyAuditValue(raw),
-        }))
-        .filter(entry => Boolean(entry.key));
+        .map(([key, raw]) => {
+          const displayKey = key === 'Parent Comment Title' || key === 'Parent Comment' ? 'Comment Title' : key;
+          return {
+            key: displayKey,
+            value: stringifyAuditValue(raw, displayKey),
+          };
+        })
+        .filter(entry => Boolean(entry.key) && entry.key !== 'Reply Title')
+        .sort((a, b) => {
+          if ('key' in a && a.key === 'Comment Title') return -1;
+          if ('key' in b && b.key === 'Comment Title') return 1;
+          return 0;
+        });
 
       if (!entries.length) {
         return null;
@@ -215,6 +258,7 @@ export function AuditLog() {
   const totalResult = useSelector(totalAuditLogResults);
   const success = useSelector(auditLogSuccess) as SuccessCodes;
   const failure = useSelector(auditLogFailure) as ErrorCodes;
+  const isLoading = useSelector(auditLogLoading);
 
   // =================
   // states
@@ -225,8 +269,6 @@ export function AuditLog() {
   const [isInvalidSearch, setInvalidSearch] = useState<boolean>(false);
 
   const tableData = isInvalidSearch ? [] : auditLogsData;
-
-
 
   // ================
   // functions
@@ -268,10 +310,10 @@ export function AuditLog() {
     {
       name: 'log_id',
       title: 'Log ID',
-      width: {minWidth: '80px'},
+      width: {minWidth: '150px', width: '150px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-text-secondary!">
+        <Text variant="caption" className="text-text-secondary! whitespace-nowrap">
           {row.log_id}
         </Text>
       ),
@@ -279,10 +321,10 @@ export function AuditLog() {
     {
       name: 'user_id',
       title: 'User ID',
-      width: {minWidth: '100px'},
+      width: {minWidth: '150px', width: '150px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-text-secondary!">
+        <Text variant="caption" className="text-text-secondary! whitespace-nowrap">
           {row.user_id}
         </Text>
       ),
@@ -290,10 +332,10 @@ export function AuditLog() {
     {
       name: 'role',
       title: 'Role',
-      width: {minWidth: '100px'},
+      width: {minWidth: '130px', width: '130px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-secondary!">
+        <Text variant="caption" className="text-secondary! whitespace-nowrap">
           {UserRole[row.role]}
         </Text>
       ),
@@ -301,10 +343,10 @@ export function AuditLog() {
     {
       name: 'resource_id',
       title: 'Resource ID',
-      width: {minWidth: '100px'},
+      width: {minWidth: '180px', width: '180px', maxWidth: '220px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-text-secondary!">
+        <Text variant="caption" className="text-text-secondary! line-clamp-2 break-all" title={row.resource_id}>
           {row.resource_id}
         </Text>
       ),
@@ -312,7 +354,7 @@ export function AuditLog() {
     {
       name: 'module',
       title: 'Module',
-      width: {minWidth: '180px'},
+      width: {minWidth: '150px', width: '150px'},
       align: 'left',
       render: row => (
         <Text variant="caption" className="text-text-secondary!">
@@ -323,10 +365,10 @@ export function AuditLog() {
     {
       name: 'action',
       title: 'Action',
-      width: {minWidth: '100px'},
+      width: {minWidth: '200px', width: '200px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-text-secondary!">
+        <Text variant="caption" className="text-text-secondary! line-clamp-2">
           {AuditActionLabel[row.action.id] || NA}
         </Text>
       ),
@@ -334,24 +376,24 @@ export function AuditLog() {
     {
       name: 'before',
       title: 'Before',
-      width: {minWidth: '150px', maxWidth: '300px'},
+      width: {minWidth: '150px', width: '150px', maxWidth: '300px'},
       align: 'left',
       render: row => <AuditValueCell value={row.before} />,
     },
     {
       name: 'after',
       title: 'After',
-      width: {minWidth: '150px', maxWidth: '300px'},
+      width: {minWidth: '150px', width: '150px', maxWidth: '300px'},
       align: 'left',
       render: row => <AuditValueCell value={row.after} />,
     },
     {
       name: 'timestamp',
       title: 'Date & Time',
-      width: {minWidth: '150px'},
+      width: {minWidth: '150px', width: '150px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-text-secondary! whitespace-pre-wrap">
+        <Text variant="caption" className="text-text-secondary! whitespace-nowrap">
           {row?.timestamp ? formatDate(row?.timestamp, 'dd-MMM-yyyy, hh:mm a') : NA}
         </Text>
       ),
@@ -387,6 +429,46 @@ export function AuditLog() {
   useEffect(() => {
     fetchAuditLogs();
   }, [filter, page]);
+
+  const {subscribe} = useContext(WebSocketContext);
+
+  useEffect(() => {
+    const unsubscribe = subscribe(event => {
+      if (event.type === SocketEventType.AUDIT_LOG && event.data) {
+        if (page !== 1) return; // Only update dynamically if on the first page
+
+        const newLog = event.data as any;
+
+        // Apply active filters check
+        if (filter.role && newLog.role !== filter.role) return;
+        if (filter.module && newLog.module?.id !== filter.module) return;
+        if (filter.action && newLog.action?.id !== filter.action) return;
+
+        if (filter.start_date || filter.end_date) {
+          const logDate = new Date(newLog.created_at).getTime();
+
+          if (filter.start_date) {
+            const startDate = new Date(filter.start_date).getTime();
+            if (logDate < startDate) return;
+          }
+
+          if (filter.end_date) {
+            const endDate = new Date(filter.end_date);
+            endDate.setDate(endDate.getDate() + 1);
+            if (logDate >= endDate.getTime()) return;
+          }
+        }
+
+        if (filter.search) {
+          return; // Skip real-time updates when searching to avoid complex matching logic on the client
+        }
+
+        dispatch(addRealtimeAuditLog(newLog));
+      }
+    });
+
+    return unsubscribe;
+  }, [subscribe, page, filter, dispatch]);
 
   useEffect(() => {
     if (success) {
@@ -446,7 +528,7 @@ export function AuditLog() {
             {
               key: 'action',
               placeholder: 'Select Action',
-            type: 'searchable-select',
+              type: 'searchable-select',
               options: ACTION_OPTIONS,
               props: {
                 className: 'min-w-38',
@@ -458,7 +540,7 @@ export function AuditLog() {
               type: 'date-range',
               placeholder: 'Select Date',
               props: {
-                calendarClassName: 'left-1/2 -translate-x-1/2',
+                usePortal: true,
               },
             },
           ]}
@@ -472,9 +554,13 @@ export function AuditLog() {
           totalPages={totalPagesData}
           currentPage={currentPage}
           totalResult={totalResult}
+          pageSize={PAGE_SIZE}
           errorMessage={tableMessage}
           onPageChange={setPage}
           stickyHeader
+          loading={isLoading}
+          ghostRowCount={6}
+          tableHeightWhenScrollable={520}
         />
       </div>
     </ScreenWrapper>

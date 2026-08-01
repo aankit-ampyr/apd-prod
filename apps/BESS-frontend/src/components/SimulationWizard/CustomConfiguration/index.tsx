@@ -1,10 +1,12 @@
-import {Button, Icon, Radio, Skeleton, Text, TextInput} from '@/ui-kits';
+import {Alert, Button, Icon, Radio, Skeleton, Text, TextInput} from '@/ui-kits';
 import {useState, useEffect, useRef} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {ViewDetailedAnalysis} from './ViewDetailedAnalysis';
 import {
+  clearCustomConfigErrors,
   customConfigRequest,
   customSimulationResultRequest,
+  editedStepSimulationDataRequest,
   getCustomConfigRequest,
   getCustomConfigSilentRequest,
   refreshProjectSimulationRequest,
@@ -12,11 +14,14 @@ import {
 } from '@/services/redux/slice/simulationWizardSlice';
 import {
   customConfigData,
+  customConfigError,
   customConfigLoading,
+  customConfigRunError,
   customConfigSuccess,
   customSimulationLoading,
   customSimulationResults,
   customSimulationSuccess,
+  editedStepData,
   generatorData,
   initiateSimulationData,
   loadProfileData,
@@ -25,6 +30,7 @@ import {
   savedSolarProfileData,
   showDetailedAnalysisSelector,
   simulationProgressData,
+  simulationProjectLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {BessContainerTypes} from '@/constants';
 import {useCustomSimulation} from './useCustomSimulation';
@@ -34,9 +40,11 @@ import {RootState} from '@/services/redux/rootReducer';
 import {allProjectsData, authDataSelector} from '@/services/redux/selectors';
 import {useSimulationStatus} from '../SimulationStatusContext';
 import {createPortal} from 'react-dom';
+import {ConfigurationOutOfSync} from '../OutOfSyncPopup';
 
 interface CustomConfigurationProps {
   setIsStepsHidden?: (hidden: boolean) => void;
+  goToStep?: (step: number) => void;
 }
 
 function CustomConfigurationEmptyStateIcon() {
@@ -73,7 +81,7 @@ function CustomConfigurationGhostLoader() {
   );
 }
 
-export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps) => {
+export const CustomConfiguration = ({setIsStepsHidden, goToStep}: CustomConfigurationProps) => {
   const dispatch = useDispatch();
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
@@ -90,6 +98,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   const isLoading = useSelector(customSimulationLoading);
   const simulProgressData = useSelector(simulationProgressData);
   const isSimulationProgressLoading = useSelector((state: RootState) => state.simulationWizard.simulationProgressLoading);
+  const isProSimulLoading = useSelector(simulationProjectLoading);
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
   const projectId = simulData?.project_id ?? proSimulData?.project_id;
@@ -97,9 +106,14 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some(user => user.id === authData.id));
   const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
   const isReadOnly = isAssignedUser || isProjectAssignmentPending;
+  const saveError = useSelector(customConfigError);
+  const runError = useSelector(customConfigRunError);
+  const stepData = useSelector(editedStepData);
+
+  const isOutOfSync = saveError === 'E-20062' || runError === 'E-20062';
 
   const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, runningSimulationId, userName, DGSizingSimulationCompleted} = useSimulationStatus() ?? {};
 
   const simulation_id = simulData?.id ?? proSimulData?.id;
   const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
@@ -112,22 +126,14 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   const [showSimulationResults, setShowSimulationResults] = useState(false);
   const [simulationCompleted, setSimulationCompleted] = useState(false);
   const [isEditable, setIsEditable] = useState(true);
+  const [runClicked, setRunClicked] = useState(false);
 
-  // Polling logic for simulation result
-  const pollingRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isPolling, setIsPolling] = useState(false);
+  const hasResults = !!customSimulResult?.data && Object.keys(customSimulResult?.data)?.length > 0;
 
-  const stopPolling = () => {
-    if (pollingRef.current) {
-      clearTimeout(pollingRef.current);
-      pollingRef.current = null;
-    }
-    setIsPolling(false);
-  };
-
-  const {handleRunSimulation, isBlocked, isSimulationRunning}: any = useCustomSimulation({
+  const {handleRunSimulation, isBlocked, isSimulationRunning, setIsSimulationRunning}: any = useCustomSimulation({
     simulationId: simulation_id,
     onSimulationCompleted: () => {
+      setRunClicked(false);
       setShowSimulationResults(true);
       setSimulationCompleted(true);
       setIsEditable(false);
@@ -140,8 +146,6 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
         );
         dispatch(getCustomConfigSilentRequest({simulation_id}));
       }
-      // Stop polling if socket completes
-      stopPolling();
     },
   });
   const shouldShowExternalSimulationMessage = !isSimulationRunning && (isBlocked || shouldBlock);
@@ -151,7 +155,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   // Stat icon mapping
   const statIconMap: Record<string, string> = {
     'Load Met (%)': 'gisLayerUpload',
-    'Green Hours (%)': 'leaf',
+    'Green Hours (%)': 'dotted-clock',
     'Generator Hours': 'clock2',
     'Fuel Used (L)': 'fuel',
     'Wastage Energy (%)': 'radioactive-waste',
@@ -167,6 +171,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   useEffect(() => {
     if (simulation_id) {
       dispatch(getCustomConfigRequest({simulation_id}));
+      dispatch(editedStepSimulationDataRequest({simulation_id}));
     }
   }, [simulation_id]);
 
@@ -200,7 +205,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   // After Simulation Completion: hide both buttons, show results
   useEffect(() => {
     // If this step has been edited after a previous run, keep results hidden until user runs again.
-    if (customResultSuccess === 'S-20038' && simulationData?.edited_step !== 8) {
+    if (customResultSuccess === 'S-20038' && hasResults && simulationData?.edited_step !== 8) {
       setShowSimulationResults(true);
       setSimulationCompleted(true);
       setIsEditable(false);
@@ -210,7 +215,20 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
         }),
       );
     }
-  }, [customResultSuccess, simulationData?.edited_step, simulation_id]);
+  }, [customResultSuccess, simulationData?.edited_step, simulation_id, hasResults]);
+
+  useEffect(() => {
+    if (saveError === 'E-20062' || runError === 'E-20062') {
+      setIsSimulationRunning(false);
+    }
+  }, [saveError, runError]);
+
+  useEffect(() => {
+    if (stepData?.last_edited === 8) {
+      setSaveEnabled(false);
+      setRunEnabled(true);
+    }
+  }, [stepData?.last_edited]);
 
   // If Step 3 sizing simulation is run again, clear stale custom simulation result UI.
   useEffect(() => {
@@ -223,41 +241,12 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
     }
   }, [sizingSimulationSuccess]);
 
-  // Loader state: show loader if simulation is running (isLoading true and not completed)
-  // Also, hide Save/Run CTAs immediately after clicking Run Simulation
-  const [runClicked, setRunClicked] = useState(false);
   useEffect(() => {
     if (!isLoading) {
       setRunClicked(false);
     }
   }, [isLoading]);
-  const showLoader = (isLoading || runClicked || isPolling) && !simulationCompleted;
-
-  // Stop polling when success code is received
-  useEffect(() => {
-    if (customResultSuccess === 'S-20038') {
-      stopPolling();
-    }
-  }, [customResultSuccess]);
-
-  // Clean up polling on unmount
-  useEffect(() => {
-    return () => {
-      stopPolling();
-    };
-  }, []);
-
-  // Start polling function
-  const startPolling = () => {
-    if (!simulation_id) return;
-    setIsPolling(true);
-    const poll = () => {
-      dispatch(customSimulationResultRequest({simulation_id}));
-      pollingRef.current = setTimeout(poll, 3000);
-    };
-    // Start first poll after 3 seconds
-    pollingRef.current = setTimeout(poll, 3000);
-  };
+  const showLoader = (isSimulationRunning || (isLoading && runClicked)) && !simulationCompleted && !isOutOfSync;
 
   // Guard function for change configuration confirmation
   const guardLocalChange = (restore: () => void) => {
@@ -351,6 +340,14 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
     setDgCapacity(customData.dg_capacity ?? 200);
   }, [customData]);
 
+  useEffect(() => {
+    if (DGSizingSimulationCompleted) {
+      setSaveEnabled(true);
+      setRunEnabled(false);
+      setSimulationCompleted(false);
+    }
+  }, [DGSizingSimulationCompleted]);
+
   const handleViewDetailedAnalysis = () => {
     dispatch(setShowDetailedAnalysis(true));
   };
@@ -411,7 +408,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
   // Keep the loader only while the request is in flight or the wizard progress
   // data is still missing. A missing custom config should fall back to defaults
   // instead of trapping the page in the skeleton state.
-  const isInitialLoad = isCustomConfigLoading || isSimulationProgressLoading;
+  const isInitialLoad = isCustomConfigLoading || isSimulationProgressLoading || isProSimulLoading || !proSimulData?.project_id || !currentProject;
 
   if (isInitialLoad) {
     return <CustomConfigurationGhostLoader />;
@@ -429,12 +426,14 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
       <>
         {shouldShowExternalSimulationMessage && (
           <div className="flex justify-center">
-            <div className="flex items-center gap-3">
-              <Icon name="infoCircle" className="size-4.5! text-warning!" />
-              <Text variant="14M" className="text-warning!">
-                Another simulation is currently running. You'll be able to start a new one once it finishes.
-              </Text>
-            </div>
+            <Alert
+              textClassName="text-error-text! text-[14px]!"
+              iconClassName="mt-0! size-4.5!"
+              iconName="warning-triangle-sharp"
+              message={`${userName} is currently running this simulation. You can run it again once it completes`}
+              variant="error"
+              className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+            />
           </div>
         )}
         <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
@@ -449,8 +448,48 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
     );
   }
 
+  const getStepInfo = () => {
+    const editedStep = stepData?.last_edited ?? 0;
+
+    if ([1, 2, 3, 4, 5, 6, 7].includes(editedStep)) {
+      return {
+        title: 'BESS & DG Sizing',
+        step: 3,
+      };
+    }
+
+    return {
+      title: 'Unknown',
+      step: null,
+    };
+  };
+  const stepInfo = getStepInfo();
+
+  const dismissOutOfSync = () => {
+    dispatch(clearCustomConfigErrors());
+  };
+
+  const handleOutOfSyncAction = () => {
+    if (stepInfo.step) {
+      goToStep?.(stepInfo.step);
+    }
+    dismissOutOfSync();
+  };
+
   return (
     <div className="main">
+      {shouldShowExternalSimulationMessage && (
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
+        </div>
+      )}
       <div className="flex gap-3">
         <div className="bg-[#F7FDFC] p-4 mt-5 border-[1.4px] border-[#B6D7D3] rounded-lg w-[65%]">
           <div className="flex items-center gap-3">
@@ -603,6 +642,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
         </div>
       </div>
       {(isSimulationRunning || isBlocked || shouldBlock) &&
+        !isOutOfSync &&
         createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
       {/* Button workflow logic */}
       {/* Show loader if simulation is running, else show Save/Run CTAs if editable */}
@@ -611,7 +651,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
           <img src={Images.loading} alt="Loading" className="text-text-primary!" style={{width: 32, height: 32}} />
         </div>
       ) : (
-        isEditable && (
+        (isEditable || DGSizingSimulationCompleted) && (
           <div className="flex justify-center gap-3 mt-4">
             {!isReadOnly && (
               <Button variant="secondary" size="md" className="self-center w-30 flex justify-center" onClick={handleSave} disabled={!saveEnabled}>
@@ -627,8 +667,6 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
                 setShowSimulationResults(false);
                 setRunClicked(true);
                 handleRunSimulation();
-                // Start polling after 3s if socket doesn't complete
-                startPolling();
               }}
               disabled={!runEnabled || isReadOnly}>
               Run Simulation
@@ -636,8 +674,19 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
           </div>
         )
       )}
+
+      {isOutOfSync && (
+        <ConfigurationOutOfSync
+          open={isOutOfSync}
+          onClose={dismissOutOfSync}
+          onAction={handleOutOfSyncAction}
+          actionText={stepInfo.title}
+          recommendationText={`Rerun the simulation, then open ${stepInfo.title} to view the updated results.`}
+        />
+      )}
+
       {/* Simulation completed block */}
-      {simulationCompleted && (
+      {simulationCompleted && hasResults && !DGSizingSimulationCompleted && (
         <div className="flex justify-center items-center my-4!">
           <div className="bg-primary-tint-2 p-3 px-6 flex items-center  gap-3 w-fit rounded-md">
             <Icon name="circle-check-big" className="text-success! mt-0.5!" size={18} />
@@ -648,7 +697,7 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
         </div>
       )}
       {/* Simulation results block */}
-      {(showSimulationResults || customResultSuccess === 'S-20038') && simulationCompleted && (
+      {(showSimulationResults || customResultSuccess === 'S-20038') && simulationCompleted && hasResults && !DGSizingSimulationCompleted && (
         <>
           <div className="rounded-2xl border border-gray-300 bg-white p-6">
             <div className="flex items-center gap-2 mb-6">
@@ -693,16 +742,6 @@ export const CustomConfiguration = ({setIsStepsHidden}: CustomConfigurationProps
             </Button>
           </div>
         </>
-      )}
-      {shouldShowExternalSimulationMessage && (
-        <div className="flex justify-center mt-3">
-          <div className="flex items-center gap-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes.
-            </Text>
-          </div>
-        </div>
       )}
     </div>
   );

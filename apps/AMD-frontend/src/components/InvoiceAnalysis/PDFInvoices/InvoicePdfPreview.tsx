@@ -49,6 +49,7 @@ export function InvoicePdfPreview(props: InvoicePdfPreviewProps) {
       fileName,
       invoiceId: fileId,
       assetId,
+      source: 'preview',
     });
   }
 

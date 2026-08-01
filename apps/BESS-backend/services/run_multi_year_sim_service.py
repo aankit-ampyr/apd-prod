@@ -1,6 +1,5 @@
 import io
 import csv
-import pandas as pd
 from typing import Optional
 from fastapi.responses import StreamingResponse
 from fastapi import status
@@ -74,13 +73,14 @@ class RunMultiYearSimulationService:
         total_bess_to_load = round(sum(x.bess_to_load for x in sorted_data), 2)
         charging_loss_mwh = round(sum(x.charging_loss for x in sorted_data), 2)
         discharging_loss_mwh = round(sum(x.discharging_loss for x in sorted_data), 2)
+        degradation_loss_mwh = sum(x.degradation_loss for x in sorted_data)
+
+        # INFO: Temporary fix(require change in multi year simulaton).
+        degradation_loss_mwh -= sorted_data[-1].degradation_loss
 
         final_bess_soc = round(sorted_data[-1].final_soc_pct, 2)
-        final_bess_energy = round(
-            sorted_data[-1].bess_mwh * (final_bess_soc / 100.0), 2
-        )
-
-        print(f"{sorted_data[-1].bess_mwh=}, {final_bess_soc=}")
+        final_bess_capacity = sorted_data[-1].bess_mwh
+        final_bess_energy = round(final_bess_capacity * (final_bess_soc / 100.0), 2)
 
         # total_bess_energy in EnergyInMetrics (energy charged into the battery)
         total_bess_energy_in = round(
@@ -126,14 +126,8 @@ class RunMultiYearSimulationService:
             round((dg_curtailed_mwh / dg_total) * 100.0, 2) if dg_total > 0 else 0.0
         )
 
-        cycle_loss = round(charging_loss_mwh + discharging_loss_mwh, 2)
-
-        total_bess_energy_out = round(
-            total_bess_to_load
-            + charging_loss_mwh
-            + discharging_loss_mwh
-            + final_bess_energy,
-            2,
+        cycle_loss = round(
+            charging_loss_mwh + discharging_loss_mwh + degradation_loss_mwh, 2
         )
 
         total_energy_out = round(
@@ -142,6 +136,7 @@ class RunMultiYearSimulationService:
             + dg_curtailed_mwh
             + charging_loss_mwh
             + discharging_loss_mwh
+            + degradation_loss_mwh
             + final_bess_energy,
             2,
         )
@@ -157,10 +152,11 @@ class RunMultiYearSimulationService:
             dg_curtailed_mwh=dg_curtailed_mwh,
             charging_loss_mwh=charging_loss_mwh,
             discharging_loss_mwh=discharging_loss_mwh,
+            degradation_loss_mwh=degradation_loss_mwh,
             cycle_loss=cycle_loss,
             final_bess_soc=final_bess_soc,
             final_bess_energy=final_bess_energy,
-            total_bess_energy=total_bess_energy_out,
+            total_bess_energy=final_bess_capacity,
             total_energy=total_energy_out,
         )
 
@@ -179,6 +175,7 @@ class RunMultiYearSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
@@ -192,16 +189,19 @@ class RunMultiYearSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if simulation.step < SimulationSetupProgress.MULTI_YEAR_PROJECTION_CONFIG:
+        if simulation.edit_step < SimulationSetupProgress.MULTI_YEAR_PROJECTION_CONFIG:
             return Res.error(
-                message="Incomplete Simulaton",
+                status_code="E-20062",
+                message="Incomplete Simulation configuration.",
                 http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         sim_job_result = await bess_db.execute(
-            select(MultiYearSimulationJob).where(
+            select(MultiYearSimulationJob)
+            .where(
                 MultiYearSimulationJob.simulation_id == simulation.id,
             )
+            .with_for_update()
         )
 
         single_sim_jobs = sim_job_result.scalar_one_or_none()
@@ -239,6 +239,24 @@ class RunMultiYearSimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
+        await bess_db.flush()
+
+        try:
+            await multi_year_projection_sim_task.kiq(
+                simulation.id,
+                job_id=new_simulation_job.job_id,
+                run_by=current_user.get("name"),  # type: ignore
+            )
+
+            await bess_db.commit()
+
+        except Exception:
+            await bess_db.rollback()
+
+            return Res.error(
+                status_code="E-20065",
+                message="Unable to run simulation.",
+            )
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -247,14 +265,8 @@ class RunMultiYearSimulationService:
             action=log_action,
             resource_id=resource_id,
             before=before_config,
-            after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
-        )
-
-        await bess_db.commit()
-        await bess_db.refresh(new_simulation_job)
-
-        await multi_year_projection_sim_task.kiq(
-            simulation.id, job_id=new_simulation_job.job_id
+            after="Simulation Status: STARTED",
+            redis=redis,
         )
 
         return Res.success(
@@ -306,6 +318,7 @@ class RunMultiYearSimulationService:
             resource_id=resource_id,
             before=f"Simulation Status: {SimulationJobStatus(simulation_job.status).name}",
             after=f"Simulation Status: {SimulationJobStatus.TERMINATED.name}",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -348,6 +361,7 @@ class RunMultiYearSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         sort: Optional[list[str]] = None,
         until_year: int = 20,
     ):
@@ -367,6 +381,7 @@ class RunMultiYearSimulationService:
                 message="Simulation result not found.",
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
+        custom_order = False
 
         order_by = []
         sort_map = {
@@ -402,6 +417,7 @@ class RunMultiYearSimulationService:
         }
 
         if sort:
+            custom_order = True
             for s in sort:
                 if s.startswith("-"):
                     field = s[1:]
@@ -434,16 +450,18 @@ class RunMultiYearSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        await audit_logs(
-            db=bess_db,
-            user_id=f"USER-{current_user.get('id')}",
-            user_role=current_user.get("role"),  # type: ignore
-            module=PSPAuditLogModules.SIMULATION.value,
-            action=PSPAuditLogScenario.MULTI_YEAR_RESULT_VIEWED.value,
-            resource_id=resource_id,
-            before=None,
-            after="Action: Multi-Year Projection Detailed Analysis Page Opened",
-        )
+        if until_year == 20 and not custom_order:
+            await audit_logs(
+                db=bess_db,
+                user_id=f"USER-{current_user.get('id')}",
+                user_role=current_user.get("role"),  # type: ignore
+                module=PSPAuditLogModules.SIMULATION.value,
+                action=PSPAuditLogScenario.MULTI_YEAR_RESULT_VIEWED.value,
+                resource_id=resource_id,
+                before=None,
+                after="Action: Multi-Year Projection Detailed Analysis Page Opened",
+                redis=redis,
+            )
 
         await bess_db.commit()
         results = [
@@ -618,6 +636,7 @@ class RunMultiYearSimulationService:
         until_year: int,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         sort: Optional[list[str]] = None,
     ):
         result = await bess_db.execute(
@@ -646,6 +665,7 @@ class RunMultiYearSimulationService:
             resource_id=resource_id,
             before=None,
             after="Action: Multi-Year Projection Results Exported",
+            redis=redis,
         )
 
         await bess_db.commit()

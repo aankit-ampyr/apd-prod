@@ -1,11 +1,14 @@
 import json
 from typing import Optional
 
-from constants.enums import SimulationLogStep
+from constants.enums import ResourceType, SimulationLogStep
+from constants.defaults import LOGS_STREAM_CHANEL
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import AuditLog
 from db.db_config import BessSessionLocal
 from datetime import timezone, datetime
+from redis.asyncio import Redis
+from dtos import AuditLogSchema, SocketLogEvent
 
 
 async def audit_logs(
@@ -13,28 +16,45 @@ async def audit_logs(
     user_role: int,
     module: int,
     action: int,
+    redis: Redis,
     before: str | dict | None,
     after: str | dict | None,
     resource_id: Optional[str] = None,
     db: Optional[AsyncSession] = None,
+    channel: str = LOGS_STREAM_CHANEL,
 ):
+    before_str = json.dumps(before) if isinstance(before, dict) else before
+    after_str = json.dumps(after) if isinstance(after, dict) else after
+
+    # Inner helper logic so session handling stays clean
+    async def _save_and_publish(session: AsyncSession):
+        audit_log = AuditLog(
+            user_id=user_id,
+            role=user_role,
+            module=module,
+            action=action,
+            resource_id=resource_id,
+            before=before_str,
+            after=after_str,
+            created_at=datetime.now(timezone.utc),
+        )
+
+        session.add(audit_log)
+        await session.commit()
+        await session.refresh(audit_log)
+
+        audit_data = AuditLogSchema.model_validate(audit_log)
+        complete_event = SocketLogEvent(
+            resource_type=ResourceType.AUDIT_LOG, data=audit_data
+        )
+        await redis.publish(channel, complete_event.model_dump_json())
+
     try:
-        async with BessSessionLocal() as db_session:
-            audit_log = AuditLog(
-                user_id=user_id,
-                role=user_role,
-                module=module,
-                action=action,
-                resource_id=resource_id,
-                before=before,
-                after=after,
-                created_at=datetime.now(timezone.utc),
-            )
-            if db:
-                db.add(audit_log)
-            else:
-                db_session.add(audit_log)
-                await db_session.commit()
+        if db:
+            await _save_and_publish(db)
+        else:
+            async with BessSessionLocal() as db_session:
+                await _save_and_publish(db_session)
 
     except Exception as e:
         raise e
@@ -92,6 +112,7 @@ FIELD_MAP = {
     "solar_step": "Solar Step Size MW",
     "min_green_energy": "Min Green Energy %",
     "max_wastage": "Max Wastage %",
+    "solar_peak": "Solar Size Capacity MWp",
 }
 
 
@@ -102,10 +123,12 @@ async def compare_and_log(
     action: int,
     before: dict,
     after: dict,
+    redis: Redis,
     sim_module_type: SimulationLogStep,
     resource_id: Optional[str] = None,
     db: Optional[AsyncSession] = None,
     remove_id: bool = False,
+    channel: str = LOGS_STREAM_CHANEL,
 ):
     diff_before = {}
     diff_after = {}
@@ -139,4 +162,6 @@ async def compare_and_log(
         else None,
         resource_id=resource_id,
         db=db,
+        redis=redis,
+        channel=channel,
     )

@@ -1,4 +1,5 @@
-import {Section, GroupedBarChart, type GroupedBarChartTooltipDetails} from '@/components';
+import {Section, GroupedBarChart, type GroupedBarChartTooltipDetails, CommentTrigger} from '@/components';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets, WidgetDataPointPayload} from '@/constants';
 import {GradientKPI, type GradientKPIObject} from '../../common';
 import type {DataTableColumn} from '@/interface';
 import {
@@ -18,11 +19,14 @@ import {
   getAssetAncillaryServiceRevenueByHourRequest,
   getAssetAncillaryServiceOpportunityCostAnalysisRequest,
 } from '@/services/redux/slice';
-import {formatCurrencyToPound} from '@/utils';
+import {setActiveContext, setPanelOpen, fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
+import {cn, formatCurrencyToPound} from '@/utils';
 import {useEffect, useMemo} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {Icon, Text, Tooltip} from '@/ui-kits';
 import type {AssetAnalysisTabProps} from '../types';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 import {
   DivergentBarChart,
   type DivergentBarDataPoint,
@@ -50,6 +54,8 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
    * ==============================
    */
   const dispatch = useDispatch();
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
   /**
    * ==============================
    * Selector
@@ -67,6 +73,38 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
 
   const ancillaryServiceRevenuByHour = useSelector(assetAncillaryServiceRevenueByHourResult);
   const ancillaryServiceRevenuByHourLoading = useSelector(assetAncillaryServiceRevenueByHourLoading);
+
+  const allComments = useSelector((state: any) => state.comment.comments || []);
+  const getCommentCountForDataPoint = <W extends WidgetDataPointPayload['context_widget']>(
+    widgetId: W,
+    label: Extract<WidgetDataPointPayload, {context_widget: W}>['context_data_point'],
+  ) => {
+    return allComments.reduce((acc: number, c: any) => {
+      if (c.context_widget !== widgetId) return acc;
+      if (c.context_data_point !== label) return acc;
+      return acc + 1 + (c.replies?.length || 0);
+    }, 0);
+  };
+
+  const handleBadgeClick = <W extends WidgetDataPointPayload['context_widget']>(
+    widgetId: W,
+    categoryId: string | number,
+    seriesId: string,
+  ) => {
+    dispatch(
+      setActiveContext({
+        context_type: CommentContextType.DataPoint,
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.AncillaryServices,
+        context_widget: widgetId,
+        context_data_point: `${categoryId}-${seriesId}`,
+        context_asset_id: assetId,
+        context_year: year,
+        context_month: month,
+      }),
+    );
+    dispatch(setPanelOpen(true));
+  };
 
   /**
    * ==============================
@@ -132,7 +170,7 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
           <span className="font-InterMedium!">Current Avg Rate =</span> Total Ancillary Revenue / Total MW-Hours
         </Text>
       ),
-      tooltipPosition: 'top'
+      tooltipPosition: 'top',
     },
     {
       icon: 'star',
@@ -142,12 +180,8 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
       variant: 'blue',
       helperLabel: `${bestService} is the best service available`,
       showTooltip: true,
-      tooltipMessage: (
-        <Text variant="14M">
-          Highest revenue per MW/h achieved by single service
-        </Text>
-      ),
-      tooltipPosition: 'top'
+      tooltipMessage: <Text variant="14M">Highest revenue per MW/h achieved by single service</Text>,
+      tooltipPosition: 'top',
     },
     {
       icon: 'shield',
@@ -158,10 +192,11 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
       showTooltip: true,
       tooltipMessage: (
         <Text variant="14R">
-          Opportunity cost = <span className="font-InterMedium!">optimal Revenue</span> - <span className="font-InterMedium!">Actual Revenue</span>
+          Opportunity cost = <span className="font-InterMedium!">optimal Revenue</span> -{' '}
+          <span className="font-InterMedium!">Actual Revenue</span>
         </Text>
       ),
-      tooltipPosition: 'left-top'
+      tooltipPosition: 'left-top',
     },
   ];
 
@@ -216,17 +251,23 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
     const data = categories.map(category => {
       const hourRevenue = hourlyRevenue.find(item => item.hour === category.id);
       const values: Record<string, number> = {};
+      const commentCounts: Record<string, number> = {};
 
-      hourRevenue?.services.forEach(serviceItem => {
-        const revenue = Number(serviceItem.revenue ?? 0);
-        if (revenue) {
-          values[getAncillaryServiceId(serviceItem.service)] = revenue;
-        }
-      });
+      if (hourRevenue) {
+        hourRevenue.services.forEach(serviceItem => {
+          const serviceKey = getAncillaryServiceId(serviceItem.service);
+          const revenue = Number(serviceItem.revenue ?? 0);
+          if (revenue) {
+            values[serviceKey] = revenue;
+          }
+          commentCounts[serviceKey] = getCommentCountForDataPoint(ViewAnalysisWidgets.ServiceRevenueByHour, `${category.id}-${serviceKey}`);
+        });
+      }
 
       return {
         categoryId: category.id,
         values,
+        commentCounts,
       };
     });
 
@@ -235,7 +276,7 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
       series,
       data,
     };
-  }, [ancillaryServiceRevenuByHour?.hourly_revenue]);
+  }, [ancillaryServiceRevenuByHour?.hourly_revenue, allComments]);
 
   /**
    * ==============================
@@ -247,72 +288,88 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
       {
         name: 'service',
         title: (
-          <Text variant="14R" className="text-center">
+          <Text variant="14R" className={cn('text-center whitespace-nowrap', isTablet && 'text-[11px]')}>
             Service
           </Text>
         ),
         align: 'center',
         headerAlign: 'center',
-        width: {minWidth: '110px'},
-        render: row => <Text variant="14R">{row.service || '-'}</Text>,
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '70px' : '110px'},
+        render: row => (
+          <Text variant="14R" className={cn('', isTablet && 'text-[11px]')}>
+            {row.service || '-'}
+          </Text>
+        ),
       },
       {
         name: 'service_name',
         title: (
-          <Text variant="14R" className="text-center">
+          <Text variant="14R" className={cn('text-center whitespace-nowrap', isTablet && 'text-[11px]')}>
             Name
           </Text>
         ),
         align: 'center',
         headerAlign: 'left',
-        width: {minWidth: '160px'},
-        render: row => <Text variant="14M">{row.service_name || '-'}</Text>,
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '90px' : '160px'},
+        render: row => (
+          <Text variant="14M" className={cn('', isTablet && 'text-[11px]')}>
+            {row.service_name || '-'}
+          </Text>
+        ),
       },
       {
         name: 'total_revenue',
         title: (
-          <Text variant="14R" className="text-center">
+          <Text variant="14R" className={cn('text-center whitespace-nowrap', isTablet && 'text-[11px]')}>
             Total Revenue <span className="text-text-secondary! font-InterRegular!">(£)</span>{' '}
           </Text>
         ),
         align: 'center',
         headerAlign: 'center',
-        width: {minWidth: '170px'},
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '120px' : '170px'},
         render: row => (
-          <Text variant="14M">{row.total_revenue == null ? '-' : formatCurrencyToPound(row.total_revenue)}</Text>
+          <Text variant="14M" className={cn('', isTablet && 'text-[11px]')}>
+            {row.total_revenue == null ? '-' : formatCurrencyToPound(row.total_revenue)}
+          </Text>
         ),
       },
       {
         name: 'periods_active',
         title: (
-          <Text variant="14R" className="text-center">
+          <Text variant="14R" className={cn('text-center whitespace-nowrap', isTablet && 'text-[11px]')}>
             Periods Active
           </Text>
         ),
         align: 'center',
         headerAlign: 'center',
-        width: {minWidth: '150px'},
-        render: row => <Text variant="14M">{row.periods_active == null ? '-' : String(row.periods_active)}</Text>,
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '100px' : '150px'},
+        render: row => (
+          <Text variant="14M" className={cn('', isTablet && 'text-[11px]')}>
+            {row.periods_active == null ? '-' : String(row.periods_active)}
+          </Text>
+        ),
       },
       {
         name: 'avg_price',
         title: (
-          <Text variant="14R" className="text-center">
+          <Text variant="14R" className={cn('text-center whitespace-nowrap', isTablet && 'text-[11px]')}>
             Avg Price per <span className="text-text-secondary!">MWh</span>
           </Text>
         ),
         align: 'center',
         headerAlign: 'center',
-        width: {minWidth: '230px'},
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '130px' : '230px'},
         render: row => (
-          <Text variant="14M">{row.avg_price == null ? '-' : `£${Number(row.avg_price).toFixed(2)}`}</Text>
+          <Text variant="14M" className={cn('', isTablet && 'text-[11px]')}>
+            {row.avg_price == null ? '-' : `£${Number(row.avg_price).toFixed(2)}`}
+          </Text>
         ),
       },
       {
         name: 'revenue_per_mwh',
         title: (
-          <div className="flex items-center justify-center gap-2">
-            <Text variant="14R">
+          <div className={cn('flex items-center justify-center gap-1.5 whitespace-nowrap', isTablet && 'text-[11px]')}>
+            <Text variant="14R" className={cn('', isTablet && 'text-[11px]')}>
               Revenue <span className="text-text-secondary! font-InterRegular!">(£)</span> per{' '}
               <span className="text-text-secondary! font-InterRegular!">MWh</span>
             </Text>
@@ -333,13 +390,15 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
         ),
         align: 'center',
         headerAlign: 'center',
-        width: {minWidth: '230px'},
+        width: {minWidth: width <= TABLET_SCREEN_BREAKPOINT ? '150px' : '230px'},
         render: row => (
-          <Text variant="14M">{row.revenue_per_mwh == null ? '-' : `£${Number(row.revenue_per_mwh).toFixed(2)}`}</Text>
+          <Text variant="14M" className={cn('', isTablet && 'text-[11px]')}>
+            {row.revenue_per_mwh == null ? '-' : `£${Number(row.revenue_per_mwh).toFixed(2)}`}
+          </Text>
         ),
       },
     ],
-    [],
+    [width],
   );
 
   /**
@@ -352,14 +411,33 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
     const service = toolTipProps.activeSeries?.label;
     const color = toolTipProps.activeSeries?.color;
     const hour = toolTipProps.categoryId;
+    const serviceId = toolTipProps.activeSeries?.seriesId;
 
     return (
-      <div className="bg-white border-border border p-3 rounded">
+      <div className="bg-white border-border border p-3 rounded pointer-events-auto">
         <Text variant="14M">{service}</Text>
-        <Text variant="14M">Hour: {hour?.toString().padStart(2, '0')}:00</Text>
-        <Text style={{color}} variant="14M">
+        <Text variant="14M" className="mb-2 block">Hour: {hour?.toString().padStart(2, '0')}:00</Text>
+        <Text style={{color}} variant="14M" className="mb-2 block">
           Revenue: {formatCurrencyToPound(value)}
         </Text>
+
+        <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+          <CommentTrigger
+            contextType={CommentContextType.DataPoint}
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.AncillaryServices}
+            contextWidget={ViewAnalysisWidgets.ServiceRevenueByHour}
+            contextDataPoint={`${hour}-${serviceId}`}
+            contextAssetId={assetId}
+            contextYear={year}
+            contextMonth={month}
+            variant="icon-with-text"
+            label="Add Comments"
+            className="text-[#088477] w-full flex items-center justify-center hover:bg-transparent!"
+            iconClassName="text-[#088477] !w-[12px] !h-[12px]"
+            labelClassName="text-[#088477] text-[12px] leading-none"
+          />
+        </div>
       </div>
     );
   }
@@ -380,12 +458,20 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
     dispatch(getAssetAncillaryServiceRevenueBreakdownRequest({assetId, month, year}));
     dispatch(getAssetAncillaryServiceOpportunityCostAnalysisRequest({assetId, month, year}));
     dispatch(getAssetAncillaryServiceRevenueByHourRequest({assetId, month, year}));
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.AncillaryServices,
+        context_year: year ?? undefined,
+      })
+    );
   }, [assetId, dispatch, month, year]);
 
   return (
     <div className="flex flex-col gap-8 py-4">
       <Section icon="monitor" title="Ancillary Revenue Summary" subtitle="All ancillary services key performance index">
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <div className={cn('grid grid-cols-1 md:grid-cols-4 gap-4', isTablet && 'gap-2')}>
           {ancillarySummaryKpis.map((kpi, index) => (
             <GradientKPI key={index} {...kpi} isLoading={Boolean(ancillarySummaryLoading || assetLoading)} />
           ))}
@@ -396,6 +482,20 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
         <DivergentBarChart
           title="Revenue by Ancillary Service"
           data={revenueByServiceData}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.AncillaryServices}
+              contextWidget={ViewAnalysisWidgets.RevenueByAncillaryService}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           xKey="label"
           yKey="value"
           downloadFileName={`${assetSystemGenerationId ?? assetId ?? 'asset'}_${month}_${year}_ancillary_service_revenue.png`}
@@ -419,14 +519,28 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
         />
 
         <Text variant="14R" className="text-text-secondary!">
-          <span className="font-InterSemiBold">Note</span> : All revenue values shown are net of the 5% GridBeyond revenue
-          share.
+          <span className="font-InterSemiBold">Note</span> : All revenue values shown are net of the 5% GridBeyond
+          revenue share.
         </Text>
       </Section>
 
       <ServiceBreakSection
         columns={columns}
         data={tableRows}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.AncillaryServices}
+            contextWidget={ViewAnalysisWidgets.AncillaryServiceBreakdown}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+              contextMonth={month}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
         loading={Boolean(ancillaryBreakdownLoading || assetLoading)}
         assetId={assetId}
         month={month}
@@ -437,6 +551,21 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
       <Section icon="clock" title="Service Utilization Patterns" subtitle="Hour-by-hour service revenue distribution">
         <GroupedBarChart
           data={hourlyServiceRevenueChartData}
+          onBadgeClick={(categoryId, seriesId) => handleBadgeClick(ViewAnalysisWidgets.ServiceRevenueByHour, categoryId, seriesId)}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.AncillaryServices}
+              contextWidget={ViewAnalysisWidgets.ServiceRevenueByHour}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`${assetSystemGenerationId ?? assetId ?? 'asset'}_${month}_${year}_ancillary_service_revenue_by_hour.png`}
           xAxisLabel="Hour"
           yAxisLabel="Revenue (£)"
@@ -459,7 +588,7 @@ export function AssetAncillaryServices(props: AssetAnalysisTabProps) {
         icon="shield"
         title="Opportunity Cost Analysis"
         subtitle="What if the Asset had used a different service mix?">
-        <div className="grid grid-cols-3 gap-4">
+        <div className={cn('grid grid-cols-3 gap-4', isTablet && 'gap-2')}>
           {oppotunityCostKpis.map(item => (
             <GradientKPI
               {...item}

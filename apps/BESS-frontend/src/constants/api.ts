@@ -33,6 +33,7 @@ export const API: ApiConfigInterface = {
     demo: 'api/v1/demo',
     login: 'api/v1/auth/login/send-otp',
     verifyOtp: 'api/v1/auth/login/verify-otp',
+    refresh: 'api/v1/auth/refresh',
   },
   authUrls: {
     // auth related APIs

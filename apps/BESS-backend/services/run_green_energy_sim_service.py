@@ -56,25 +56,25 @@ class RunGreenEnergySimulationService:
         writer = csv.writer(output)
 
         headers = [
-            "Solar (MWp)",
-            "BESS (MWh)",
-            "Duration (hr)",
-            "Power (MW)",
+            "Solar Size (MWp)",
+            "Battery Size (MWh)",
+            "Discharge Duration (hr)",
+            "Battery Power (MW)",
             "Containers",
-            "DG (MW)",
-            "Delivery %",
-            "Green Hours %",
-            "Green Energy %",
-            "Green Hours (Mar-Oct) %",
-            "Wastage %",
-            "Delivery Hrs",
-            "Load Hrs",
-            "Green Hrs",
-            "DG Hrs",
-            "DG Starts",
-            "BESS Cycles",
-            "Unserved (MWh)",
-            "Fuel (L)",
+            "Generator Size (MW)",
+            "Load Met (%)",
+            "Green Hours (%)",
+            "Green Energy (%)",
+            "Green Hours (Mar-Oct) (%)",
+            "Wastage Energy (%)",
+            "Hours Fully Served",
+            "Total Load Hours",
+            "Green Hours",
+            "Generator Hours",
+            "Generator Starts",
+            "Avg. Battery Cycles per Day",
+            "Unmet Energy (MWh)",
+            "Fuel Used(L)",
         ]
         writer.writerow(headers)
 
@@ -154,15 +154,15 @@ class RunGreenEnergySimulationService:
             "power_mw": GreenEnergySizingSimulationResult.power_mw,
             "containers": GreenEnergySizingSimulationResult.containers,
             "dg_mw": GreenEnergySizingSimulationResult.dg_mw,
-            "delivery_percentage": GreenEnergySizingSimulationResult.delivery_pct,
-            "green_percentage": GreenEnergySizingSimulationResult.green_pct,
-            "green_energy_percentage": GreenEnergySizingSimulationResult.green_energy_pct,
-            "green_hours_mar_oct_percentage": GreenEnergySizingSimulationResult.green_hours_mar_oct_pct,
-            "wastage_percentage": GreenEnergySizingSimulationResult.wastage_pct,
-            "delivery_hrs": GreenEnergySizingSimulationResult.delivery_hours,
-            "load_hrs": GreenEnergySizingSimulationResult.load_hours,
-            "green_hrs": GreenEnergySizingSimulationResult.green_hours,
-            "dg_hrs": GreenEnergySizingSimulationResult.dg_hours,
+            "delivery_pct": GreenEnergySizingSimulationResult.delivery_pct,
+            "green_pct": GreenEnergySizingSimulationResult.green_pct,
+            "green_energy_pct": GreenEnergySizingSimulationResult.green_energy_pct,
+            "green_hours_mar_oct_pct": GreenEnergySizingSimulationResult.green_hours_mar_oct_pct,
+            "wastage_pct": GreenEnergySizingSimulationResult.wastage_pct,
+            "delivery_hours": GreenEnergySizingSimulationResult.delivery_hours,
+            "load_hours": GreenEnergySizingSimulationResult.load_hours,
+            "green_hours": GreenEnergySizingSimulationResult.green_hours,
+            "dg_hours": GreenEnergySizingSimulationResult.dg_hours,
             "dg_starts": GreenEnergySizingSimulationResult.dg_starts,
             "bess_cycles": GreenEnergySizingSimulationResult.bess_cycles,
             "unserved_mwh": GreenEnergySizingSimulationResult.unserved_mwh,
@@ -203,6 +203,7 @@ class RunGreenEnergySimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
@@ -216,16 +217,18 @@ class RunGreenEnergySimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        if simulation.step < SimulationSetupProgress.MULTI_YEAR_PROJECTION_CONFIG:
+        if simulation.step < SimulationSetupProgress.DISPATCH_RULES:
             return Res.error(
                 message="Incomplete Simulation",
                 http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         green_sim_result = await bess_db.execute(
-            select(GreenSizingSimulationJob).where(
+            select(GreenSizingSimulationJob)
+            .where(
                 GreenSizingSimulationJob.simulation_id == simulation.id,
             )
+            .with_for_update()
         )
 
         green_sim_job = green_sim_result.scalar_one_or_none()
@@ -266,7 +269,25 @@ class RunGreenEnergySimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
-        print("logging run green simulaton")
+        await bess_db.flush()
+
+        try:
+            await green_year_sizing_simulation.kiq(
+                simulation_id=simulation.id,
+                job_id=new_simulation_job.job_id,
+                run_by=current_user.get("name"),  # type: ignore
+            )
+
+            await bess_db.commit()
+
+        except Exception:
+            await bess_db.rollback()
+
+            return Res.error(
+                status_code="E-20065",
+                message="Unable to run simulation.",
+            )
+
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -275,14 +296,8 @@ class RunGreenEnergySimulationService:
             action=log_action,
             resource_id=resource_id,
             before=before_config,
-            after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
-        )
-
-        await bess_db.commit()
-        await bess_db.refresh(new_simulation_job)
-
-        await green_year_sizing_simulation.kiq(
-            simulation_id=simulation.id, job_id=new_simulation_job.job_id
+            after="Simulation Status: STARTED",
+            redis=redis,
         )
 
         return Res.success(
@@ -334,6 +349,7 @@ class RunGreenEnergySimulationService:
             resource_id=resource_id,
             before=f"Simulation Status: {SimulationJobStatus(simulation_job.status).name}",
             after=f"Simulation Status: {SimulationJobStatus.TERMINATED.name}",
+            redis=redis,
         )
         await bess_db.commit()
 
@@ -384,6 +400,7 @@ class RunGreenEnergySimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         page: int = 1,
         limit: int = 100,
         solar_capacity: Optional[List[float]] = None,
@@ -427,29 +444,37 @@ class RunGreenEnergySimulationService:
             GreenEnergySizingSimulationResult.job_id == simulation_job.id
         )
 
+        applied_filter = False
         # Filters
         if solar_capacity is not None:
+            applied_filter = True
             query = query.where(
                 GreenEnergySizingSimulationResult.solar_mwp.in_(solar_capacity)
             )
         if dg_capacity is not None:
+            applied_filter = True
             query = query.where(
                 GreenEnergySizingSimulationResult.dg_mw.in_(dg_capacity)
             )
         if bess_capacity is not None:
+            applied_filter = True
             query = query.where(
                 GreenEnergySizingSimulationResult.bess_mwh.in_(bess_capacity)
             )
         if duration_hr is not None:
+            applied_filter = True
             query = query.where(
                 GreenEnergySizingSimulationResult.duration_hr.in_(duration_hr)
             )
         if delivery_100_only:
+            applied_filter = True
             query = query.where(GreenEnergySizingSimulationResult.delivery_pct == 100)
         if zero_dg_hours_only:
+            applied_filter = True
             query = query.where(GreenEnergySizingSimulationResult.dg_hours == 0)
 
         if viable_only:
+            applied_filter = True
             query = query.where(
                 GreenEnergySizingSimulationResult.green_pct
                 >= green_config.min_green_energy
@@ -485,6 +510,7 @@ class RunGreenEnergySimulationService:
         }
 
         if sort:
+            applied_filter = True
             for s in sort:
                 if s.startswith("-"):
                     field = s[1:]
@@ -495,6 +521,7 @@ class RunGreenEnergySimulationService:
 
                 if field in sort_map:
                     col = sort_map[field]
+                    print(f"{col=}")
                     order_by.append(col.desc() if direction == "desc" else col.asc())
 
         # Paginate
@@ -502,7 +529,7 @@ class RunGreenEnergySimulationService:
             db=bess_db, base_query=query, page=page, limit=limit, order_by=order_by
         )
 
-        if page == 1:
+        if page == 1 and not applied_filter:
             await audit_logs(
                 db=bess_db,
                 user_id=f"USER-{current_user.get('id')}",
@@ -512,6 +539,7 @@ class RunGreenEnergySimulationService:
                 resource_id=resource_id,
                 before=None,
                 after="Green Energy Analysis - Detailed View Opened",
+                redis=redis,
             )
 
             await bess_db.commit()
@@ -541,6 +569,7 @@ class RunGreenEnergySimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         solar_capacity: Optional[List[float]] = None,
         dg_capacity: Optional[List[float]] = None,
         bess_capacity: Optional[List[float]] = None,
@@ -573,6 +602,7 @@ class RunGreenEnergySimulationService:
             resource_id=resource_id,
             before=None,
             after="Exported Green Energy Analysis Results",
+            redis=redis,
         )
 
         await bess_db.commit()

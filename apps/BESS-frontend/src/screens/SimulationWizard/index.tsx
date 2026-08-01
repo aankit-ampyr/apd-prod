@@ -14,15 +14,14 @@ import {useState, useEffect, useMemo} from 'react';
 import {useSelector, useDispatch} from 'react-redux';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
 import {
-  getLoadProfileRequest,
-  getSolarProfileRequest,
   getBessConfigRequest,
-  getGeneratorDgRequest,
-  getProjectSimulationRequest,
   getDispatchRuleRequest,
-  simulationProgressRequest,
-  refreshProjectSimulationRequest,
+  getGeneratorDgRequest,
+  getLoadProfileRequest,
+  getProjectSimulationRequest,
+  getSolarProfileRequest,
   resetProjectSimulation,
+  simulationProgressRequest,
 } from '@/services/redux/slice/simulationWizardSlice';
 import {DGSizing} from '@/components/SimulationWizard/DGSizing';
 import {Skeleton, Text} from '@/ui-kits';
@@ -68,17 +67,6 @@ const scrollWizardViewportToTop = () => {
 function WizardGhostLoader() {
   return (
     <div className="w-full min-h-screen bg-slate-100 flex flex-col items-center py-10 px-4">
-      {/* Step indicators */}
-      {/* <div className="flex items-center gap-10 mb-10">
-        {[1, 2, 3, 4, 5].map(step => (
-          <div key={step} className="flex flex-col items-center gap-2">
-            <span className="text-xs text-gray-400 font-medium">{step}.</span>
-
-            <Skeleton animation="wave" variant="rounded" width={48} height={4} className="rounded-full!" />
-          </div>
-        ))}
-      </div> */}
-
       {/* Main card */}
       <div className="w-full max-w-4xl bg-white rounded-[32px] p-6 md:p-8 shadow-sm">
         {/* Top text skeletons */}
@@ -133,8 +121,6 @@ function SimulationWizard() {
   const [isStepsHidden, setIsStepsHidden] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const syncStepHistory = (step: number, replace = false) => {
-    setCurrentStep(step);
-
     if (!simulation_id) return;
 
     navigate(
@@ -220,7 +206,7 @@ function SimulationWizard() {
         step = 5;
       } else if (editedStep === 10 || editedStep === 11) {
         step = 6;
-      } else if (editedStep === 12 || editedStep === 13) {
+      } else if (editedStep === 12 || editedStep >= 13) {
         step = 7;
       }
       step = Math.min(7, Math.max(1, step));
@@ -230,11 +216,29 @@ function SimulationWizard() {
   }, [canRestoreStepFromReload, currentStep, location.search, pageLoadToken, simulationProgress, simulation_id]);
 
   useEffect(() => {
+    if (simulation_id) {
+      dispatch(getLoadProfileRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getSolarProfileRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getBessConfigRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getGeneratorDgRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getDispatchRuleRequest({simulation_id: Number(simulation_id)}));
+      dispatch(simulationProgressRequest({simulation_id: Number(simulation_id)}));
+      dispatch(getAllProjectListRequest());
+    }
+  }, [simulation_id, dispatch]);
+
+  useEffect(() => {
     const stepFromUrl = getStepFromSearch(location.search);
     const state = location.state as WizardHistoryState | null;
     const stateStep = state?.wizardStep && String(state.simulationId ?? '') === String(simulation_id) ? state.wizardStep : null;
     const nextStep = stepFromUrl ?? stateStep;
     if (!nextStep) return;
+
+    // Ignore stale history state.
+    // If URL says 3 but history state still says 4, trust the URL.
+    if (stepFromUrl !== null && stateStep !== null && stepFromUrl !== stateStep) {
+      return;
+    }
     if (nextStep === currentStep) return;
 
     setCurrentStep(nextStep);
@@ -255,17 +259,6 @@ function SimulationWizard() {
 
   // Fetch saved data for all tabs when simulation_id changes
   // This ensures tick marks show correctly for all tabs on project switch
-  useEffect(() => {
-    if (simulation_id) {
-      dispatch(getLoadProfileRequest({simulation_id: Number(simulation_id)}));
-      dispatch(getSolarProfileRequest({simulation_id: Number(simulation_id)}));
-      dispatch(getBessConfigRequest({simulation_id: Number(simulation_id)}));
-      dispatch(getGeneratorDgRequest({simulation_id: Number(simulation_id)}));
-      dispatch(getDispatchRuleRequest({simulation_id: Number(simulation_id)}));
-      dispatch(simulationProgressRequest({simulation_id: Number(simulation_id)}));
-      dispatch(getAllProjectListRequest());
-    }
-  }, [simulation_id, dispatch]);
 
   useEffect(() => {
     if (showProjectSwitcher) {
@@ -348,7 +341,10 @@ function SimulationWizard() {
   if (isLoading || currentStep === null) {
     return <WizardGhostLoader />;
   }
-
+  const goToStep = (step: number) => {
+    if (!step) return;
+    syncStepHistory(step);
+  };
   return (
     <ScreenWrapper
       className={`bg-[linear-gradient(122.55deg,#F3F9FF_3.63%,#F2F3FF_92.69%)] ${isStepsHidden ? 'pt-8' : 'pt-0'}`}
@@ -381,8 +377,8 @@ function SimulationWizard() {
           )}
           {currentStep === 3 && <DGSizing onNextToRunSimulation={() => syncStepHistory(4)} />}
           {currentStep === 4 && <SimulationResults setIsStepsHidden={setIsStepsHidden} />}
-          {currentStep === 5 && <CustomConfiguration setIsStepsHidden={setIsStepsHidden} />}
-          {currentStep === 6 && <MultiYearProjection setIsStepsHidden={setIsStepsHidden} />}
+          {currentStep === 5 && <CustomConfiguration setIsStepsHidden={setIsStepsHidden} goToStep={goToStep} />}
+          {currentStep === 6 && <MultiYearProjection setIsStepsHidden={setIsStepsHidden} goToStep={goToStep} />}
           {currentStep === 7 && <GreenEnergyAnalysis setIsStepsHidden={setIsStepsHidden} />}
         </ChangeConfigurationProvider>
       </SimulationStatusProvider>

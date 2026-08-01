@@ -1,5 +1,4 @@
-import {Badge, Icon, IconTypes, SelectInput, Text} from '@/ui-kits';
-import {downloadElementAsImage} from '@/utils';
+import {Icon, IconTypes, SelectInput, Text} from '@/ui-kits';
 import {useEffect, useRef, useState} from 'react';
 import {StorableSolarAnalysis} from './StorableSolarAnalysis';
 import {useDispatch, useSelector} from 'react-redux';
@@ -11,26 +10,24 @@ import {
   solarProfileData,
   solarProfileSourceListSelector,
 } from '@/services/redux/selectors/simulationWizardSelector';
-import {CustomBarChart} from '@/components';
 import {useDropdownValues} from '@/hooks';
 import {useChangeConfigurationConfirmation} from '../../ChangeConfigurationContext';
+import {HourlyGenerationChart} from './HourlyGenerationChart';
+import {MonthlyGenerationChart} from './MonthlyGenerationChart';
+import {useChartsActionV2} from '@/hooks';
 
 export const SelectSolarProfile = ({
+  setIsStepsHidden,
   data,
   isFileMode = true,
-  maximizedChart,
-  onMaximize,
-  onMinimize,
   isExpanded: controlledIsExpanded,
   setIsExpanded: setControlledIsExpanded,
   readOnly,
   onProfileChange,
 }: Readonly<{
+  setIsStepsHidden?: (hidden: boolean) => void;
   data?: any;
   isFileMode?: boolean;
-  maximizedChart?: 'hourly' | 'monthly' | null;
-  onMaximize?: (chart: 'hourly' | 'monthly') => void;
-  onMinimize?: () => void;
   isExpanded?: boolean;
   setIsExpanded?: (val: boolean) => void;
   readOnly?: boolean;
@@ -48,15 +45,6 @@ export const SelectSolarProfile = ({
   // Use controlled expanded state if provided
   const isExpanded = typeof controlledIsExpanded === 'boolean' ? controlledIsExpanded : false;
   const setIsExpanded = setControlledIsExpanded || (() => {});
-
-  // Ensure expanded state is preserved when maximizing/minimizing
-  useEffect(() => {
-    if (maximizedChart && setIsExpanded) {
-      setIsExpanded(true);
-    }
-  }, [maximizedChart, setIsExpanded]);
-  const chartRef = useRef<HTMLDivElement>(null);
-  const monthlyChartRef = useRef<HTMLDivElement>(null);
 
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
@@ -111,6 +99,18 @@ export const SelectSolarProfile = ({
       setSelectedProfile(hydratedSolarData?.source?.id ? Number(hydratedSolarData.source.id) : null);
     }
   }, [simulation_id, hydratedSolarData]);
+
+  const {onMaximize: onHourlyMaximize, onMinimize: onHourlyMinimize} = useChartsActionV2({
+    downloadFileName: '',
+    renderFullScreen: () => <HourlyGenerationChart setIsStepsHidden={setIsStepsHidden} hourlyData={hourlyData} isFullScreen onMinimize={onHourlyMinimize} />,
+  });
+
+  const {onMaximize: onMonthlyMaximize, onMinimize: onMonthlyMinimize} = useChartsActionV2({
+    downloadFileName: '',
+    renderFullScreen: () => (
+      <MonthlyGenerationChart setIsStepsHidden={setIsStepsHidden} monthlyData={monthlyData} isFullScreen onMinimize={onMonthlyMinimize} />
+    ),
+  });
 
   // Clear the saved tick only when user edits the profile (not on mount/remount)
   const handleProfileChange = (item: any) => {
@@ -205,149 +205,6 @@ export const SelectSolarProfile = ({
       value: Number(item?.value?.toFixed(2)),
     })) || [];
 
-  const handleDownloadHourlyGeneration = async () => {
-    const elements = chartRef.current?.querySelectorAll('.no-export');
-
-    elements?.forEach(el => {
-      (el as HTMLElement).style.visibility = 'visible';
-    });
-    await downloadElementAsImage(chartRef.current, 'hourly_generation.png');
-
-    elements?.forEach(el => {
-      (el as HTMLElement).style.display = '';
-    });
-  };
-
-  const handleDownloadMonthlyGeneration = async () => {
-    const elements = monthlyChartRef.current?.querySelectorAll('.no-export');
-
-    elements?.forEach(el => {
-      (el as HTMLElement).style.visibility = 'visible';
-    });
-
-    await downloadElementAsImage(monthlyChartRef.current, 'monthly_generation.png');
-
-    elements?.forEach(el => {
-      (el as HTMLElement).style.display = '';
-    });
-  };
-
-  const CustomTooltip = ({active, payload}: any) => {
-    if (active && payload?.length) {
-      const item = payload[0]?.payload;
-      if (!item || item.value === 0) return null;
-
-      return (
-        <div className="bg-[#F1F0FF] px-4 py-2 rounded-xl shadow-md no-export">
-          <Text variant="btnMedium" className=" font-InterSemibold! text-text-secondary!">
-            Hour {item?.hour}
-          </Text>
-          <Text variant="btnMedium" className=" font-InterSemibold! text-blue!">
-            Load {item?.value.toFixed(2)} MW
-          </Text>
-        </div>
-      );
-    }
-    return null;
-  };
-
-  // If a specific chart is maximized, render only that chart fullscreen
-  if (maximizedChart === 'hourly') {
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 h-full flex flex-col">
-        {/* Wrap heading and chart together for download */}
-        <div ref={chartRef} className="flex-1 flex flex-col bg-white">
-          <div className="flex items-center justify-between mb-3 mr-4">
-            <div className="ml-11.5">
-              <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1">
-                Hourly Generation Profile
-              </Text>
-              <Text variant="small" className="text-sm text-text-secondary!">
-                AVERAGE MW BY HOUR OF DAY
-              </Text>
-            </div>
-            <Badge size="sm" className="w-20 border-[1.4px] border-blue" message="Avg Day" color="blue" />
-          </div>
-          <div className="flex justify-end mr-4">
-            <div className="flex items-center gap-3 no-export">
-              <Icon name="download" size={20} className="text-primary-tint-1! cursor-pointer" onClick={handleDownloadHourlyGeneration} />
-              <Icon
-                name="minimize"
-                size={20}
-                className="text-primary-tint-1! cursor-pointer"
-                onClick={() => {
-                  setIsExpanded(true);
-                  onMinimize?.();
-                }}
-              />
-            </div>
-          </div>
-          <div className="bg-white flex-1">
-            <CustomBarChart
-              hoverColor="#025681"
-              data={hourlyData}
-              xKey="hour"
-              yKey="value"
-              xAxisLabel="Hour of Day"
-              yAxisLabel="Average MW"
-              barColor="#0284C7"
-              barWidth={18}
-              tooltipComponent={<CustomTooltip />}
-              enableCellHover={true}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (maximizedChart === 'monthly') {
-    return (
-      <div className="bg-white border border-gray-200 rounded-xl p-4 h-full flex flex-col">
-        {/* Wrap heading and chart together for download */}
-        <div ref={monthlyChartRef} className="flex-1 flex flex-col bg-white">
-          <div className="flex items-center justify-between mb-3 mr-4">
-            <div className="ml-11.5">
-              <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1">
-                Monthly Solar Generation
-              </Text>
-              <Text variant="small" className="text-sm text-text-secondary!">
-                TOTAL MWh PER MONTH
-              </Text>
-            </div>
-            <Badge size="sm" className="w-20 border-[1.4px] border-primary" message={new Date().getFullYear().toString()} color="primary" />
-          </div>
-          <div className="flex justify-end mr-4">
-            <div className="flex items-center gap-3 no-export">
-              <Icon name="download" size={20} className="text-primary-tint-1! cursor-pointer" onClick={handleDownloadMonthlyGeneration} />
-              <Icon
-                name="minimize"
-                size={20}
-                className="text-primary-tint-1! cursor-pointer"
-                onClick={() => {
-                  setIsExpanded(true);
-                  onMinimize?.();
-                }}
-              />
-            </div>
-          </div>
-          <div className="bg-white flex-1">
-            <CustomBarChart
-              data={monthlyData}
-              showValues
-              xKey="month"
-              yKey="value"
-              xAxisLabel="Month"
-              yAxisLabel="Total MWh"
-              barColor="#2F9C8F"
-              barWidth={50}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="mt-5">
       {isFileMode && (
@@ -428,41 +285,7 @@ export const SelectSolarProfile = ({
                   {/* ===== LEFT (Hourly) ===== */}
 
                   <div className="w-full xl:w-[50%]">
-                    {/* Wrap heading and chart together for download */}
-                    <div ref={chartRef} className="bg-white">
-                      <div className="flex items-center justify-between mb-3 mr-4">
-                        <div className="ml-11.5">
-                          <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1">
-                            Hourly Generation Profile
-                          </Text>
-                          <Text variant="small" className="text-sm text-text-secondary!">
-                            AVERAGE MW BY HOUR OF DAY
-                          </Text>
-                        </div>
-                        <Badge size="sm" className="w-20 border-[1.4px] border-blue" message="Avg Day" color="blue" />
-                      </div>
-
-                      <div className="flex justify-end mr-4">
-                        <div className="flex gap-3 items-center no-export">
-                          <Icon name="download" size={20} className="text-primary-tint-1! cursor-pointer" onClick={handleDownloadHourlyGeneration} />
-
-                          <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={() => onMaximize?.('hourly')} />
-                        </div>
-                      </div>
-
-                      <CustomBarChart
-                        hoverColor="#025681"
-                        data={hourlyData}
-                        xKey="hour"
-                        yKey="value"
-                        xAxisLabel="Hour of Day"
-                        yAxisLabel="Average MW"
-                        barColor="#0284C7"
-                        barWidth={18}
-                        tooltipComponent={<CustomTooltip />}
-                        enableCellHover={true}
-                      />
-                    </div>
+                    <HourlyGenerationChart hourlyData={hourlyData} onMaximize={onHourlyMaximize} />
                   </div>
 
                   {/* ===== DIVIDER ===== */}
@@ -480,39 +303,7 @@ export const SelectSolarProfile = ({
                   />
                   {/* ===== RIGHT (Monthly) ===== */}
                   <div className="w-full xl:w-[50%]">
-                    {/* Wrap heading and chart together for download */}
-                    <div ref={monthlyChartRef} className="bg-white">
-                      <div className="flex items-center justify-between mb-3 mr-4">
-                        <div className="ml-11.5 mt-4">
-                          <Text variant="caption" className="text-sm text-text-primary! font-InterSemiBold! mb-1!">
-                            Monthly Solar Generation
-                          </Text>
-                          <Text variant="small" className="text-sm text-text-secondary!">
-                            TOTAL MWh PER MONTH
-                          </Text>
-                        </div>
-                        <Badge size="sm" className="w-20 border-[1.4px] border-primary" message={new Date().getFullYear().toString()} color="primary" />
-                      </div>
-
-                      <div className="flex justify-end mr-4">
-                        <div className="flex gap-3 items-center no-export">
-                          <Icon name="download" size={20} className="text-primary-tint-1! cursor-pointer" onClick={handleDownloadMonthlyGeneration} />
-
-                          <Icon name="maximize" size={20} className="text-primary-tint-1! cursor-pointer" onClick={() => onMaximize?.('monthly')} />
-                        </div>
-                      </div>
-
-                      <CustomBarChart
-                        data={monthlyData}
-                        showValues
-                        xKey="month"
-                        yKey="value"
-                        xAxisLabel="Month"
-                        yAxisLabel="Total MWh"
-                        barColor="#2F9C8F"
-                        barWidth={50}
-                      />
-                    </div>
+                    <MonthlyGenerationChart monthlyData={monthlyData} onMaximize={onMonthlyMaximize} />
                   </div>
                 </div>
               </>

@@ -1,3 +1,5 @@
+from typing import Optional
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status
@@ -30,6 +32,7 @@ class DetailGreenConfigService:
         payload: DetailGreenConfigPayload,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
 
         job_result = await bess_db.execute(
@@ -47,7 +50,7 @@ class DetailGreenConfigService:
             return Res.error(
                 status_code="E-20059",
                 message="Green Sizing simulation not completed",
-                http_status_code=status.HTTP_404_NOT_FOUND,
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         query = select(DetailGreenSimulationConfiguration).where(
@@ -63,6 +66,7 @@ class DetailGreenConfigService:
                 setattr(detail_green_config, key, value)
             after_config = jsonable_encoder(detail_green_config)
             status_code = "S-20052"
+            action = PSPAuditLogScenario.DETAILED_GREEN_ENERGY_CONF_UPDATED.value
         else:
             detail_green_config = DetailGreenSimulationConfiguration(
                 simulation_id=simulation_id,
@@ -74,6 +78,7 @@ class DetailGreenConfigService:
             bess_db.add(detail_green_config)
             after_config = jsonable_encoder(detail_green_config)
             status_code = "S-20051"
+            action = PSPAuditLogScenario.DETAILED_GREEN_ENERGY_CONF_CREATED.value
 
         await progress_simulation_setup(
             simulation_id=simulation_id,
@@ -89,18 +94,19 @@ class DetailGreenConfigService:
             include_multi_job=False,
             include_detailed_green_job=True,
         )
-        # await compare_and_log(
-        #     db=bess_db,
-        #     user_id=f"USER-{current_user.get('id')}",
-        #     user_role=current_user.get("role"),  # type: ignore
-        #     module=PSPAuditLogModules.SIMULATION.value,
-        #     action=PSPAuditLogScenario.CUSTOM_CONF_EDITED.value,
-        #     resource_id=resource_id,
-        #     before=before_config,
-        #     after=after_config,
-        #     remove_id=True,
-        #     sim_module_type=SimulationLogStep.CUSTOM_CONFIGURATION,
-        # )
+        await compare_and_log(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=action,
+            resource_id=resource_id,
+            before=before_config,
+            after=after_config,
+            remove_id=True,
+            sim_module_type=SimulationLogStep.DETAILED_GREEN_ENERGY_CONFIGURATION,
+            redis=redis,
+        )
 
         await bess_db.commit()
         await bess_db.refresh(detail_green_config)

@@ -10,6 +10,7 @@ class AssetRouter:
         self.tags = ["Assets"]
 
         self.controller = AssetController()
+        self.router.post("/analysis/start-compute")(self.controller.start_analysis_computation)
         self.router.get("/")(self.controller.get_assets)
         self.router.put("/{asset_id}/organization")(self.controller.reassign_asset)
         self.router.get('/{asset_id}/users')(self.controller.assets_users)

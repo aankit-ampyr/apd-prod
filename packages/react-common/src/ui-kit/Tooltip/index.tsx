@@ -138,15 +138,35 @@ const PortalTooltipContent: React.FC<PortalTooltipContentProps> = ({
     const parent = sentinelRef.current?.parentElement;
     if (!parent) return;
 
-    const handleEnter = () =>
+    const handleEnter = () => {
+      if (window.innerWidth <= 1024) return;
       setCoords(getPortalCoords(parent.getBoundingClientRect(), position));
-    const handleLeave = () => setCoords(null);
+    };
+    const handleLeave = () => {
+      if (window.innerWidth <= 1024) return;
+      setCoords(null);
+    };
+    const handleClick = (e: Event) => {
+      if (window.innerWidth <= 1024) {
+        setCoords(prev => prev ? null : getPortalCoords(parent.getBoundingClientRect(), position));
+      }
+    };
+    const handleDocClick = (e: Event) => {
+      if (window.innerWidth <= 1024 && !parent.contains(e.target as Node)) {
+        setCoords(null);
+      }
+    };
 
     parent.addEventListener("mouseenter", handleEnter);
     parent.addEventListener("mouseleave", handleLeave);
+    parent.addEventListener("click", handleClick);
+    document.addEventListener("click", handleDocClick, { capture: true });
+
     return () => {
       parent.removeEventListener("mouseenter", handleEnter);
       parent.removeEventListener("mouseleave", handleLeave);
+      parent.removeEventListener("click", handleClick);
+      document.removeEventListener("click", handleDocClick, { capture: true });
     };
   }, [position]);
 

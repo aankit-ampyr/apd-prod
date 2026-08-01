@@ -33,10 +33,12 @@ export const API: ApiConfigInterface = {
     demo: 'api/v1/demo',
     login: 'api/v1/auth/login/send-otp',
     verifyOtp: 'api/v1/auth/login/verify-otp',
+    refresh: 'api/v1/auth/refresh',
   },
   authUrls: {
     // auth related APIs
     logout: 'api/v1/auth/logout',
+    websocketToken: 'api/v1/websocket/auth',
 
     // users related APIs
     users: 'api/v1/users/',
@@ -54,6 +56,7 @@ export const API: ApiConfigInterface = {
     asset_optimization_parameters: (id: number) => `api/v1/assets/${id}/optimization-parameters`,
     asset_organization: (assetId: number) => `api/v1/assets/${assetId}/organization`,
     asset_multiple_users: `api/v1/assets/users`,
+    asset_taggable_users: (assetId: number) => `api/v1/assets/${assetId}/comments/users/taggable`,
     asset_aggregator_report_upload: (assetId: number) => `api/v1/assets/${assetId}/aggregator-report`,
     asset_scada_report_upload: (assetId: number) => `api/v1/assets/${assetId}/scada-report`,
     asset_merge_dataset: (assetId: number) => `api/v1/assets/${assetId}/merge-dataset`,
@@ -104,6 +107,8 @@ export const API: ApiConfigInterface = {
       `api/v1/assets/${assetId}/analysis/battery-health/cycle-comparison`,
     asset_analysis_battery_health_strategy_cycling_comparison: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/battery-health/strategy-cycling-comparison`,
+    asset_analysis_battery_health_strategy_energy_throughput_summary_export: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/battery-health/strategy-energy-throughput-summary/export`,
     asset_analysis_battery_health_annual_projection_report: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/battery-health/annual-projection-report`,
     asset_analysis_battery_health_daily_cycles: (assetId: number) =>
@@ -188,9 +193,42 @@ export const API: ApiConfigInterface = {
     asset_invoices_settlement_id_export: (assetId: number, settlementId: number) =>
       `api/v1/assets/${assetId}/invoices/settlement/${settlementId}/export`,
 
-    asset_invoice_analysis_capacity_market: (assetId: number) =>
-      `api/v1/assets/${assetId}/invoice-analysis/capacity-market`,
+    asset_invoice_analysis_capacity_market_summary: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/capacity-market/summary`,
+    asset_invoice_analysis_capacity_market_payments: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/capacity-market/payments`,
+    asset_invoice_analysis_capacity_market_payment_trend: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/capacity-market/payment-trend`,
     asset_invoice_analysis_capacity_market_export: (assetId: number) =>
       `api/v1/assets/${assetId}/invoice-analysis/capacity-market/export`,
+    asset_invoice_analysis_revenue_reconciliation_summary: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/revenue-reconciliation/summary`,
+    asset_invoice_analysis_revenue_reconciliation_per_stream_comparison: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/revenue-reconciliation/per-stream-comparison`,
+    asset_invoice_analysis_revenue_reconciliation_export: (assetId: number) =>
+      `api/v1/assets/${assetId}/invoice-analysis/revenue-reconciliation/per-stream-comparison/export`,
+
+    asset_invoices_summary_statement: (assetId: number) => `api/v1/assets/${assetId}/invoices/summary-statement`,
+    asset_invoices_summary_statement_id: (assetId: number, statementId: number) =>
+      `api/v1/assets/${assetId}/invoices/summary-statement/${statementId}`,
+    asset_invoices_summary_statement_id_export: (assetId: number, statementId: number) =>
+      `api/v1/assets/${assetId}/invoices/summary-statement/${statementId}/export`,
+
+    // comments related APIs
+    comments: (assetId: number) => `api/v1/assets/${assetId}/comments/`,
+    comment_id: (assetId: number, commentId: number | string) => `api/v1/assets/${assetId}/comments/${commentId}`,
+    comment_reply: (assetId: number, commentId: number | string) => `api/v1/assets/${assetId}/comments/${commentId}/reply`,
+    comment_read: (assetId: number, commentId: number | string) => `api/v1/assets/${assetId}/comments/${commentId}/read`,
+    comment_status: (assetId: number, commentId: number | string) => `api/v1/assets/${assetId}/comments/${commentId}/status`,
+
+    // notifications related APIs
+    notifications_active: 'api/v1/notifications/active',
+    notification_read: (notificationId: number | string) => `api/v1/notifications/${notificationId}/read`,
+  },
+};
+
+export const SOCKET = {
+  socketUrl: {
+    ws: 'api/v1/websocket/',
   },
 };

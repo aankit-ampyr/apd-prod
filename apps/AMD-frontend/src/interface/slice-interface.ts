@@ -1,3 +1,4 @@
+import {AssetType} from '@/constants';
 import type {
   Asset,
   AssetOperationAnalytics,
@@ -23,7 +24,9 @@ import type {
   InvoiceExtractionQualitySummary,
   InvoiceExtractionCategorySummary,
   InvoiceSettlement,
-  AssetCapacityMarketAnalytics,
+  InvoiceStatementSummary,
+  AssetInvoiceRevenueReconciliation,
+  AssetCapacityMarketAnalytics2,
 } from './common-interface';
 
 export interface UserSliceInitialState {
@@ -71,6 +74,7 @@ export interface AssetSliceInitialState {
   aggregatorReportUploadLoading: boolean;
   scadaReportUploadLoading: boolean;
   iarReportUploadLoading: boolean;
+  assetListLoading: boolean;
   currentAssetFilesLoading: boolean;
 
   solar: {
@@ -107,18 +111,15 @@ export interface AssetSliceInitialState {
   iarReportUploadError: AssetFileUploadError | null;
   invoiceUploadError: AssetFileUploadError | null;
   invoiceSettlementUploadError: AssetFileUploadError | null;
+  invoiceSummaryStatementUploadError: AssetFileUploadError | null;
 
   users: User[];
 
   // analytics data
   analytics: {
     operations: Partial<{
-      revenue_metrics: Nullable<AssetOperationAnalytics['revenue']>;
-      revenue_distribution: Nullable<AssetOperationAnalytics['revenue_distribution']>;
-      soc_distribution: Nullable<AssetOperationAnalytics['soc_distribution']>;
-      market_prices: Nullable<AssetOperationAnalytics['market_price']>;
-      ancillary_services_revenue: Nullable<AssetOperationAnalytics['ancillary_services_revenue']>;
-      trading_activity: Nullable<AssetOperationAnalytics['trading_activity']>;
+      revenue: Nullable<AssetOperationAnalytics['revenue']>;
+      market_summary: Nullable<AssetOperationAnalytics['market_summary']>;
       energy_price_comparison: Nullable<AssetOperationAnalytics['energy_price_comparison']>;
       battery_power_over_time: Nullable<AssetOperationAnalytics['battery_power_over_time']>;
     }>;
@@ -165,7 +166,6 @@ export interface AssetSliceInitialState {
   analyticsLoading: {
     operations: Partial<{
       revenue: boolean;
-      soc: boolean;
       market_summary: boolean;
       energy_price_comparison: boolean;
       battery_power_over_time: boolean;
@@ -348,6 +348,18 @@ export interface AssetSliceInitialState {
     error: string | boolean;
     success: string | boolean;
   };
+
+  // upload invoice summary statement data
+  uploadInvoiceSummaryStatement: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
+  deleteInvoiceSummaryStatement: {
+    loading: boolean;
+    error: string | boolean;
+    success: string | boolean;
+  };
 }
 
 export interface DigestSliceInitialState {
@@ -433,10 +445,54 @@ export interface InvoiceSliceInitialState {
     totalResults: number;
   };
 
-  capacityMarket: {
+  summaryStatementList: {
     loading: boolean;
     error: string | boolean;
     success: string | boolean;
-    data: Nullable<AssetCapacityMarketAnalytics>;
+    data: InvoiceStatementSummary[];
+    totalResults: number;
   };
+
+  capacityMarket2: {
+    summary: {
+      loading: boolean;
+      error: string | boolean;
+      success: string | boolean;
+      data: Nullable<AssetCapacityMarketAnalytics2['summary']>;
+    },
+    payment_trend: {
+      loading: boolean;
+      error: string | boolean;
+      success: string | boolean;
+      data: Nullable<AssetCapacityMarketAnalytics2['payment_trend']>;
+    },
+    payments: {
+      loading: boolean;
+      error: string | boolean;
+      success: string | boolean;
+      data: Nullable<AssetCapacityMarketAnalytics2['payments']>;
+    }
+  }
+
+  revenueReconciliation: {
+    summary: {
+      loading: boolean;
+      error: string | boolean;
+      success: string | boolean;
+      data: Nullable<AssetInvoiceRevenueReconciliation['summary']>;
+    },
+    per_stream_comparison: {
+      loading: boolean;
+      error: string | boolean;
+      success: string | boolean;
+      data: Nullable<AssetInvoiceRevenueReconciliation['per_stream_comparison']>;
+    }
+  }
+}
+
+export interface AnalyticsFilterSliceInitialState {
+  assetId: number | null;
+  month: number | null;
+  year: number | null;
+  assetType: AssetType | null;
 }

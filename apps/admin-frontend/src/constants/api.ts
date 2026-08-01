@@ -35,6 +35,8 @@ export const API: ApiConfigInterface = {
     verifyOtp: 'api/v1/auth/login/verify-otp',
   },
   authUrls: {
+    logout: 'api/v1/auth/logout',
+    refresh: 'api/v1/auth/refresh',
     users: 'api/v1/users/',
     user_id: (id: number) => `api/v1/users/${id}`,
     user_organization: (userId: number) => `/api/v1/users/${userId}/organization`,
@@ -43,5 +45,9 @@ export const API: ApiConfigInterface = {
     organization_id: (id: number) => `api/v1/organizations/${id}`,
 
     audit_logs: 'api/v1/audit-logs/',
+
+    // websocket
+    ws_token: 'api/v1/websocket/auth',
+    ws: 'api/v1/websocket',
   },
 };

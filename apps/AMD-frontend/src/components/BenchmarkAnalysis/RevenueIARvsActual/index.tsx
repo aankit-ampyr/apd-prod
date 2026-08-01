@@ -6,7 +6,9 @@ import {
   GroupedBarComparisonFilter,
   GroupedBarComparisonChart,
   CompositeChart,
+  CommentTrigger,
 } from '../../common';
+import {BenchmarkAnalysisTabs, BenchmarkAnalysisWidgets, CommentContextType, CommentModule} from '@/constants';
 import {AssetBenchnarkTabGroup} from '../types';
 import {useDispatch, useSelector} from 'react-redux';
 import {
@@ -18,6 +20,8 @@ import {VarianceTable} from './VarianceTable';
 import {formatCurrencyToPound, formatNumber, formatPercentage} from '@/utils';
 import {RevenueStreamType} from '@/constants';
 import {getAssetBenchmarkRevenueIARvsActualRequest} from '@/services/redux/slice';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
+import { useWidgetComments } from '@/hooks';
 import {getAssetBenchmarkRevenueIARvsActualExport} from '@/services/api';
 
 type MonthlyEntry = {
@@ -44,6 +48,12 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
    */
   const benchmarkData = useSelector(assetBenchmarkRevenueIARvsActualResult);
   const isLoading = useSelector(assetBenchmarkRevenueIARvsActualLoading);
+  const { getCommentCountForDataPoint, handleBadgeClick } = useWidgetComments(
+    CommentModule.BenchmarkAnalysis,
+    BenchmarkAnalysisTabs.RevenueIarVsActual,
+    assetId,
+    year
+  );
 
   /**
    * ==================================
@@ -81,9 +91,9 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
     return sortMonthlyEntries(benchmarkData.monthly_data, benchmarkData.year);
   }, [benchmarkData, isLoading]);
 
-  const revenueStreamComparisonData = useMemo(() => buildComparisonData(monthlyEntries), [monthlyEntries]);
+  const revenueStreamComparisonData = useMemo(() => buildComparisonData(monthlyEntries), [monthlyEntries, getCommentCountForDataPoint]);
   const comparisonFilters = useMemo(() => buildComparisonFilters(monthlyEntries), [monthlyEntries]);
-  const compositeChartData = useMemo(() => buildCompositeChartData(monthlyEntries), [monthlyEntries]);
+  const compositeChartData = useMemo(() => buildCompositeChartData(monthlyEntries), [monthlyEntries, getCommentCountForDataPoint]);
 
   /**
    * ==================================
@@ -173,6 +183,9 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
             actual: stream.actual_revenue,
             iarProjection: stream.iar_revenue,
           },
+          commentCounts: {
+            _category: getCommentCountForDataPoint(BenchmarkAnalysisWidgets.IarVsActualRevenueByStream, stream.revenue_stream, monthEntry.month),
+          },
         })),
       ),
     };
@@ -194,6 +207,9 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
       iar_revenue: monthEntry.total_all_streams.iar_revenue,
       actual_revenue: monthEntry.total_all_streams.actual_revenue,
       variance_percentage: monthEntry.total_all_streams.variance_percentage,
+      commentCounts: {
+        _category: getCommentCountForDataPoint(BenchmarkAnalysisWidgets.MonthlyTotalRevenueVsIarChart, formatMonthLabel(monthEntry.month, monthEntry.year))
+      }
     }));
   }
 
@@ -215,14 +231,17 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
   useEffect(() => {
     if (!assetId) return;
     if (!year) return;
-
+    dispatch(getAssetBenchmarkRevenueIARvsActualRequest({assetId: Number(assetId), year}));
     dispatch(
-      getAssetBenchmarkRevenueIARvsActualRequest({
-        assetId,
-        year,
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.BenchmarkAnalysis,
+        context_tab: BenchmarkAnalysisTabs.RevenueIarVsActual,
+        context_year: year ?? undefined,
       }),
     );
-  }, [year, assetId]);
+  }, [assetId, year, dispatch]);
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
@@ -248,13 +267,21 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
             title={`Monthly Total Revenue vs IAR with Variance (${year})`}
             subtitle="Monthly comparison of IAR projected revenue vs Actual revenue, with variance % shown across the annual period."
             icon="chart-trend-up"
+            className="flex-1 min-w-0 [&>div:last-child]:min-w-0"
           />
         }
-        className='mt-4'
+        className="mt-4"
         isLoading={isLoading}
+        margin={{ top: 60 }}
         xAxisKey="label"
         xAxisLabel="Months"
         data={compositeChartData}
+        onBadgeClick={(categoryId, _seriesId) => {
+          const [monthStr] = String(categoryId).split(' ');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthIndex = months.indexOf(monthStr) + 1;
+          handleBadgeClick(BenchmarkAnalysisWidgets.MonthlyTotalRevenueVsIarChart, String(categoryId), monthIndex || undefined);
+        }}
         tooltipInteractionMode="item"
         tooltipRenderer={({label, currentData, series}) => {
           return (
@@ -282,6 +309,22 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
                   </Text>
                 </div>
               ) : null}
+              <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+                <CommentTrigger
+                    contextModule={CommentModule.BenchmarkAnalysis}
+                    contextTab={BenchmarkAnalysisTabs.RevenueIarVsActual}
+                    contextWidget={BenchmarkAnalysisWidgets.MonthlyTotalRevenueVsIarChart}
+                    contextType={CommentContextType.DataPoint}
+                    contextAssetId={assetId}
+                    contextYear={year}
+                    contextDataPoint={label as string}
+                    variant="icon-with-text"
+                    label="Add Comment"
+                    className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                    iconClassName="w-4 h-4 text-[#088477]"
+                    labelClassName="text-[#088477]"
+                  />
+              </div>
             </div>
           );
         }}
@@ -291,11 +334,13 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
             label: 'Total Revenue £ (All Streams)',
             tickFormatter: formatNumber,
             domainStrategy: 'positive',
+            domainMaxMultiplier: 1.05,
           },
           right: {
             label: 'Variance (%)',
             tickFormatter: formatPercentage,
             domainStrategy: 'positive',
+            domainMaxMultiplier: 1.05,
           },
         }}
         series={[
@@ -327,6 +372,19 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
             valueFormatter: value => formatPercentage(value),
           },
         ]}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.BenchmarkAnalysis}
+            contextTab={BenchmarkAnalysisTabs.RevenueIarVsActual}
+            contextWidget={BenchmarkAnalysisWidgets.MonthlyTotalRevenueVsIarChart}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
       <Text variant="14R" className="text-text-secondary!">
         <span className="font-InterMedium">Note</span> : All revenue values shown are net of the 5% GridBeyond revenue
@@ -340,7 +398,7 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
             icon="chart-trend-up"
           />
         }
-        className='mt-4'
+        className="mt-4"
         yAxisLabel="Revenue (£)"
         xAxisLabel="Revenue Stream"
         barGap={6}
@@ -348,7 +406,8 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
         baseSeriesId="iarProjection"
         comparisonSeriesId="actual"
         baseSeriesColor="#8376C9"
-        customTooltipRenderer={({baseLabel, baseSeries, comparisonSeries}) => {
+        tooltipInteractionMode="item"
+        customTooltipRenderer={({baseLabel, categoryId, baseSeries, comparisonSeries, filterId}) => {
           const tooltipItems = [baseSeries, comparisonSeries].filter(Boolean);
           if (!tooltipItems.length) return null;
 
@@ -367,6 +426,23 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
                   </Text>
                 ))}
               </div>
+              <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+                <CommentTrigger
+                    contextModule={CommentModule.BenchmarkAnalysis}
+                    contextTab={BenchmarkAnalysisTabs.RevenueIarVsActual}
+                    contextWidget={BenchmarkAnalysisWidgets.IarVsActualRevenueByStream}
+                    contextType={CommentContextType.DataPoint}
+                    contextAssetId={assetId}
+                    contextYear={year}
+                    contextMonth={filterId ? parseInt(filterId.split('-')[1], 10) : undefined}
+                    contextDataPoint={categoryId}
+                    variant="icon-with-text"
+                    label="Add Comment"
+                    className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                    iconClassName="w-4 h-4 text-[#088477]"
+                    labelClassName="text-[#088477]"
+                  />
+              </div>
             </div>
           );
         }}
@@ -378,17 +454,46 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
         xAxisLabelProps={{
           offset: -45,
         }}
+        onBadgeClick={(categoryId, _seriesId, filterId) => {
+          handleBadgeClick(BenchmarkAnalysisWidgets.IarVsActualRevenueByStream, String(categoryId), filterId ? Number(filterId.split('-')[1]) : undefined);
+        }}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.BenchmarkAnalysis}
+            contextTab={BenchmarkAnalysisTabs.RevenueIarVsActual}
+            contextWidget={BenchmarkAnalysisWidgets.IarVsActualRevenueByStream}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
 
       <VarianceTable
         title={`IAR vs Actual Variance by Stream and Month (${year ?? benchmarkData?.year ?? 'Year'})`}
         subtitle="Month-wise variance percentage between Actual revenue and IAR projection for each revenue stream."
         icon="chart-trend-up"
-        className='mt-4'
+        className="mt-4"
         downloadFileName=""
         monthlyEntries={monthlyEntries}
         loading={isLoading}
         onDownload={handleDownload}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.BenchmarkAnalysis}
+            contextTab={BenchmarkAnalysisTabs.RevenueIarVsActual}
+            contextWidget={BenchmarkAnalysisWidgets.IarVsActualVariance}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
     </div>
   );

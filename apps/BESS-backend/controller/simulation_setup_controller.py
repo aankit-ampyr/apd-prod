@@ -1,6 +1,7 @@
 from fastapi import Depends
-from context.dependency import get_resource_id
-from constants.enums import UserRole
+from redis.asyncio import Redis
+from context.dependency import get_resource_id, get_redis_conn, get_edited_step
+from constants.enums import SimulationSetupProgress, UserRole
 from db.dependencies import allowed_roles, get_bess_db
 from utils.response_utils import Res
 from dtos.simulation_dto import (
@@ -59,6 +60,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.load_service.compute_and_save_load_profile(
             simulation_id=simulation_id,
@@ -66,6 +68,7 @@ class SimulationSetupController:
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_load_profile(self, simulation_id: int, bess_db=Depends(get_bess_db)):
@@ -85,6 +88,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.bess_config_service.create_or_update_container_config(
             bess_db=bess_db,
@@ -92,6 +96,7 @@ class SimulationSetupController:
             payload=payload,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_bess_config(self, simulation_id: int, bess_db=Depends(get_bess_db)):
@@ -116,6 +121,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.dg_config_service.upsert_config(
             simulation_id=simulation_id,
@@ -123,6 +129,7 @@ class SimulationSetupController:
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def fuel_curve_calculation(
@@ -144,6 +151,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.dispatch_rule_service.upsert_dispatch_rule(
             simulation_id=simulation_id,
@@ -151,6 +159,7 @@ class SimulationSetupController:
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_dispatch_rules(
@@ -175,6 +184,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.bess_dg_service.create_or_update_bess_dg_config(
             bess_db=bess_db,
@@ -182,6 +192,7 @@ class SimulationSetupController:
             payload=payload,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_bess_dg_sizing(
@@ -200,6 +211,7 @@ class SimulationSetupController:
         bess_db=Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         try:
             return await self.simulation_service.update_simulation(
@@ -208,6 +220,7 @@ class SimulationSetupController:
                 name=payload.get("name"),  # type: ignore
                 current_user=current_user,
                 resource_id=resource_id,
+                redis=redis,
             )
         except Exception:
             return Res.error("E-20001")
@@ -218,12 +231,14 @@ class SimulationSetupController:
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.simulation_service.delete_simulation(
             bess_db=bess_db,
             simulation_id=simulation_id,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_simulation_details(
@@ -240,6 +255,15 @@ class SimulationSetupController:
             bess_db=bess_db, simulation_id=simulation_id, current_user=current_user
         )
 
+    async def fetch_simulation_step(
+        self,
+        simulation_id: int,
+        bess_db: AsyncSession = Depends(get_bess_db),
+    ):
+        return await self.simulation_service.fetch_simulation_step(
+            bess_db=bess_db, simulation_id=simulation_id
+        )
+
     async def upsert_custom_config(
         self,
         simulation_id: int,
@@ -252,6 +276,8 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        last_edited: SimulationSetupProgress = Depends(get_edited_step),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.custom_config_service.create_or_update_custom_config(
             bess_db=bess_db,
@@ -259,6 +285,8 @@ class SimulationSetupController:
             payload=payload,
             current_user=current_user,
             resource_id=resource_id,
+            last_edited=last_edited,
+            redis=redis,
         )
 
     async def get_custom_config(
@@ -296,12 +324,16 @@ class SimulationSetupController:
                 UserRole.ADMIN, UserRole.ANALYST, UserRole.VIEWER, UserRole.MANAGEMENT
             )
         ),
+        last_edited: SimulationSetupProgress = Depends(get_edited_step),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.multi_y_config_service.calc_create_multi_y_config(
             bess_db=bess_db,
             simulation_id=simulation_id,
             config=payload,
             current_user=current_user,
+            last_edited=last_edited,
+            redis=redis,
         )
 
     async def save_multi_year_projection(
@@ -316,6 +348,8 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        last_edited: SimulationSetupProgress = Depends(get_edited_step),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.multi_y_config_service.save_multi_y_config(
             bess_db=bess_db,
@@ -323,6 +357,8 @@ class SimulationSetupController:
             config=payload,
             current_user=current_user,
             resource_id=resource_id,
+            last_edited=last_edited,
+            redis=redis,
         )
 
     async def upsert_green_energy_config(
@@ -337,6 +373,7 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.green_energy_service.create_or_update_config(
             bess_db=bess_db,
@@ -344,6 +381,7 @@ class SimulationSetupController:
             payload=payload,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_green_energy_config(
@@ -367,13 +405,17 @@ class SimulationSetupController:
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
-        return await self.detail_green_config_service.create_or_update_detail_green_config(
-            bess_db=bess_db,
-            simulation_id=simulation_id,
-            payload=payload,
-            current_user=current_user,
-            resource_id=resource_id,
+        return (
+            await self.detail_green_config_service.create_or_update_detail_green_config(
+                bess_db=bess_db,
+                simulation_id=simulation_id,
+                payload=payload,
+                current_user=current_user,
+                resource_id=resource_id,
+                redis=redis,
+            )
         )
 
     async def get_detail_green_config(

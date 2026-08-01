@@ -1,3 +1,4 @@
+from python_common.exceptions.auth_exception import InvalidPlatformAccess
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from utils.response_utils import Res
@@ -26,14 +27,17 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
 
+        except InvalidPlatformAccess:
+            return Res.error("E-10011", message="You are not authorized to access this platform.", http_status_code=403)
+        
         except UserNotAuthenticated:
-            return Res.error("E-20002", http_status_code=401)
+            return Res.error("E-20064", http_status_code=401)
         except UserTokenExpired:
             logger.info(
                 "User token expired",
                 extra={"error_code": "E-20002", "path": request.url.path},
             )
-            return Res.error("E-20002")
+            return Res.error("E-20002", message="User token expired", http_status_code=401)
         except UserSessionExpired:
             return Res.error("E-20002", http_status_code=401)
         except UserNotAuthorized:

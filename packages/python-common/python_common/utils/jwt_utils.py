@@ -1,9 +1,11 @@
+import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any
 from jose import jwt, JWTError
 from python_common.constants.defaults import (
     JWT_ALGORITHM,
     JWT_EXPIRY,
+    ACCESS_JWT_EXPIRY,
     EPHEMERAL_WS_TOKEN_EXPIRY,
 )
 from config import JWT_SECRET
@@ -19,15 +21,14 @@ def _build_user_payload(
 ) -> Dict[str, Any]:
 
     now = datetime.now(timezone.utc)
-
     return {
         "sub": email,
         "id": user_id,
         "name": name,
         "role": role,
         "platform": platform,
-        "iat": now,
-        "exp": now + timedelta(seconds=expiry_seconds),
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(seconds=expiry_seconds)).timestamp()),
     }
 
 
@@ -40,7 +41,9 @@ def create_access_token(
     expires_delta: Optional[timedelta] = None,
 ) -> str:
 
-    expiry_seconds = int(expires_delta.total_seconds()) if expires_delta else JWT_EXPIRY
+    expiry_seconds = (
+        int(expires_delta.total_seconds()) if expires_delta else ACCESS_JWT_EXPIRY
+    )
 
     payload = _build_user_payload(
         email=email,

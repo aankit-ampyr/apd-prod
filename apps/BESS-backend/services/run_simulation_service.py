@@ -1,18 +1,17 @@
 import io
 import csv
-import pandas as pd
-import numpy as np
-import calendar
 from fastapi import status
 from typing import List, Optional
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from fastapi.responses import StreamingResponse
-from sqlalchemy import desc, extract, select
-from sqlalchemy.ext.asyncio import AsyncResult, AsyncSession
+from redis.asyncio import Redis
+from sqlalchemy import asc, desc, extract, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from constants.enums import (
     SimulationJobStatus,
+    SimulationSetupProgress,
     SimulationStatus,
     Month,
     PSPAuditLogScenario,
@@ -33,6 +32,7 @@ from models.simulation_model import (
     DispatchRuleConfiguration,
     SimulationHourlyResult,
     Simulation,
+    SimulationMonthlyResult,
     SingularConfSimulationResult,
 )
 from utils.log_utils import audit_logs
@@ -189,110 +189,13 @@ class RunSingleSimulationService:
             output.seek(0)
             output.truncate(0)
 
-    async def __aggregate_monthly_data(
-        self, result: AsyncResult
-    ) -> tuple[list[MonthlySimulationMetrics], int]:
-        """
-        Consumes an async SQLAlchemy stream, loads it into a Pandas DataFrame,
-        calculates monthly KPIs, and returns a list of MonthlySimulationMetrics models.
-        """
-
-        data = []
-        year: int = 1990
-
-        async for row in result.scalars():
-            data.append(
-                {
-                    "timestamp": row.timestamp,
-                    "is_dg_running": row.is_dg_running,
-                    "dg_to_load": row.dg_to_load,
-                    "load_mw": row.load_mw,
-                    "solar_curtailed": row.solar_curtailed,
-                    "solar_mw": row.solar_mw,
-                    "delivery": row.delivery,
-                    "green_energy_to_load_mwh": row.green_energy_to_load_mwh,
-                }
-            )
-
-        # Load into DataFrame
-        df = pd.DataFrame(data)
-
-        # Handle empty results gracefully
-        if df.empty:
-            return [], year
-
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df["month_int"] = df["timestamp"].dt.month
-        year = int(df["timestamp"].dt.year.iloc[0])
-
-        # Booleans for fast counting
-        df["load_active"] = (df["load_mw"] > 0).astype(int)
-        df["delivery_int"] = df["delivery"].astype(int)
-        df["dg_running_int"] = df["is_dg_running"].astype(int)
-        df["delivery_dg_off"] = (df["delivery"] & ~df["is_dg_running"]).astype(int)
-
-        grouped = (
-            df.groupby("month_int")
-            .agg(
-                hours_fully_served=("delivery_int", "sum"),
-                total_load_hours=("load_active", "sum"),
-                green_delivery_hours=("delivery_dg_off", "sum"),
-                generator_hours=("dg_running_int", "sum"),
-                sum_solar_mw=("solar_mw", "sum"),
-                green_energy_to_load_mwh=("green_energy_to_load_mwh", "sum"),
-                dg_to_load_mwh=("dg_to_load", "sum"),
-                curtailed_mwh=("solar_curtailed", "sum"),
-            )
-            .reset_index()
-        )
-
-        # 4. Perform final percentage calculations (with safe division to prevent divide-by-zero errors)
-        grouped["load_met_pct"] = np.where(
-            grouped["total_load_hours"] > 0,
-            (grouped["hours_fully_served"] / grouped["total_load_hours"]) * 100,
-            0.0,
-        )
-
-        grouped["green_energy_pct"] = np.where(
-            grouped["hours_fully_served"] > 0,
-            (grouped["green_delivery_hours"] / grouped["hours_fully_served"]) * 100,
-            0.0,
-        )
-
-        grouped["wastage_energy_pct"] = np.where(
-            grouped["sum_solar_mw"] > 0,
-            (grouped["curtailed_mwh"] / grouped["sum_solar_mw"]) * 100,
-            0.0,
-        )
-
-        grouped["month"] = grouped["month_int"].apply(lambda x: calendar.month_name[x])
-
-        metrics_list = []
-
-        for row in grouped.itertuples(index=False):
-            metric = MonthlySimulationMetrics(
-                month=row.month,  # type: ignore
-                load_met_pct=row.load_met_pct,  # type: ignore
-                green_energy_pct=row.green_energy_pct,  # type: ignore
-                wastage_energy_pct=row.wastage_energy_pct,  # type: ignore
-                hours_fully_served=int(row.hours_fully_served),  # type: ignore
-                total_load_hours=int(row.total_load_hours),  # type: ignore
-                generator_hours=int(row.generator_hours),  # type: ignore
-                green_energy_to_load_mwh=row.green_energy_to_load_mwh,  # type: ignore
-                dg_to_load_mwh=row.dg_to_load_mwh,  # type: ignore
-                curtailed_mwh=row.curtailed_mwh,  # type: ignore
-                month_int=row.month_int,  # type: ignore
-            )
-            metrics_list.append(metric)
-
-        return metrics_list, year
-
     async def _generate_monthly_result_csv(
         self,
         simulation_job_id: int,
         months: Optional[list[Month]],
         sort: Optional[str],
         bess_db: AsyncSession,
+        yield_per: int = 100,
     ):
         output = io.StringIO()
         writer = csv.writer(output)
@@ -310,46 +213,48 @@ class RunSingleSimulationService:
             "Curtailed (MWh)",
         ]
         writer.writerow(headers)
+        yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
 
-        stmt = select(SimulationHourlyResult).where(
-            SimulationHourlyResult.custom_job_id == simulation_job_id,
-        )
+        stmt = select(
+            SimulationMonthlyResult.month,
+            SimulationMonthlyResult.load_met_pct,
+            SimulationMonthlyResult.green_energy_pct,
+            SimulationMonthlyResult.wastage_energy_pct,
+            SimulationMonthlyResult.hours_fully_served,
+            SimulationMonthlyResult.total_load_hours,
+            SimulationMonthlyResult.generator_hours,
+            SimulationMonthlyResult.green_energy_to_load_mwh,
+            SimulationMonthlyResult.dg_to_load_mwh,
+            SimulationMonthlyResult.curtailed_mwh,
+        ).where(SimulationMonthlyResult.job_id == simulation_job_id)
 
         if months:
-            stmt = stmt.where(
-                extract(
-                    "month", SimulationHourlyResult.timestamp.op("AT TIME ZONE")("UTC")
-                ).in_(months)
-            )
-
-        # Stream results to keep aggregation memory-efficient
-        hourly_result = await bess_db.stream(stmt)
-        hourly_data, _ = await self.__aggregate_monthly_data(result=hourly_result)
+            stmt = stmt.where(SimulationMonthlyResult.month_int.in_(months))
 
         if sort in ("month", "-month"):
-            descending = sort.startswith("-")
-            hourly_data.sort(
-                key=lambda metric: metric.month_int,
-                reverse=descending,
-            )
+            if sort.startswith("-"):
+                stmt = stmt.order_by(desc(SimulationMonthlyResult.month_int))
+            else:
+                stmt = stmt.order_by(asc(SimulationMonthlyResult.month_int))
 
-        for metric in hourly_data:
-            writer.writerow(
-                [
-                    metric.month,
-                    metric.load_met_pct,
-                    metric.green_energy_pct,
-                    metric.wastage_energy_pct,
-                    metric.hours_fully_served,
-                    metric.total_load_hours,
-                    metric.generator_hours,
-                    metric.green_energy_to_load_mwh,
-                    metric.dg_to_load_mwh,
-                    metric.curtailed_mwh,
-                ]
-            )
+        stmt = stmt.execution_options(yield_per=yield_per)
+        result = await bess_db.stream(stmt)
 
         yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        async for db_batch in result.partitions():
+            for row in db_batch:
+                writer.writerow(row)
+
+            # Yield the chunk of CSV text to FastAPI
+            yield output.getvalue()
+
+            output.seek(0)
+            output.truncate(0)
 
     async def run_simulation(
         self,
@@ -357,6 +262,7 @@ class RunSingleSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
@@ -370,14 +276,19 @@ class RunSingleSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # WARNING: Uncomment it once the progress status update is implemented after step 3.
-        # if simulation.step < SimulationSetupProgress.BESS_DG_CONFIG:
-        #     return Res.error()
+        if simulation.edit_step < SimulationSetupProgress.CUSTOM_CONFIGURATION:
+            return Res.error(
+                status_code="E-20062",
+                message="Incomplete Simulation configuration.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         sim_job_result = await bess_db.execute(
-            select(CustomSimulationJob).where(
+            select(CustomSimulationJob)
+            .where(
                 CustomSimulationJob.simulation_id == simulation.id,
             )
+            .with_for_update()
         )
 
         single_sim_jobs = sim_job_result.scalar_one_or_none()
@@ -414,6 +325,25 @@ class RunSingleSimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
+        await bess_db.flush()
+
+        try:
+            await bess_single_sim_task.kiq(
+                simulation.id,
+                job_id=new_simulation_job.job_id,
+                run_by=current_user.get("name"),  # type: ignore
+            )
+
+            await bess_db.commit()
+
+        except Exception:
+            await bess_db.rollback()
+
+            return Res.error(
+                status_code="E-20065",
+                message="Unable to run simulation.",
+            )
+
         await audit_logs(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -422,13 +352,9 @@ class RunSingleSimulationService:
             action=log_action,
             resource_id=resource_id,
             before=before_config,
-            after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
+            after="Simulation Status: STARTED",
+            redis=redis,
         )
-
-        await bess_db.commit()
-        await bess_db.refresh(new_simulation_job)
-
-        await bess_single_sim_task.kiq(simulation.id, job_id=new_simulation_job.job_id)
 
         return Res.success(
             status_code="S-20037", data={"simulation_job_id": new_simulation_job.job_id}
@@ -724,6 +650,7 @@ class RunSingleSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
         start_time: Optional[datetime] = None,
         end_time: Optional[datetime] = None,
         sort: Optional[List[str]] = None,
@@ -754,6 +681,7 @@ class RunSingleSimulationService:
             resource_id=resource_id,
             before=None,
             after="Action: Custom Configuration Hourly Performance Exported",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -780,7 +708,7 @@ class RunSingleSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
-        yield_per: int = 1000,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(CustomSimulationJob)
@@ -798,45 +726,46 @@ class RunSingleSimulationService:
                 message="Simulation result not found.",
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
-        stmt = select(SimulationHourlyResult).where(
-            SimulationHourlyResult.custom_job_id == simulation_job.job_id,
+        query = select(SimulationMonthlyResult).where(
+            SimulationMonthlyResult.job_id == simulation_job.id,
         )
 
         if months:
-            stmt = stmt.where(
-                extract(
-                    "month", SimulationHourlyResult.timestamp.op("AT TIME ZONE")("UTC")
-                ).in_(months)
-            )
-
-        stmt = stmt.execution_options(yield_per=yield_per)
-        hourly_result = await bess_db.stream(stmt)
-
-        hourly_data, year = await self.__aggregate_monthly_data(result=hourly_result)
-
-        data = MonthlySimulationResponse(
-            simulation_id=simulation_id, year=year, result=hourly_data
-        )
-
-        await audit_logs(
-            db=bess_db,
-            user_id=f"USER-{current_user.get('id')}",
-            user_role=current_user.get("role"),  # type: ignore
-            module=PSPAuditLogModules.SIMULATION.value,
-            action=PSPAuditLogScenario.CUSTOM_CONF_RESULT_VIEWED.value,
-            resource_id=resource_id,
-            before=None,
-            after="Action: Detailed Analysis Page Opened",
-        )
-
-        await bess_db.commit()
+            query = query.where(SimulationMonthlyResult.month_int.in_(months))
 
         if sort in ("month", "-month"):
-            descending = sort.startswith("-")
-            data.result.sort(
-                key=lambda metric: metric.month_int,
-                reverse=descending,
+            if sort.startswith("-"):
+                query = query.order_by(desc(SimulationMonthlyResult.month_int))
+            else:
+                query = query.order_by(asc(SimulationMonthlyResult.month_int))
+
+        response = await bess_db.execute(query)
+        results = response.scalars().all()
+
+        hourly_data = [
+            MonthlySimulationMetrics.model_validate(data) for data in results
+        ]
+
+        data = MonthlySimulationResponse(
+            simulation_id=simulation_id,
+            year=hourly_data[0].year_int if len(hourly_data) > 0 else 2004,
+            result=hourly_data,
+        )
+
+        if not sort and not months:
+            await audit_logs(
+                db=bess_db,
+                user_id=f"USER-{current_user.get('id')}",
+                user_role=current_user.get("role"),  # type: ignore
+                module=PSPAuditLogModules.SIMULATION.value,
+                action=PSPAuditLogScenario.CUSTOM_CONF_RESULT_VIEWED.value,
+                resource_id=resource_id,
+                before=None,
+                after="Action: Detailed Analysis Page Opened",
+                redis=redis,
             )
+
+        await bess_db.commit()
 
         return Res.success(status_code="S-20040", data=data.model_dump(mode="json"))
 
@@ -848,6 +777,7 @@ class RunSingleSimulationService:
         current_user: dict,
         resource_id: str,
         bess_db: AsyncSession,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(CustomSimulationJob)
@@ -875,13 +805,14 @@ class RunSingleSimulationService:
             resource_id=resource_id,
             before=None,
             after="Action: Custom Configuration Monthly Performance Exported",
+            redis=redis,
         )
 
         await bess_db.commit()
 
         return StreamingResponse(
             self._generate_monthly_result_csv(
-                simulation_job_id=simulation_job.job_id,
+                simulation_job_id=simulation_job.id,
                 months=months,
                 sort=sort,
                 bess_db=bess_db,

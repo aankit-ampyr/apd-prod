@@ -1,11 +1,16 @@
 from .enums import AssetMetrics
 from python_common.constants.defaults import *
-# JWT 
+
+# JWT
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRY = 60*60*24
+JWT_EXPIRY = 60 * 60 * 24
 EPHEMERAL_WS_TOKEN_EXPIRY = 10
 
+API_RESULT_CACHE_TTL = 60 * 60 * 4  # 4 hours
+
 ASSET_DEGRADATION_PER_CYCLE_PERCENTAGE = 2.5 / (1.5 * 365)
+
+LOGS_STREAM_CHANEL = "audit_logs_update"
 
 CONSTRAINT_NAMES = {
     "UNIQUE_USER_EMAIL_CONSTRAINT": "uq_users_email",
@@ -13,9 +18,9 @@ CONSTRAINT_NAMES = {
 
 UPLOAD_PATHS = {
     "MERGED_DATASETS": lambda asset_id: f"assets/asset-{asset_id}/merged_report/",
-    "INVOICE_PATH" :"invoice-analysis/pdf-invoices/",
-    "SETTLEMENT_PATH":"invoice-analysis/settlements/",
-
+    "INVOICE_PATH": "invoice-analysis/pdf-invoices/",
+    "SETTLEMENT_PATH": "invoice-analysis/settlements/",
+    "SUMMARY_STATEMENT_PATH": "invoice-analysis/summary-statements/",
 }
 
 ASSET_METRIC_LABEL = {
@@ -43,3 +48,4 @@ ASSET_BENCHMARK_MONTHLY_HARDCODED_METRICS = [
     AssetMetrics.DUOS_CREDIT,
     AssetMetrics.CAPACITY_MARKET,
 ]
+

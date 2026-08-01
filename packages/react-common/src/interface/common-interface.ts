@@ -1,5 +1,10 @@
 import type { IconName } from "../assets/icons";
-import { AuditLogModules, AuditLogScenario, Platform, UserRole } from "../constants";
+import {
+  AuditLogModules,
+  AuditLogScenario,
+  Platform,
+  UserRole,
+} from "../constants";
 export type SortType = "asc" | "desc" | null;
 
 interface DataTableColumnWidth {
@@ -16,12 +21,32 @@ export interface DataTableColumn<T> {
   width?: DataTableColumnWidth;
   align: Align;
   headerAlign?: Align;
-  render?: (row: T, width?: DataTableColumnWidth, isHovered?: boolean) => string | React.ReactNode;
-  renderCell?: ({row, index, width, isHovered}: {row: T; index: number; width?: DataTableColumnWidth; isHovered?: boolean}) => string | React.ReactNode;
+  render?: (
+    row: T,
+    width?: DataTableColumnWidth,
+    isHovered?: boolean,
+  ) => string | React.ReactNode;
+  renderCell?: ({
+    row,
+    index,
+    width,
+    isHovered,
+  }: {
+    row: T;
+    index: number;
+    width?: DataTableColumnWidth;
+    isHovered?: boolean;
+  }) => string | React.ReactNode;
   headerClassName?: string;
-  cellClassName?: string;
+  cellClassName?:
+    | string
+    | ((props: {
+        row: T;
+        index: number;
+        width?: DataTableColumnWidth;
+        isHovered?: boolean;
+      }) => string | undefined);
 }
-
 
 export interface GroupedTableBaseColumn<T> {
   key: string;
@@ -34,11 +59,7 @@ export interface GroupedTableBaseSubColumn {
   key: string;
   title: React.ReactNode;
   align?: Align;
-  renderCell?: (
-    value: any,
-    row: any,
-    align?: Align,
-  ) => React.ReactNode;
+  renderCell?: (value: any, row: any, align?: Align) => React.ReactNode;
 }
 
 export interface HorizontalTableMetric<T> {
@@ -107,7 +128,6 @@ export type Undefinedable<T> = {
   [K in keyof T]: T[K] | undefined;
 };
 
-
 export type MonthYear = {
   month: number; // 1-12
   year: number; // e.g., 2024
@@ -148,4 +168,5 @@ export interface AuditLog {
   before: string | Record<string, unknown> | null;
   after: string | Record<string, unknown> | null;
   timestamp: string;
+  platform?: string;
 }

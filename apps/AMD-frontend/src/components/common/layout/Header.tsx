@@ -63,7 +63,7 @@ export const Header = () => {
   };
 
   return (
-    <div className='py-4 z-999 px-8 shadow-md/10 flex items-center'>
+    <div className='sticky top-0 bg-white py-4 z-[998] px-8 shadow-md/10 flex items-center'>
       {showBackButton && (
         <button onClick={handleNavigateBack} className="cursor-pointer shrink-0">
           <Icon name="arrow-left" className="size-6! mr-4 sm:size-6 font-bold text-text-primary" />

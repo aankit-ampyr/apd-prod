@@ -130,7 +130,7 @@ const authSlice = createSlice({
       return { ...initialState };
     },
 
-    resetAuthWithReason(_state, action: PayloadAction<{reason: UserSessionEndReason}>) {
+    resetAuthWithReason(_state, action: PayloadAction<{reason: UserSessionEndReason; errorCode?: string}>) {
       return {
         ...initialState,
         sessionEndReason: action.payload.reason,

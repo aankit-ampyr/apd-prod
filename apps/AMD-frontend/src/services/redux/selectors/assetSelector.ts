@@ -31,7 +31,7 @@ export const noAsset = createSelector(
     return totalAssets === 0;
   },
 );
-
+export const assetListLoading = (state: RootState) => state.asset.assetListLoading;
 export const assetMultipleUsers = (state: RootState) => state.asset.users;
 
 export const allAssetsList = createSelector([(state: RootState) => state.asset.allAssets], allAssets =>
@@ -46,6 +46,33 @@ export const analysisAssetsList = createSelector([(state: RootState) => state.as
     allAssets
       // exclude asset without analysis and solar assets
       .filter(item => item.analysis_available && item.type !== AssetTypeEnum.Solar)
+      .map(
+        (
+          item,
+        ): SelectInputItem<{
+          organization_id: number;
+          organization_name: string;
+          available_periods?: MonthYear[];
+        }> => ({
+          id: item.id,
+          label: item.name,
+          subLabel: item.organization.name,
+          metadata: {
+            organization_id: item.organization.id,
+            organization_name: item.organization.name,
+            available_periods: item.available_periods,
+          },
+        }),
+      )
+  );
+});
+
+// Benchmark Analysis dropdown: show only assets that have analysis months and an uploaded IAR file.
+export const benchmarkAnalysisAssetsList = createSelector([(state: RootState) => state.asset.allAssets], allAssets => {
+  return (
+    allAssets
+      // exclude asset without analysis, without IAR, and solar assets
+      .filter(item => item.analysis_available && item.has_iar && item.type !== AssetTypeEnum.Solar)
       .map(
         (
           item,
@@ -117,26 +144,71 @@ export const iarReportUploadError = (state: RootState) => state.asset.iarReportU
 export const optimizedDatasetGenerationLoading = (state: RootState) => state.asset.optimizedDatasetGenerationLoading;
 
 // ================================ Asset Analysis selectors ================================
-export const assetOperationalAnalyticsResult = (state: RootState) => state.asset.analytics.operations;
 
-// operations analysis selectors
+// operations summary
+export const assetAnalysisOperationalSummaryResult = (state: RootState) => state.asset.analytics.operations?.revenue;
 export const assetAnalysisOperationalRevenueLoading = (state: RootState) =>
   state.asset.analyticsLoading.operations?.revenue ?? false;
 export const assetAnalysisOperationalRevenueError = (state: RootState) =>
   state.asset.analyticsError.operations?.revenue ?? false;
 
-// market summary
-export const assetAnalysisOperationalMarketSummaryLoading = (state: RootState) =>
+// operations market summary
+export const assetOperationalMarketSummaryResult = (state: RootState) => state.asset.analytics.operations?.market_summary;
+export const assetOperationalMarketSummaryLoading = (state: RootState) =>
   state.asset.analyticsLoading.operations?.market_summary ?? false;
 export const assetAnalysisOperationalMarketSummaryError = (state: RootState) =>
   state.asset.analyticsError.operations?.market_summary ?? false;
 
 // energy price comparison
+export const assetEnergyPriceComparisonResult = (state: RootState) =>
+  state.asset.analytics.operations.energy_price_comparison;
+export const assetAnalysisEnergyPriceComparisonLoading = (state: RootState) =>
+  state.asset.analyticsLoading.operations?.energy_price_comparison ?? false;
+export const assetAnalysisEnergyPriceComparisonError = (state: RootState) =>
+  state.asset.analyticsError.operations?.energy_price_comparison ?? false;
+
+// battery power over time
+export const assetBatteryPowerOverTimeResult = (state: RootState) =>
+  state.asset.analytics.operations.battery_power_over_time;
+export const assetAnalysisBatteryPowerOverTimeLoading = (state: RootState) =>
+  state.asset.analyticsLoading.operations?.battery_power_over_time ?? false;
+export const assetAnalysisBatteryPowerOverTimeError = (state: RootState) =>
+  state.asset.analyticsError.operations?.battery_power_over_time ?? false;
+
+// market optimization summary
 export const assetMarketSummaryAnalysisResult = (state: RootState) => state.asset.analytics.market?.summary;
 export const assetMarketSummaryAnalysisLoading = (state: RootState) =>
   state.asset.analyticsLoading.market?.summary ?? false;
 export const assetMarketSummaryAnalysisError = (state: RootState) =>
   state.asset.analyticsError.market?.summary ?? false;
+
+// market statistics
+export const assetMarketStatisticsResult = (state: RootState) => state.asset.analytics.market?.statistics;
+export const assetMarketStatisticsLoading = (state: RootState) =>
+  state.asset.analyticsLoading.market?.statistics ?? false;
+export const assetMarketStatisticsError = (state: RootState) => state.asset.analyticsError.market?.statistics ?? false;
+
+// market utilization
+export const assetMarketUtilizationAnalysisResult = (state: RootState) => state.asset.analytics.market?.utilization;
+export const assetMarketUtilizationAnalysisLoading = (state: RootState) =>
+  state.asset.analyticsLoading.market?.utilization ?? false;
+export const assetMarketUtilizationAnalysisError = (state: RootState) =>
+  state.asset.analyticsError.market?.utilization ?? false;
+
+// best markets
+export const assetBestMarketsAnalysisResult = (state: RootState) => state.asset.analytics.market?.best_markets;
+export const assetBestMarketsAnalysisLoading = (state: RootState) =>
+  state.asset.analyticsLoading.market.best_markets ?? false;
+export const assetBestMarketsAnalysisError = (state: RootState) =>
+  state.asset.analyticsError.market.best_markets ?? false;
+
+// market revenue distribution
+export const assetMarketRevenueDistributionResult = (state: RootState) =>
+  state.asset.analytics.market?.revenue_distribution;
+export const assetMarketRevenueDistributionLoading = (state: RootState) =>
+  state.asset.analyticsLoading.market?.revenue_distribution ?? false;
+export const assetMarketRevenueDistributionError = (state: RootState) =>
+  state.asset.analyticsError.market?.revenue_distribution ?? false;
 
 // ancillary service summary
 export const assetAncillaryServiceSummaryResult = (state: RootState) =>
@@ -260,33 +332,6 @@ export const assetTBSpreadDetailsLoading = (state: RootState) =>
   state.asset.analyticsLoading.tb_spread?.details ?? false;
 export const assetTBSpreadDetailsError = (state: RootState) => state.asset.analyticsError.tb_spread?.details ?? false;
 
-// market statistics
-export const assetMarketStatisticsResult = (state: RootState) => state.asset.analytics.market?.statistics;
-export const assetMarketStatisticsLoading = (state: RootState) =>
-  state.asset.analyticsLoading.market?.statistics ?? false;
-export const assetMarketStatisticsError = (state: RootState) => state.asset.analyticsError.market?.statistics ?? false;
-
-// market utilization
-export const assetMarketUtilizationAnalysisResult = (state: RootState) => state.asset.analytics.market?.utilization;
-export const assetMarketUtilizationAnalysisLoading = (state: RootState) =>
-  state.asset.analyticsLoading.market?.utilization ?? false;
-export const assetMarketUtilizationAnalysisError = (state: RootState) =>
-  state.asset.analyticsError.market?.utilization ?? false;
-
-// best markets
-export const assetBestMarketsAnalysisResult = (state: RootState) => state.asset.analytics.market?.best_markets;
-export const assetBestMarketsAnalysisLoading = (state: RootState) =>
-  state.asset.analyticsLoading.market.best_markets ?? false;
-export const assetBestMarketsAnalysisError = (state: RootState) =>
-  state.asset.analyticsError.market.best_markets ?? false;
-
-// market revenue distribution
-export const assetMarketRevenueDistributionResult = (state: RootState) =>
-  state.asset.analytics.market?.revenue_distribution;
-export const assetMarketRevenueDistributionLoading = (state: RootState) =>
-  state.asset.analyticsLoading.market?.revenue_distribution ?? false;
-export const assetMarketRevenueDistributionError = (state: RootState) =>
-  state.asset.analyticsError.market?.revenue_distribution ?? false;
 
 // market hourly price patterns
 export const assetMarketHourlyPricePatternsResult = (state: RootState) =>
@@ -311,22 +356,6 @@ export const assetMarketPriceCorrelationMatrixLoading = (state: RootState) =>
   state.asset.analyticsLoading?.market_prices?.correlation_matrix ?? false;
 export const assetMarketPriceCorrelationMatrixError = (state: RootState) =>
   state.asset.analyticsError?.market_prices?.correlation_matrix ?? false;
-
-// energy price comparison
-export const assetEnergyPriceComparisonResult = (state: RootState) =>
-  state.asset.analytics.operations.energy_price_comparison;
-export const assetAnalysisEnergyPriceComparisonLoading = (state: RootState) =>
-  state.asset.analyticsLoading.operations?.energy_price_comparison ?? false;
-export const assetAnalysisEnergyPriceComparisonError = (state: RootState) =>
-  state.asset.analyticsError.operations?.energy_price_comparison ?? false;
-
-// battery power over time
-export const assetBatteryPowerOverTimeResult = (state: RootState) =>
-  state.asset.analytics.operations.battery_power_over_time;
-export const assetAnalysisBatteryPowerOverTimeLoading = (state: RootState) =>
-  state.asset.analyticsLoading.operations?.battery_power_over_time ?? false;
-export const assetAnalysisBatteryPowerOverTimeError = (state: RootState) =>
-  state.asset.analyticsError.operations?.battery_power_over_time ?? false;
 
 // market price spread
 export const assetMarketPriceSpreadResult = (state: RootState) => state.asset.analytics?.market_prices?.spread;
@@ -400,3 +429,14 @@ export const assetInvoiceSettlementUploadErrorMessage = (state: RootState) => st
 export const assetInvoiceSettlementDeleteLoading = (state: RootState) => state.asset.deleteInvoiceSettlement.loading;
 export const assetInvoiceSettlementDeleteError = (state: RootState) => state.asset.deleteInvoiceSettlement.error;
 export const assetInvoiceSettlementDeleteSuccess = (state: RootState) => state.asset.deleteInvoiceSettlement.success;
+
+// Invoice Summary Statement Upload Selectors
+export const assetInvoiceSummaryStatementUploadLoading = (state: RootState) => state.asset.uploadInvoiceSummaryStatement.loading;
+export const assetInvoiceSummaryStatementUploadError = (state: RootState) => state.asset.uploadInvoiceSummaryStatement.error;
+export const assetInvoiceSummaryStatementUploadSuccess = (state: RootState) => state.asset.uploadInvoiceSummaryStatement.success;
+export const assetInvoiceSummaryStatementUploadErrorMessage = (state: RootState) => state.asset.invoiceSummaryStatementUploadError;
+
+// Invoice Summary Statement Delete Selectors
+export const assetInvoiceSummaryStatementDeleteLoading = (state: RootState) => state.asset.deleteInvoiceSummaryStatement.loading;
+export const assetInvoiceSummaryStatementDeleteError = (state: RootState) => state.asset.deleteInvoiceSummaryStatement.error;
+export const assetInvoiceSummaryStatementDeleteSuccess = (state: RootState) => state.asset.deleteInvoiceSummaryStatement.success;

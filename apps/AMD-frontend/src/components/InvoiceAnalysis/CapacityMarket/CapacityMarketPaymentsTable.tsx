@@ -4,16 +4,17 @@ import {IconButton, Badge, Text} from '@/ui-kits';
 import {SectionHeader} from '@/components/common';
 import {useChartsActionV2} from '@/hooks';
 import {CALENDAR_MONTH_NAMES} from '@/constants';
-import type {AssetCapacityMarketAnalytics, MonthYear} from '@/interface';
+import type {AssetCapacityMarketAnalytics2, MonthYear} from '@/interface';
 import {downloadAssetCapacityMarketAnalytics} from '@/services/api';
 
 interface CapacityMarketPaymentsTableProps {
-  data?: AssetCapacityMarketAnalytics['capacity_market_payments'];
+  data?: AssetCapacityMarketAnalytics2['payments']['capacity_market_payments'];
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
   assetId?: number | null;
   year?: number | null;
   reportingPeriod?: MonthYear;
+  customActions?: React.ReactNode;
 }
 
 function renderInvoiceDetailsWithFallback(text: string | null | undefined, centerBadge?: boolean) {
@@ -34,7 +35,7 @@ function renderInvoiceDetailsWithFallback(text: string | null | undefined, cente
   return <Text variant="14R">{text}</Text>;
 }
 
-const columns: DataTableColumn<AssetCapacityMarketAnalytics['capacity_market_payments'][0]>[] = [
+const columns: DataTableColumn<AssetCapacityMarketAnalytics2['payments']['capacity_market_payments'][0]>[] = [
   {
     name: 'capacity_month_year',
     title: 'Capacity Month-Year',
@@ -87,7 +88,7 @@ const columns: DataTableColumn<AssetCapacityMarketAnalytics['capacity_market_pay
 ];
 
 export function CapacityMarketPaymentsTable(props: CapacityMarketPaymentsTableProps) {
-  const {data = [], isLoading = false, isFullScreenOverride = false} = props;
+  const {data = [], isLoading = false, isFullScreenOverride = false, customActions} = props;
 
   const {chartRef, onMaximize, onMinimize} = useChartsActionV2({
     downloadFileName: 'capacity_market_payments',
@@ -118,6 +119,7 @@ export function CapacityMarketPaymentsTable(props: CapacityMarketPaymentsTablePr
             icon="table-gbp"
           />
           <div className="flex shrink-0 items-center gap-3 chart-actions">
+            {customActions}
             <IconButton
               name="download"
               size={20}
@@ -151,7 +153,7 @@ export function CapacityMarketPaymentsTable(props: CapacityMarketPaymentsTablePr
         columns={columns}
         loading={isLoading}
         headerColor="#F4FBF9"
-        wrapperClassName="border-0! overflow-x-auto"
+        wrapperClassName="overflow-x-auto"
         tableClassName="w-full"
       />
     </div>

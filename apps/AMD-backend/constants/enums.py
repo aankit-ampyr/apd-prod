@@ -1,36 +1,43 @@
-from enum import IntEnum
+from enum import IntEnum, StrEnum
 
 from python_common.constants.enums import AuditLogModules, AuditLogScenario
+
 
 class BaseEnum(IntEnum):
     @classmethod
     def choices(cls):
-        return [(e.value, e.name.replace('_', ' ').title()) for e in cls]
-    
+        return [(e.value, e.name.replace("_", " ").title()) for e in cls]
+
+
 class UserRole(BaseEnum):
     ANALYST = 1
     ADMIN = 2
     MANAGER = 3
     SUPER_ADMIN = 4
-    VIEWER=5
+    VIEWER = 5
+
 
 class Platform(BaseEnum):
     AMD = 1
     BESS = 2
+
 
 class DigestScope(BaseEnum):
     PER_ASSET = 1
     PER_ORGANIZATION = 2
     PORTFOLIO_WIDE = 3
 
+
 class DigestFrequency(BaseEnum):
     DAILY = 1
     WEEKLY = 2
     MONTHLY = 3
 
+
 class DigestStatus(BaseEnum):
     ACTIVE = 1
     INACTIVE = 0
+
 
 class DigestResource(BaseEnum):
     ASSET = 1
@@ -45,6 +52,7 @@ class AssetStatus(BaseEnum):
     DRAFT = 4
     PENDING_APPROVAL = 5
 
+
 class AssetSteps(BaseEnum):
     BASIC_INFORMATION = 1
     OPTIMIZATION_CONFIGURATION = 2
@@ -52,17 +60,20 @@ class AssetSteps(BaseEnum):
     IAR_REPORT = 4
     REVIEW = 5
 
+
 class AssetType(BaseEnum):
     SOLAR = 1
     BATTERY = 2
     SOLAR_BATTERY = 3
 
+
 class AssetFileType(BaseEnum):
     AGGREGATOR_REPORT = 1
     SCADA_REPORT = 2
     MERGED_SCADA_AGGREGATOR = 3
-    INTERNAL_APPRAISAL_REPORT=4
-    OPTIMIZED_DATASET=5
+    INTERNAL_APPRAISAL_REPORT = 4
+    OPTIMIZED_DATASET = 5
+
 
 class AssetMetrics(BaseEnum):
     ASSET_REVENUE = 1
@@ -77,15 +88,29 @@ class AssetMetrics(BaseEnum):
     IAR_PROJECTION = 10
     TB_SPREAD_REVENUE = 11
 
+
 class InvoiceType(BaseEnum):
-    HARTREE_PV         = 1
-    HARTREE_BESS       = 2
-    EMR                = 3
-    GRIDBEYOND         = 4
+    HARTREE_PV = 1
+    HARTREE_BESS = 2
+    EMR = 3
+    GRIDBEYOND = 4
     HARTREE_BESS_POWER = 5
-    HARTREE_AUXILIARY  = 6
+    HARTREE_AUXILIARY = 6
     HARTREE_SOLAR_POWER = 7
-    HARTREE_OTHER      = 8
+    HARTREE_OTHER = 8
+
+
+class CommentContextType(BaseEnum):
+    SCREEN = 1
+    WIDGET = 2
+    DATA_POINT = 3
+    TAB = 4
+
+
+class SocketEventType(StrEnum):
+    AUDIT_LOG = "audit_log"
+    COMMENT_NOTIFICATION = "comment_notification"
+
 
 class APDAuditLogScenario(BaseEnum):
     OTP_SENT = AuditLogScenario.OTP_SENT.value
@@ -118,10 +143,18 @@ class APDAuditLogScenario(BaseEnum):
     SCADA_REPORT_REMOVED = AuditLogScenario.SCADA_REPORT_REMOVED.value
     DATASET_MERGED = AuditLogScenario.DATASET_MERGED.value
     AGGREGATOR_REPORT_REMOVED = AuditLogScenario.AGGREGATOR_REPORT_REMOVED.value
-    BENCHMARK_CONFIGURATION_UPDATED = AuditLogScenario.BENCHMARK_CONFIGURATION_UPDATED.value
-    INTERNAL_APPRAISAL_REPORT_REMOVED = AuditLogScenario.INTERNAL_APPRAISAL_REPORT_REMOVED.value
-    VIEWED_ASSET_BASIC_INFORMATION = AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION.value
-    OPTIMIZATION_PARAMETERS_CONFIRMED = AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED.value
+    BENCHMARK_CONFIGURATION_UPDATED = (
+        AuditLogScenario.BENCHMARK_CONFIGURATION_UPDATED.value
+    )
+    INTERNAL_APPRAISAL_REPORT_REMOVED = (
+        AuditLogScenario.INTERNAL_APPRAISAL_REPORT_REMOVED.value
+    )
+    VIEWED_ASSET_BASIC_INFORMATION = (
+        AuditLogScenario.VIEWED_ASSET_BASIC_INFORMATION.value
+    )
+    OPTIMIZATION_PARAMETERS_CONFIRMED = (
+        AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED.value
+    )
     AGGREGATOR_FILE_UPLOADED = AuditLogScenario.AGGREGATOR_FILE_UPLOADED.value
     AGGREGATOR_FILE_REPLACED = AuditLogScenario.AGGREGATOR_FILE_REPLACED.value
     SCADA_FILE_REPLACED = AuditLogScenario.SCADA_FILE_REPLACED.value
@@ -135,9 +168,13 @@ class APDAuditLogScenario(BaseEnum):
     ASSET_SUBMITTED_FOR_APPROVAL = AuditLogScenario.ASSET_SUBMITTED_FOR_APPROVAL.value
     VIEWED_PENDING_APPROVAL_ASSET = AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET.value
     VIEWED_ACTIVE_ASSET = AuditLogScenario.VIEWED_ACTIVE_ASSET.value
-    MONTHLY_AGGREGATOR_FILE_UPLOADED = AuditLogScenario.MONTHLY_AGGREGATOR_FILE_UPLOADED.value
+    MONTHLY_AGGREGATOR_FILE_UPLOADED = (
+        AuditLogScenario.MONTHLY_AGGREGATOR_FILE_UPLOADED.value
+    )
     MONTHLY_SCADA_FILE_UPLOADED = AuditLogScenario.MONTHLY_SCADA_FILE_UPLOADED.value
-    MONTHLY_AGGREGATOR_FILE_REPLACED = AuditLogScenario.MONTHLY_AGGREGATOR_FILE_REPLACED.value
+    MONTHLY_AGGREGATOR_FILE_REPLACED = (
+        AuditLogScenario.MONTHLY_AGGREGATOR_FILE_REPLACED.value
+    )
     MONTHLY_SCADA_FILE_REPLACED = AuditLogScenario.MONTHLY_SCADA_FILE_REPLACED.value
     UPDATED_IAR_FILE = AuditLogScenario.UPDATED_IAR_FILE.value
     DOWNLOADED_AGGREGATOR_FILE = AuditLogScenario.DOWNLOADED_AGGREGATOR_FILE.value
@@ -150,15 +187,26 @@ class APDAuditLogScenario(BaseEnum):
     MONTHLY_METRIC_CREATED = AuditLogScenario.MONTHLY_METRIC_CREATED.value
     MONTHLY_METRIC_UPDATED = AuditLogScenario.MONTHLY_METRIC_UPDATED.value
     MONTHLY_METRIC_CLEARED = AuditLogScenario.MONTHLY_METRIC_CLEARED.value
-    INVOICE_UPLOADED=AuditLogScenario.INVOICE_UPLOADED.value
-    INVOICE_DELETED=AuditLogScenario.INVOICE_DELETED.value
-    SETTLEMENT_FILE_UPLOADED=AuditLogScenario.SETTLEMENT_FILE_UPLOADED.value
-    SETTLEMENT_FILE_DELETED=AuditLogScenario.SETTLEMENT_FILE_DELETED.value
+    INVOICE_UPLOADED = AuditLogScenario.INVOICE_UPLOADED.value
+    INVOICE_DELETED = AuditLogScenario.INVOICE_DELETED.value
+    SETTLEMENT_FILE_UPLOADED = AuditLogScenario.SETTLEMENT_FILE_UPLOADED.value
+    SETTLEMENT_FILE_DELETED = AuditLogScenario.SETTLEMENT_FILE_DELETED.value
     INVOICE_FILE_DOWNLOADED = AuditLogScenario.INVOICE_FILE_DOWNLOADED.value
     SETTLEMENT_FILE_DOWNLOADED = AuditLogScenario.SETTLEMENT_FILE_DOWNLOADED.value
     INVOICE_PREVIEW_DOWNLOADED = AuditLogScenario.INVOICE_PREVIEW_DOWNLOADED.value
     INVOICE_ANALYSIS_VIEWED = AuditLogScenario.INVOICE_ANALYSIS_VIEWED.value
-    INVOICE_ANALYSIS_DATA_DOWNLOADED = AuditLogScenario.INVOICE_ANALYSIS_DATA_DOWNLOADED.value
+    INVOICE_ANALYSIS_DATA_DOWNLOADED = (
+        AuditLogScenario.INVOICE_ANALYSIS_DATA_DOWNLOADED.value
+    )
+    SUMMARY_STATEMENT_UPLOADED = AuditLogScenario.SUMMARY_STATEMENT_UPLOADED.value
+    SUMMARY_STATEMENT_DOWNLOADED = AuditLogScenario.SUMMARY_STATEMENT_DOWNLOADED.value
+    SUMMARY_STATEMENT_DELETED = AuditLogScenario.SUMMARY_STATEMENT_DELETED.value
+    ADDED_COMMENT = AuditLogScenario.ADDED_COMMENT.value
+    UPDATED_COMMENT = AuditLogScenario.UPDATED_COMMENT.value
+    REMOVED_COMMENT = AuditLogScenario.REMOVED_COMMENT.value
+    REPLIED_TO_COMMENT = AuditLogScenario.REPLIED_TO_COMMENT.value
+    VIEWED_EXECUTIVE_ANALYSIS = AuditLogScenario.VIEWED_EXECUTIVE_ANALYSIS.value
+
 
 class APDAuditLogModules(BaseEnum):
     AUTHENTICATION = AuditLogModules.AUTHENTICATION.value
@@ -166,9 +214,130 @@ class APDAuditLogModules(BaseEnum):
     ASSET_MANAGEMENT_AMD = AuditLogModules.ASSET_MANAGEMENT_AMD.value
     DIGEST_MANAGEMENT_AMD = AuditLogModules.DIGEST_MANAGEMENT_AMD.value
     ORGANIZATION_MANAGEMENT_AMD = AuditLogModules.ORGANIZATION_MANAGEMENT_AMD.value
-    BENCHMARK_CONFIGURATION = AuditLogModules.BENCHMARK_CONFIGURATION.value
-    MONTHLY_VALUE_MANAGEMENT_AMD = AuditLogModules.MONTHLY_VALUE_MANAGEMENT_AMD.value
     ASSET_ONBOARDING = AuditLogModules.ASSET_ONBOARDING.value
     VIEW_ANALYSIS = AuditLogModules.VIEW_ANALYSIS.value
     BENCHMARK_ANALYSIS = AuditLogModules.BENCHMARK_ANALYSIS.value
     INVOICE_ANALYSIS = AuditLogModules.INVOICE_ANALYSIS.value
+    SETTINGS = AuditLogModules.SETTINGS.value
+    EXECUTIVE_ANALYSIS = AuditLogModules.EXECUTIVE_ANALYSIS.value
+
+
+class AnalysisSections(StrEnum):
+    # analysis section
+    OPERATIONS = "operations"
+    MARKET_OPTIMIZATION = "market-optimization"
+    MARKET_PRICES = "market-prices"
+    ANCILLARY_SERVICES = "ancillary-services"
+    IMBALANCE_ANALYSIS = "imbalance-analysis"
+    BATTERY_HEALTH = "battery-health"
+    TB_SPREAD = "tb-spread"
+
+    # revenue analysis section
+    REVENUE_VS_BENCHMARK = "revenue-vs-benchmark"
+    REVENUE_IAR_VS_ACTUAL = "revenue-iar-vs-actual"
+    OPTIMIZED_VS_ACTUAL = "optimized-vs-actual"
+
+    # invoice analysis section
+    CAPACITY_MARKET = "capacity-market"
+    REVENUE_RECONCILIATION = "revenue-reconciliation"
+
+    # executive summary section
+    EXECUTIVE_SUMMARY = "executive-summary"
+
+
+class AnalysisModules:
+    ASSET_ANALYSIS = "view-analysis"
+    BENCHMARK_ANALYSIS = "benchmark-analysis"
+    INVOICE_ANALYSIS = "invoice-analysis"
+    EXECUTIVE_ANALYSIS = "executive-analysis"
+
+
+class AnalysisWidget(StrEnum):
+    # ================= #
+    #  asset analysis   #
+    # ================= #
+
+    # Operations
+    ANALYSIS_OPERATIONS_SUMMARY = "analysis-operations-summary"
+    ANALYSIS_OPERATIONS_MARKET_SUMMARY = "analysis-operations-market-summary"
+    ANALYSIS_OPERATIONS_ENERGY_PRICE = "analysis-operations-energy-price"
+    ANALYSIS_OPERATIONS_BATTERY_POWER_OVER_TIME = (
+        "analysis-operations-battery-power-over-time"
+    )
+
+    # Market Optimization
+    ANALYSIS_MARKET_SUMMARY = "analysis-market-summary"
+    ANALYSIS_MARKET_UTILIZATION = "analysis-market-utilization"
+    ANALYSIS_MARKET_STATISTICS = "analysis-market-statistics"
+    ANALYSIS_MARKET_REVENUE_DISTRIBUTION = "analysis-market-revenue-distribution"
+    ANALYSIS_MARKET_BEST_MARKETS = "analysis-market-best-markets"
+
+    # Market Prices
+    ANALYSIS_MARKET_PRICE_SPREAD = "analysis-market-price-spread"
+    ANALYSIS_MARKET_PRICE_VOLATILITY = "analysis-market-price-volatility"
+    ANALYSIS_MARKET_HOURLY_PRICE_PATTERNS = "analysis-market-hourly-price-patterns"
+    ANALYSIS_MARKET_PRICE_CORRELATION_MATRIX = (
+        "analysis-market-price-correlation-matrix"
+    )
+
+    # Ancillary Services
+    ANALYSIS_ANCILLARY_SUMMARY = "analysis-ancillary-summary"
+    ANALYSIS_ANCILLARY_REVENUE_BREAKDOWN = "analysis-ancillary-revenue-breakdown"
+    ANALYSIS_ANCILLARY_SERVICE_REVENUE_BY_HOUR = (
+        "analysis-ancillary-service-revenue-by-hour"
+    )
+    ANALYSIS_ANCILLARY_OPPORTUNITY_COST_ANALYSIS = (
+        "analysis-ancillary-opportunity-cost-analysis"
+    )
+
+    # Imbalance Analysis
+    ANALYSIS_IMBALANCE_SUMMARY = "analysis-imbalance-summary"
+    ANALYSIS_IMBALANCE_HOURLY_CHARGES = "analysis-imbalance-hourly-charges"
+    ANALYSIS_IMBALANCE_DAILY_BREAKDOWN = "analysis-imbalance-daily-breakdown"
+    ANALYSIS_IMBALANCE_WORST_DAYS = "analysis-imbalance-worst-days"
+
+    # Battery Health
+    ANALYSIS_BATTERY_HEALTH_SUMMARY = "analysis-battery-health-summary"
+    ANALYSIS_BATTERY_HEALTH_CYCLE_COMPARISON = (
+        "analysis-battery-health-cycle-comparison"
+    )
+    ANALYSIS_BATTERY_HEALTH_STRATEGY_CYCLING_COMPARISON = (
+        "analysis-battery-health-strategy-cycling-comparison"
+    )
+    ANALYSIS_BATTERY_HEALTH_ANNUAL_PROJECTION_REPORT = (
+        "analysis-battery-health-annual-projection-report"
+    )
+    ANALYSIS_BATTERY_HEALTH_DAILY_CYCLES = "analysis-battery-health-daily-cycles"
+    ANALYSIS_BATTERY_HEALTH_WARRANTY_EXCEEDANCE = (
+        "analysis-battery-health-warranty-exceedance"
+    )
+
+    # TB Spread
+    ANALYSIS_TB_SPREAD_SUMMARY = "analysis-tb-spread-summary"
+    ANALYSIS_TB_SPREAD_DETAILS = "analysis-tb-spread-details"
+
+    # ======================= #
+    #  Executive Comparison   #
+    # ======================= #
+    EXECUTIVE_MONTHLY_REVENUE_COMPARISON = (
+        "analysis-executive-monthly-revenue-comparison"
+    )
+    EXECUTIVE_REVENUE_BY_STREAM = "analysis-executive-revenue-by-stream"
+    EXECUTIVE_SUMMARY = "analysis-executive-summary"
+
+    # ======================= #
+    #  Benchmark Analysis     #
+    # ======================= #
+    BENCHMARK_REVENUE_COMPARISON = "analysis-benchmark-revenue-comparison"
+    BENCHMARK_REVENUE_IAR_VS_ACTUAL = "analysis-benchmark-revenue-iar-vs-actual"
+    BENCHMARK_MULTI_MARKET_OPTIMIZED_VS_ACTUAL = "analysis-benchmark-multi-market-optimized-vs-actual"
+
+    # ================== #
+    #  Invoice Analysis  #
+    # ================== # 
+    CAPACITY_MARKET_SUMMARY = "analysis-capacity-market-summary"
+    CAPACITY_MARKET_PAYMENT_TREND = "analysis-capacity-market-payment-trend"
+    CAPACITY_MARKET_PAYMENTS = "analysis-capacity-market-payments"
+
+    REVENUE_RECONCILIATION_PER_STREAM_COMPARISON = "analysis-revenue-reconciliation-per-stream-comparison"
+    REVENUE_RECONCILIATION_SUMMARY = "analysis-revenue-reconciliation-summary"

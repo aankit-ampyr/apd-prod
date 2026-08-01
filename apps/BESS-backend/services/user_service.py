@@ -8,6 +8,7 @@ from utils.response_utils import Res
 from models import User
 from dtos import UserResponse
 from python_common.utils import paginate
+from fastapi import status
 
 
 class UserService:
@@ -40,7 +41,7 @@ class UserService:
                 filter_applied = True
             except ValueError:
                 # TODO: The error code need's to be changed.
-                return Res.error(status_code="E-20006", message="Invalid date format")
+                return Res.error(status_code="E-20006", message="Invalid date format", http_status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
         if params.end_date:
             try:
@@ -50,7 +51,7 @@ class UserService:
                 filter_applied = True
             except ValueError:
                 # TODO: The error code need's to be changed.
-                return Res.error(status_code="E-20006", message="Invalid date format")
+                return Res.error(status_code="E-20006", message="Invalid date format", http_status_code=status.HTTP_422_UNPROCESSABLE_CONTENT)
 
         
         data_query = select(User).where(
@@ -89,8 +90,8 @@ class UserService:
 
         if total_results == 0:
             if filter_applied:
-                return Res.error('E-20006', message="No data found")
-            return Res.error('E-20005', message="No records match applied filters")
+                return Res.error('E-20006', message="No data found", http_status_code=status.HTTP_404_NOT_FOUND)
+            return Res.error('E-20005', message="No records match applied filters", http_status_code=status.HTTP_404_NOT_FOUND)
 
         data = {
             "users": [

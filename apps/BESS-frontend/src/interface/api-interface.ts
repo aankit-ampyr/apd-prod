@@ -23,6 +23,7 @@ export interface ApiConfigInterface {
     demo: string;
     login: string;
     verifyOtp: string;
+    refresh: string;
   };
   authUrls: {
     logout: string;
@@ -79,6 +80,169 @@ export interface UserListRequest {
 }
 
 // ============================== Simulation Slice =============================
+
+export interface LoadProfileRequest {
+  simulation_id: number;
+  params?: Record<string, unknown>;
+  payload: {
+    pattern: number; // enum
+    config: Record<string, any>;
+  };
+}
+
+export interface LoadProfileResponse {
+  status: string;
+  status_code: string;
+  data: {
+    pattern: {
+      id: number;
+      label: string;
+    };
+    config: Record<string, any>;
+    output: {
+      peak_load: number;
+      total_hours: number;
+      total_energy: number;
+      hour_percentage: number;
+      data_points: {
+        hour: number;
+        value: number;
+      }[];
+    };
+  };
+}
+
+export interface InitiateSimulationRequest {
+  project_id: number;
+  project_name?: string;
+}
+
+export interface InitiateSimulationResponse {
+  status: string;
+  status_code: string;
+  data: Simulation;
+}
+
+export interface SolarProfileRequest {
+  simulation_id: number;
+  params?: Record<string, unknown>;
+  payload: {
+    type: 'static' | 'file';
+    source_id: number;
+  };
+}
+
+export interface SolarProfileData {
+  id: number;
+  source: {
+    type: 'static' | 'file';
+    id: number;
+    metadata: {
+      name: string;
+      size: number;
+      rows: number;
+    };
+  };
+  total_generation: number;
+  peak_generation: number;
+  avg_generation: number;
+  generation_hours: number;
+  max_storable: number;
+  excess_hours: number;
+  total_storable: number;
+  hourly_generation_graph_points: {
+    hour: number;
+    value: number;
+  }[];
+  monthly_generation_graph_points: {
+    month: number;
+    value: number;
+  }[];
+  storable_solar_graph_points: {
+    hour: number;
+    value: number;
+  }[];
+}
+
+export interface SolarProfileResponse {
+  status: string;
+  status_code: string;
+  data: SolarProfileData;
+}
+
+// ======================================
+// Upload Solar Profile CSV Types
+// ======================================
+
+export interface UploadSolarCSVRequest {
+  simulation_id: number;
+  file: File;
+}
+
+export interface UploadSolarCSVData {
+  key: string;
+  size: number;
+  rows: number;
+  name: string;
+  id: number;
+  created_at?: string; // ISO string, optional for compatibility
+}
+
+export interface UploadSolarCSVResponse {
+  status: string;
+  status_code: string;
+  data: UploadSolarCSVData;
+}
+
+// ======================================
+// Save/Get Solar Profile Types
+// ======================================
+
+export interface SaveSolarProfileRequest {
+  simulation_id: number;
+  payload: {
+    type: 'static' | 'file';
+    source_id: number;
+  };
+}
+
+export interface GetSolarProfileRequest {
+  simulation_id: number;
+}
+
+export interface BessContainerConfigRequest {
+  simulation_id: number;
+  params?: Record<string, unknown>;
+  payload: {
+    containers: number[];
+    bess_efficiency: number;
+    bess_min_soc: number;
+    bess_max_soc: number;
+    bess_initial_soc: number;
+    bess_daily_cycle_limit: number;
+    bess_enforce_cycle_limit: boolean;
+  };
+}
+
+export interface BessContainerConfigResponse {
+  status: string;
+  status_code: string;
+  data: {
+    id: number;
+    simulation_id: number;
+    containers: {
+      id: number;
+      label: string;
+    }[];
+    bess_efficiency: number;
+    bess_min_soc: number;
+    bess_max_soc: number;
+    bess_initial_soc: number;
+    bess_daily_cycle_limit: number;
+    bess_enforce_cycle_limit: boolean;
+  };
+}
+
 export interface SolarProfileSourceListRequest {
   params: {
     simulation_id: number;
@@ -651,6 +815,40 @@ export interface MultiYearProjectionRequest {
   };
 
   response: APIResponse<{
+    simulation_id: number;
+    summary: {
+      no_of_years: number;
+      balance: number;
+      energy_in: {
+        solar_avg: number;
+        solar_total: number;
+        dg_avg: number;
+        dg_total: number;
+        initial_capacity: number;
+        initial_bess_soc: number;
+        initial_bess_energy: number;
+        total_bess_energy: number;
+        total_energy: number;
+      };
+      energy_out: {
+        total_solar_to_load: number;
+        total_bess_to_load: number;
+        total_dg_to_load: number;
+        total_energy_to_load: number;
+        solar_curtailed_pct: number;
+        solar_curtailed_mwh: number;
+        dg_curtailed_pct: number;
+        dg_curtailed_mwh: number;
+        charging_loss_mwh: number;
+        discharging_loss_mwh: number;
+        degradation_loss_mwh: number;
+        cycle_loss: number;
+        final_bess_soc: number;
+        final_bess_energy: number;
+        total_bess_energy: number;
+        total_energy: number;
+      };
+    };
     results: MultiYearProjectionResults[];
   }>;
 }
@@ -808,5 +1006,19 @@ export interface GetDetailedGreenAnalysisSimulationResult {
     unserved_mwh: number;
     fuel_consumption_l: number;
     created_at: string;
+  }>;
+}
+
+export interface GetEditedStepSimulation {
+  params: {
+    simulation_id: number;
+  };
+  response: APIResponse<{
+    simulation_id: number;
+    id: number;
+    step: number;
+    last_edited: number;
+    created_at: string;
+    updated_at: string;
   }>;
 }

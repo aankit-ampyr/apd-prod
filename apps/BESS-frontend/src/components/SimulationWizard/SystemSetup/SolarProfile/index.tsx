@@ -1,9 +1,9 @@
 import {Button, Icon, Skeleton, Text} from '@/ui-kits';
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {SelectSolarProfile} from './SelectSolarProfile';
 import {CSVUpload} from './CSVUpload';
 import {useDispatch, useSelector} from 'react-redux';
-import {saveSolarProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {getProjectSimulationSilentRequest, getSolarProfileRequest, saveSolarProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {
   saveSolarProfileLoading,
   saveSolarProfileSuccess,
@@ -14,14 +14,19 @@ import {
   solarProfileError,
   initiateSimulationData,
   projectSimulationData,
-  solarProfileLoading,
   solarProfileFetchLoading,
+  uploadSolarCSVData,
+  uploadSolarCSVSuccess,
+  solarProfileSourceListSelector,
+  uploadSolarCSVLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData} from '@/services/redux/selectors';
+import {useScreenOverride} from '@/hooks';
 
 type Props = {
   readonly onSaveComplete?: () => void;
   readonly readOnly?: boolean;
+  readonly setIsStepsHidden?: (hidden: boolean) => void;
 };
 
 function SolarProfileGhostLoader() {
@@ -68,7 +73,7 @@ function SolarProfileGhostLoader() {
   );
 }
 
-export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
+export const SolarProfile = ({onSaveComplete, readOnly, setIsStepsHidden}: Props) => {
   const dispatch = useDispatch();
   const [activeTab, setActiveTab] = useState<'existing' | 'csv'>('existing');
   const simulData = useSelector(initiateSimulationData);
@@ -85,6 +90,19 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
   const saveLoading = useSelector(saveSolarProfileLoading);
   const saveError = useSelector(saveSolarProfileError);
 
+  const uploadData = useSelector(uploadSolarCSVData);
+  const success = useSelector(uploadSolarCSVSuccess);
+
+  const uploadError = useSelector(uploadSolarCSVError);
+  const computeError = useSelector(solarProfileError);
+
+  const sourceList = useSelector(solarProfileSourceListSelector);
+  const uploadLoading = useSelector(uploadSolarCSVLoading);
+
+  const hasUploadedCSV = !uploadLoading && sourceList?.some(file => file?.id);
+
+  const isCSVUploaded = success === 'S-20005' && uploadData?.id != null && uploadError !== 'E-20049';
+
   // Check if user is an assigned user (view-only access)
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
@@ -100,12 +118,11 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
   const [maximizedChart, setMaximizedChart] = useState<'hourly' | 'monthly' | null>(null);
   // Move isExpanded to parent so it persists across remounts
   const [isExpanded, setIsExpanded] = useState(false);
-  // Track if the user has made a change since last save
-  const [isDirty, setIsDirty] = useState(false);
+  const {setFullscreenExitHandler} = useScreenOverride();
 
   const solarSectionRef = useRef<HTMLDivElement>(null);
 
-  const handleMinimize = () => {
+  const handleMinimize = useCallback(() => {
     setMaximizedChart(null);
 
     setTimeout(() => {
@@ -126,13 +143,20 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
         scrollContainer = scrollContainer.parentElement;
       }
     }, 50); // small delay lets React finish remounting the normal view
-  };
+  }, []);
+
+  useEffect(() => {
+    setFullscreenExitHandler?.(maximizedChart ? handleMinimize : null);
+
+    return () => {
+      setFullscreenExitHandler?.(null);
+    };
+  }, [handleMinimize, maximizedChart, setFullscreenExitHandler]);
 
   // Call onSaveComplete when save is successful (only for fresh saves)
   useEffect(() => {
     if (!saveLoading && saveSuccess && isSavingRef.current && onSaveComplete) {
       isSavingRef.current = false;
-      setIsDirty(false); // Mark as not dirty after save
       onSaveComplete();
     }
   }, [saveLoading, saveSuccess, onSaveComplete]);
@@ -142,35 +166,32 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
   useEffect(() => {
     if (!saveLoading && isSavingRef.current && !saveError && onSaveComplete) {
       isSavingRef.current = false;
-      setIsDirty(false); // Mark as not dirty after save
       onSaveComplete();
     }
   }, [saveLoading, saveError, onSaveComplete]);
 
   useEffect(() => {
     if (!previewSolar) {
-      setIsDirty(false);
       return;
     }
 
     if (!savedSolar) {
-      setIsDirty(true);
       return;
     }
-
-    const hasChangedSource = previewSolar.source.id !== savedSolar.source.id || previewSolar.source.type !== savedSolar.source.type;
-    setIsDirty(hasChangedSource);
   }, [previewSolar, savedSolar]);
 
+  useEffect(() => {
+    if (simulation_id) {
+      dispatch(getProjectSimulationSilentRequest({simulation_id: simulation_id}));
+      dispatch(getSolarProfileRequest({simulation_id: simulation_id}));
+    }
+  }, [simulation_id, dispatch]);
+
   // Mark as dirty when a new file is uploaded or a different profile is selected
-  const handleProfileChange = () => {
-    setIsDirty(true);
-  };
 
   // Ensure the green tick (saveSuccess) is not cleared on remount, only on edit
   // No code needed here, handled in SelectSolarProfile
 
-  const isAlreadySaved = !!saveSuccess;
   const hasUnsavedChanges =
     previewSolar && savedSolar ? previewSolar.source.id !== savedSolar.source.id || previewSolar.source.type !== savedSolar.source.type : !!previewSolar;
 
@@ -189,9 +210,6 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
       }),
     );
   };
-
-  const uploadError = useSelector(uploadSolarCSVError);
-  const computeError = useSelector(solarProfileError);
 
   // Button is disabled unless the current preview truly differs from the saved solar profile.
   const disableButton = !solarData || !hasUnsavedChanges || isReadOnly || !!uploadError || !!computeError;
@@ -212,9 +230,9 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
               {/* Select Existing File */}
               <button
                 onClick={() => !isReadOnly && setActiveTab('existing')}
-                disabled={isReadOnly}
+                disabled={isReadOnly || !hasUploadedCSV}
                 className={`flex-1 py-2 self-center rounded-sm text-center font-semibold transition-all duration-200
-          ${activeTab === 'existing' ? 'bg-primary text-white shadow-sm' : 'text-gray-600'} ${isReadOnly ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+          ${activeTab === 'existing' ? 'bg-primary text-white shadow-sm' : 'text-gray-600'} ${isReadOnly || !hasUploadedCSV ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                 Select Existing File
               </button>
 
@@ -233,14 +251,13 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
               ) : (
                 <SelectSolarProfile
                   data={solarData}
-                  onMaximize={(chart: 'hourly' | 'monthly') => setMaximizedChart(chart)}
+                  setIsStepsHidden={setIsStepsHidden}
                   isExpanded={isExpanded}
                   setIsExpanded={setIsExpanded}
                   readOnly={isReadOnly}
-                  onProfileChange={handleProfileChange}
                 />
               ))}
-            {activeTab === 'csv' && <CSVUpload readOnly={isReadOnly} onFileChange={handleProfileChange} />}
+            {activeTab === 'csv' && <CSVUpload readOnly={isReadOnly} />}
           </div>
           {activeTab === 'existing' &&
             !isReadOnly &&
@@ -261,18 +278,6 @@ export const SolarProfile = ({onSaveComplete, readOnly}: Props) => {
               </div>
             ))}
         </>
-      )}
-      {maximizedChart && (
-        <div className="w-full h-[calc(100vh-100px)] p-4">
-          <SelectSolarProfile
-            data={solarData}
-            maximizedChart={maximizedChart}
-            onMinimize={handleMinimize}
-            isExpanded={isExpanded}
-            setIsExpanded={setIsExpanded}
-            readOnly={isReadOnly}
-          />
-        </div>
       )}
     </>
   );

@@ -5,3 +5,6 @@ from .asset_controller import AssetController
 from .asset_analysis_controller import AnalysisController
 from .audit_controller import AuditController
 from .invoice_analysis_controller import PdfInvoiceController 
+from .metric_controller import MetricController
+from .comment_controller import CommentController
+from .socket_controller import SocketController

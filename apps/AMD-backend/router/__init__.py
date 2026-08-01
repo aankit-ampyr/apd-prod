@@ -13,6 +13,9 @@ from .audit_router import AuditRouter
 from .metric_router import MetricRouter
 from .asset_analysis_router import AnalysisRouter
 from .invoice_router import PdfInvoiceRouter,InvoiceAnalysisRouter
+from .comment_router import CommentRouter
+from .notification_router import NotificationRouter
+from .socket_router import SocketRouter
 
 
 class BaseRouter:
@@ -33,7 +36,11 @@ class BaseRouter:
             MetricRouter(),
             AnalysisRouter(),
             PdfInvoiceRouter(),
-            InvoiceAnalysisRouter(pdf_invoice_controller=pdf_invoice_router.controller)
+            CommentRouter(),
+            NotificationRouter(),
+            InvoiceAnalysisRouter(),
+            SocketRouter(),
+            
         ]
 
         # register routes

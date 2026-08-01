@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
+from redis.asyncio import Redis
 from uuid import uuid4
 import io
 
@@ -479,6 +480,7 @@ class SolarProfileService:
         current_user: dict,
         resource_id: Optional[str] = None,
         is_saved: bool = False,
+        redis: Optional[Redis] = None,
     ):
         try:
             source_type = payload.type  # "static" | "file"
@@ -592,7 +594,10 @@ class SolarProfileService:
                     config_row.output_graph_points = output_graph_points
 
                     await depreciate_simulation_job(
-                        simulation_id=simulation_id, db=bess_db, include_green_job=True
+                        simulation_id=simulation_id,
+                        db=bess_db,
+                        include_green_job=True,
+                        include_detailed_green_job=True,
                     )
                     await audit_logs(
                         db=bess_db,
@@ -601,6 +606,7 @@ class SolarProfileService:
                         module=PSPAuditLogModules.SIMULATION.value,
                         action=PSPAuditLogScenario.SOLAR_PROFILE_UPDATED.value,
                         resource_id=resource_id,
+                        redis=redis,
                         before=json.dumps(
                             {
                                 SimulationLogStep.SYSTEM_SETUP.value: {
@@ -649,6 +655,7 @@ class SolarProfileService:
                         module=PSPAuditLogModules.SIMULATION.value,
                         action=PSPAuditLogScenario.SOLAR_PROFILE_CREATED.value,
                         resource_id=resource_id,
+                        redis=redis,
                         before=None,
                         after=json.dumps(
                             {
@@ -661,11 +668,11 @@ class SolarProfileService:
                     await bess_db.commit()
                     await bess_db.refresh(config_row)
 
-            await progress_simulation_setup(
-                simulation_id=simulation_id,
-                to=SimulationSetupProgress.SOLAR_PROFILE,
-                db=bess_db,
-            )
+                await progress_simulation_setup(
+                    simulation_id=simulation_id,
+                    to=SimulationSetupProgress.SOLAR_PROFILE,
+                    db=bess_db,
+                )
             # For static mode, use source_id as the id; for file mode, use config_row.id or source.id
             response_id = config_row.id if config_row else source_id
 
@@ -699,6 +706,7 @@ class SolarProfileService:
         payload: SolarProfileComputeRequest,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         return await self.compute_solar_profile(
             bess_db=bess_db,
@@ -707,6 +715,7 @@ class SolarProfileService:
             current_user=current_user,
             resource_id=resource_id,
             is_saved=True,
+            redis=redis,
         )
 
     async def get_solar_profile(self, bess_db: AsyncSession, simulation_id: int):
@@ -718,7 +727,11 @@ class SolarProfileService:
         config = result.scalar_one_or_none()
 
         if not config:
-            return Res.error(status_code="E-20006", message="No simulation found")
+            return Res.error(
+                status_code="E-20006",
+                message="No simulation found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
 
         source_metadata: dict[str, Any] | None = None
 

@@ -61,7 +61,8 @@ export function RoutesWrapper() {
   return (
     <Routes>
       <Route element={<DashboardLayout />}>
-        {/* Redirect public routes when logged in */}
+        {/* Redirect public routes when logged in or index route */}
+        <Route path={WebRoutes.INDEX} element={<Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} replace />} />
         <Route path={WebRoutes.LOGIN} element={<Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} replace />} />
 
         <Route path={WebRoutes.OTP_VERIFICATION} element={<Navigate to={getLandingRoute(Boolean(isBESSAdmin), isAnalyst)} replace />} />

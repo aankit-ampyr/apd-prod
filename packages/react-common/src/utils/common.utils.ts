@@ -235,7 +235,10 @@ export const formatCurrencyToPound = (
     maximumFractionDigits: allowDecimal ? 2 : 0,
   });
 
-  const absFormatted = formatter.format(Math.abs(value)).replace("£", "").trim();
+  const absFormatted = formatter
+    .format(Math.abs(value))
+    .replace("£", "")
+    .trim();
 
   return value < 0 ? `-£${absFormatted}` : `£${absFormatted}`;
 };
@@ -253,7 +256,9 @@ export async function downloadChart(
   const exportEdgeBuffer = 64;
 
   const expandedElements = Array.from(
-    chartElement.querySelectorAll<HTMLElement>('[data-export-full-width="true"]'),
+    chartElement.querySelectorAll<HTMLElement>(
+      '[data-export-full-width="true"]',
+    ),
   );
   const savedStyles = expandedElements.map((element) => ({
     element,
@@ -291,7 +296,10 @@ export async function downloadChart(
       chartElement.scrollWidth,
       widestExpandedNode + exportEdgeBuffer,
     );
-    const exportHeight = Math.max(chartElement.offsetHeight, chartElement.scrollHeight);
+    const exportHeight = Math.max(
+      chartElement.offsetHeight,
+      chartElement.scrollHeight,
+    );
 
     chartElement.style.width = `${exportWidth}px`;
     chartElement.style.maxWidth = "none";
@@ -302,6 +310,7 @@ export async function downloadChart(
     const dataUrl = await htmlToImage.toPng(chartElement, {
       width: exportWidth,
       height: exportHeight,
+      pixelRatio: window.devicePixelRatio && window.devicePixelRatio > 1 ? window.devicePixelRatio : 2,
       style: {
         width: `${exportWidth}px`,
         height: `${exportHeight}px`,
@@ -317,14 +326,24 @@ export async function downloadChart(
   } catch (err) {
     console.error("Download failed", err);
   } finally {
-    savedStyles.forEach(({ element, width, maxWidth, overflow, overflowX, overflowY, scrollLeft }) => {
-      element.style.width = width;
-      element.style.maxWidth = maxWidth;
-      element.style.overflow = overflow;
-      element.style.overflowX = overflowX;
-      element.style.overflowY = overflowY;
-      element.scrollLeft = scrollLeft;
-    });
+    savedStyles.forEach(
+      ({
+        element,
+        width,
+        maxWidth,
+        overflow,
+        overflowX,
+        overflowY,
+        scrollLeft,
+      }) => {
+        element.style.width = width;
+        element.style.maxWidth = maxWidth;
+        element.style.overflow = overflow;
+        element.style.overflowX = overflowX;
+        element.style.overflowY = overflowY;
+        element.scrollLeft = scrollLeft;
+      },
+    );
     chartElement.style.width = savedChartStyle.width;
     chartElement.style.maxWidth = savedChartStyle.maxWidth;
     chartElement.style.overflow = savedChartStyle.overflow;
@@ -371,24 +390,22 @@ export const formatNumber = (value: number): string => {
   const abs = Math.abs(value);
 
   if (abs >= 1_000_000_000) {
-    return `${(value / 1_000_000_000)
-      .toFixed(1)
-      .replace(/\.0$/, "")}B`;
+    return `${(value / 1_000_000_000).toFixed(1).replace(/\.0$/, "")}B`;
   }
 
   if (abs >= 1_000_000) {
-    return `${(value / 1_000_000)
-      .toFixed(1)
-      .replace(/\.0$/, "")}M`;
+    return `${(value / 1_000_000).toFixed(1).replace(/\.0$/, "")}M`;
   }
 
   if (abs >= 1_000) {
-    return `${(value / 1_000)
-      .toFixed(1)
-      .replace(/\.0$/, "")}k`;
+    return `${(value / 1_000).toFixed(1).replace(/\.0$/, "")}k`;
   }
 
   return value.toString();
 };
 
-// export const 
+// export const
+
+export const formatNumberWithCommas = (number: number): string => {
+  return number.toLocaleString("en-IN"); // 'en-IN' for Indian numbering system
+};

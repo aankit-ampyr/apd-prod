@@ -12,13 +12,17 @@ import {
 import {Divider, Section, SectionHeader, CompositeChart, LineChart} from '@/components/common';
 import {getAssetTBSpreadDetailsRequest} from '@/services/redux/slice';
 import {getAssetTBSpreadSummaryRequest} from '@/services/redux/slice';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
 import {TBSpreadAnalysisCards, TBSpreadAnalysisCardObject} from './SpeadAnalysisCard';
 import {cn, formatCurrencyToPound, formatDate} from '@/utils';
 import {Alert, Badge, BadgeVariants, IconTypes, Text} from '@/ui-kits';
 import {DataTableColumn} from '@/interface';
 import {TBSpreadDetail, TBSpreadDetailsTable} from './TBSpreadDetailsTable';
 import {downloadAssetTBSpreadDetails} from '@/services/api';
-import { useContainerDimentions } from '@/hooks';
+import {useContainerDimentions, useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
+import {CommentTrigger} from '@/components/common';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets} from '@/constants';
 
 /**
  * ==================================
@@ -44,7 +48,9 @@ export function AssetTbSpread(props: TbSpreadProps) {
    */
   const dispatch = useDispatch();
   const ref = React.useRef<HTMLDivElement>(null);
-  const {width} = useContainerDimentions(ref);
+  const {width: containerWidth} = useContainerDimentions(ref);
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
 
   /**
    * ===========================
@@ -131,7 +137,7 @@ export function AssetTbSpread(props: TbSpreadProps) {
   const averageArbitrageRevenue = tbSpreadSummary?.avg_arbitrage_revenue ?? 0;
   const benchmarkGap = Number((tbSpreadSummary?.benchmark_gap ?? 0).toFixed(0));
   const tb2CaptureRate = (tbSpreadSummary?.tb2_capture_rate ?? 0).toFixed(0);
-  const benchmarkTbSpread = tbSpreadSummary?.tb_spread_benchmark ?? 0;
+  const benchmarkTbSpread = tbSpreadSummary?.tb_spread_benchmark;
   const tbCaptureRateBadgeVariant = getTbCaptureRateGapColorCodingAndLabel(benchmarkGap);
 
   const tbSpreadSummaryKpis: TBSpreadAnalysisCardObject[] = [
@@ -194,22 +200,24 @@ export function AssetTbSpread(props: TbSpreadProps) {
       ),
       variant: 'yellow',
       value: (
-        <div className="flex justify-between">
-          <Text variant="h2" className="self-center text-[26px]!">
+        <div className={cn('flex justify-between', isTablet ? 'gap-1' : 'gap-2')}>
+          <Text variant="free" className={cn('self-center font-InterBold!', isTablet ? 'text-[22px]' : 'text-[26px]')}>
             {tb2CaptureRate}%
           </Text>
-          <Divider orientation="vertical" className="bg-[#CCCB9D] w-0.2! shrink-0" />
-          <div className="flex flex-col gap-3">
-            <Text variant="14R" className="text-[#9B9A66]! ml-2">
-              Benchmark: <span className="text-warning! font-InterBold">{benchmarkTbSpread}%</span>
+          <Divider orientation="vertical" className={cn('bg-[#CCCB9D] shrink-0', isTablet ? 'w-0.5!' : 'w-0.2!')} />
+          <div className={cn('flex flex-col shrink w-full min-w-0', isTablet ? 'gap-1.5' : 'gap-3')}>
+            <Text variant="free" className={cn('text-[#9B9A66]!', isTablet ? 'text-small ml-1' : 'text-[14px] ml-2')}>
+              Benchmark: <span className="text-warning! font-InterBold">{benchmarkTbSpread != null ? `${benchmarkTbSpread}%` : '-'}</span>
             </Text>
-            <Badge
-              size="sm"
-              icon={tbCaptureRateBadgeVariant.icon}
-              color={tbCaptureRateBadgeVariant.badgeVariant}
-              message={tbCaptureRateBadgeVariant.label(benchmarkGap)}
-              textClassName={cn(benchmarkGap === 0 && 'font-InterMedium!')}
-            />
+            {benchmarkTbSpread != null && (
+              <Badge
+                size="sm"
+                icon={tbCaptureRateBadgeVariant.icon}
+                color={tbCaptureRateBadgeVariant.badgeVariant}
+                message={tbCaptureRateBadgeVariant.label(benchmarkGap)}
+                textClassName={cn(benchmarkGap === 0 && 'font-InterMedium!', isTablet && 'text-[10px]! leading-tight')}
+              className={cn(isTablet && 'px-1.5 py-0.5 min-w-0 w-max max-w-full')}
+            />)}
           </div>
         </div>
       ),
@@ -342,25 +350,48 @@ export function AssetTbSpread(props: TbSpreadProps) {
     dispatch(getAssetTBSpreadDetailsRequest({assetId, month, year}));
   }, [month, year, assetId]);
 
+  useEffect(() => {
+    if (!assetId) return;
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(assetId),
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.TBSpread,
+        context_year: year ?? undefined,
+      })
+    );
+  }, [assetId, year, dispatch]);
+
   return (
     <div ref={ref} className="flex flex-col gap-8 @container">
       {/* <p>width: {width}</p> */}
       {/* Top-Bottom Spread Analysis */}
       <Section
-        className='pt-3'
+        className="pt-3"
         icon="zap-solid"
         title="Top-Bottom Spread Analysis"
         subtitle="View monthly TB spread opportunity, average arbitrage revenue, and capture performance against benchmark.">
-        <div className="grid mt-2 grid-cols-[repeat(4,minmax(180px,270px))_minmax(300px,1fr)] gap-4">
+        <div
+          className={cn(
+            'grid mt-2 gap-2 xl:gap-4',
+            isTablet
+              ? 'grid-cols-[repeat(4,minmax(135px,1fr))_minmax(240px,1.5fr)]'
+              : 'grid-cols-[repeat(4,minmax(180px,270px))_minmax(300px,1fr)]',
+          )}>
           {tbSpreadSummaryKpis.map(kpi => (
-            <TBSpreadAnalysisCards renderUnitToBottom={width < 1125} {...kpi} key={kpi.title} isLoading={tbSpreadSummaryLoading || assetLoading} />
+            <TBSpreadAnalysisCards
+              renderUnitToBottom={isTablet || containerWidth < 1125}
+              {...kpi}
+              key={kpi.title}
+              isLoading={tbSpreadSummaryLoading || assetLoading}
+            />
           ))}
         </div>
 
         <Alert
           message="TB Spread Revenue Benchmark value is configured in Settings and apply across views."
           className="w-fit mt-1 items-stretch"
-          iconClassName='translate-y-[-2px]!'
+          iconClassName="translate-y-[-2px]!"
         />
       </Section>
 
@@ -369,6 +400,20 @@ export function AssetTbSpread(props: TbSpreadProps) {
         chartMargin={{left: 40}}
         xAxisProps={{padding: {left: 20, right: 20}}}
         data={tbSpreadTrendData}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.TBSpread}
+            contextWidget={ViewAnalysisWidgets.DailyTbSpreadTrend}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+              contextMonth={month}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
         downloadFileName={`${assetSystemGenerationId}_${month}_${year}_TBSpreadTrend.png`}
         headerRenderer={
           <SectionHeader
@@ -559,6 +604,20 @@ export function AssetTbSpread(props: TbSpreadProps) {
       <TBSpreadDetailsTable
         columns={tbSpreadDetailsTableColumns}
         data={tbSpreadDetailsTableData}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ViewAnalysis}
+            contextTab={ViewAnalysisTabs.TBSpread}
+            contextWidget={ViewAnalysisWidgets.DailyTbSpreadDetails}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+              contextMonth={month}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
         loading={tbSpreadDetailsLoading}
         onDownload={handleDownload}
         month={month ?? 1}

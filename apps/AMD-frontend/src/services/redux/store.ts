@@ -8,17 +8,19 @@ import {PERSIST_KEY} from '@/constants/keys';
 const persistConfig: PersistConfig<RootState> = {
   key: PERSIST_KEY,
   storage,
-  whitelist: ['auth'],
-
+  whitelist: ['auth', 'analyticsFilter'],
 };
 
 const sagaMiddleware = createSagaMiddleware();
 
 const persistedReducer = persistReducer<RootState>(persistConfig, rootReducer);
 
+import {deepLinkMiddleware} from './deepLinkMiddleware';
+
 const store = configureStore({
   reducer: persistedReducer,
-  middleware: getDefaultMiddleware => getDefaultMiddleware({thunk: false, serializableCheck: false}).concat(sagaMiddleware),
+  middleware: getDefaultMiddleware =>
+    getDefaultMiddleware({thunk: false, serializableCheck: false}).concat(sagaMiddleware, deepLinkMiddleware),
 });
 
 const persistor = persistStore(store);

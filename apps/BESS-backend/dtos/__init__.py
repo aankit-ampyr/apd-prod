@@ -11,7 +11,8 @@ from .simulation_dto import (
     BessDgSizingPayload,
     BessDgSizingResponse,
 )
-from .socket_dto import SocketEvent
+from .socket_dto import SocketEvent, SocketLogEvent, AuditLogSchema
+
 __all__ = [
     "UserBase",
     "UserResponse",
@@ -27,5 +28,7 @@ __all__ = [
     "DGFuelCurvePoint",
     "BessDgSizingPayload",
     "BessDgSizingResponse",
-    "SocketEvent"
+    "SocketEvent",
+    "AuditLogSchema",
+    "SocketLogEvent",
 ]

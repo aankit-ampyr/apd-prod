@@ -1,7 +1,8 @@
 import {Fragment, useMemo, useState} from 'react';
 import {Alert, IconButton, MultiSelectInput, Skeleton, Text} from '@/ui-kits';
-import {useChartsActionV2} from '@/hooks';
+import {useChartsActionV2, useWindowDimensions} from '@/hooks';
 import {cn, formatPercentage} from '@/utils';
+import {TABLET_SCREEN_BREAKPOINT} from '@/constants';
 import {ClearFilterButton, SectionHeader, WithFallback, getHeatmapTone, HeatVarianceLabels} from '../../common';
 import type {IconTypes, SelectInputItem} from '@/interface';
 import type {AssetBenchmarkRevenueActualvsIAR} from '@/interface';
@@ -29,6 +30,7 @@ interface VarianceTableProps {
 
   // states
   selectedMonths?: SelectInputItem['id'][] | null;
+  customActions?: React.ReactNode;
 }
 
 function formatMonthLabel(month: number, year: number) {
@@ -51,7 +53,8 @@ export function VarianceTable(props: VarianceTableProps) {
     onDownload,
     loading = false,
     className,
-    selectedMonths: selectedMonthsFromProps = null
+    selectedMonths: selectedMonthsFromProps = null,
+    customActions
   } = props;
   /**
    * ===========================
@@ -59,17 +62,19 @@ export function VarianceTable(props: VarianceTableProps) {
    * ===========================
    */
   const [selectedMonths, setSelectedMonths] = useState<SelectInputItem['id'][] | null>(selectedMonthsFromProps);
-  
+
   /**
    * ===========================
    * Hooks
    * ===========================
    */
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
+
   const {chartRef, onMaximize, onMinimize} = useChartsActionV2({
     downloadFileName,
-    renderFullScreen: () => <VarianceTable {...props} isFullScreenOverride selectedMonths={selectedMonths}/>,
+    renderFullScreen: () => <VarianceTable {...props} isFullScreenOverride selectedMonths={selectedMonths} />,
   });
-
 
   /**
    * ===========================
@@ -122,6 +127,7 @@ export function VarianceTable(props: VarianceTableProps) {
         <div className="flex items-start justify-between gap-4">
           <SectionHeader title={title} subtitle={subtitle} icon={icon} />
           <div className={cn('flex shrink-0 items-center gap-3 chart-actions', actionWrapperClassName)}>
+            {customActions}
             <IconButton
               name="download"
               size={20}
@@ -152,7 +158,6 @@ export function VarianceTable(props: VarianceTableProps) {
       {!loading && (
         <div className="flex justify-end mt-4 items-center gap-3">
           <MultiSelectInput
-
             labelClassName="text-caption! text-text-secondary! text-nowrap absolute -left-2 -translate-x-full top-1/2 -translate-y-1/2 font-InterRegular! mr-1"
             info
             label="Choose Months to Compare"
@@ -290,7 +295,7 @@ export function VarianceTable(props: VarianceTableProps) {
           </table>
         </div>
       </div>
-      <HeatVarianceLabels />
+      <HeatVarianceLabels allowWrapOnTablet={isTablet} />
       {!loading && (
         <Alert
           className="mt-4"
@@ -350,9 +355,13 @@ function StreamRowCells({
           <Text variant="14R">{stream ? stream.actual_revenue?.toLocaleString() : '-'}</Text>
         </WithFallback>
       </td>
-      <td style={{backgroundColor: bgColor}} className="border-b border-r border-border bg-white px-4 whitespace-nowrap py-4 text-center">
+      <td
+        style={{backgroundColor: bgColor}}
+        className="border-b border-r border-border bg-white px-4 whitespace-nowrap py-4 text-center">
         <WithFallback isLoading={loading} fallback={<Skeleton className="rounded-md! max-w-10! h-4! mx-auto" />}>
-          <Text style={{color: textColor}} variant="14R">{stream ? formatPercentage(stream.variance_percentage) : '-'}</Text>
+          <Text style={{color: textColor}} variant="14R">
+            {stream ? formatPercentage(stream.variance_percentage) : '-'}
+          </Text>
         </WithFallback>
       </td>
     </>

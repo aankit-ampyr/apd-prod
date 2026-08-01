@@ -3,8 +3,8 @@
  */
 
 import {createSlice, type PayloadAction} from '@reduxjs/toolkit';
-import type {APIResponse, AuthSliceInitalState, LoginRequest, VerifyOtpRequest} from '@/interface';
-import { UserSessionEndReason } from '@/constants';
+import type {APIResponse, AuthSliceInitalState, LoginRequest, LogoutRequest, VerifyOtpRequest} from '@/interface';
+import {UserSessionEndReason} from '@/constants';
 
 const initialState: AuthSliceInitalState = {
   isLoading: false,
@@ -47,7 +47,7 @@ const authSlice = createSlice({
     },
     loginOtpSuccess(state, action: PayloadAction<LoginRequest['response']>) {
       state.isLoading = false;
-      state.authSuccess = action.payload.status_code;      
+      state.authSuccess = action.payload.status_code;
       // Update remaining attempts if returned in response
       const remainingAttempts = action.payload.data?.otp_attempts;
       if (typeof remainingAttempts === 'number' && !state.session.limit_reached) {
@@ -55,7 +55,6 @@ const authSlice = createSlice({
         state.session.otp_recieved_at = new Date().toISOString();
         state.session.otp_attempts = remainingAttempts;
       }
-      
     },
     loginOtpFailure(state, action: PayloadAction<APIResponse>) {
       state.isLoading = false;
@@ -119,9 +118,27 @@ const authSlice = createSlice({
       // complete the implementation
     },
 
+    // logout
+    logoutRequest(state) {
+      state.isLoading = true;
+      state.authSuccess = false;
+      state.authFailure = false;
+    },
+    logoutSuccess(state, action: PayloadAction<LogoutRequest['response']>) {
+      state.isLoading = false;
+      state.authSuccess = action.payload.status_code;
+      state.isAuthenticated = false;
+      state.authData = null;
+    },
+    logoutFailure(state, action: PayloadAction<APIResponse>) {
+      state.isLoading = false;
+      state.isAuthenticated = false;
+      state.authFailure = action.payload.status_code;
+    },
+
     // reset auth
     resetAuth(state, _action: PayloadAction<void>) {
-      return { ...initialState };
+      return {...initialState};
     },
 
     resetAuthWithReason(state, action: PayloadAction<{reason: UserSessionEndReason}>) {
@@ -167,6 +184,11 @@ export const {
   resendOtpRequest,
   resendOtpSuccess,
   resendOtpFailure,
+
+  // logout actions
+  logoutRequest,
+  logoutSuccess,
+  logoutFailure,
 
   resetAuthMessage,
   resetAuth,

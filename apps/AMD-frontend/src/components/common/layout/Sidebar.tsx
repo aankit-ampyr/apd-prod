@@ -19,7 +19,7 @@ export function SideNav() {
     <SideNavBar
       sections={sections}
       platformLabel="APD"
-      className="z-999"
+      className="z-[1000]"
       isRouteActive={route => isAppRouteActive(pathname, {check: route})}
     />
   );

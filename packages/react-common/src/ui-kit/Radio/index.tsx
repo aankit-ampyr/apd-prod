@@ -1,44 +1,44 @@
-import {cn} from '../../utils';
-import React from 'react';
-import {tv, type VariantProps} from 'tailwind-variants';
-import {Text, type TextVariantType} from '../Text';
+import { cn } from "../../utils";
+import React from "react";
+import { tv, type VariantProps } from "tailwind-variants";
+import { Text, type TextVariantType } from "../Text";
 
 const radioStyles = tv({
   slots: {
-    container: 'inline-flex items-center gap-2',
-    base: 'relative inline-flex items-center justify-center rounded-full border outline-none transition-colors',
-    dot: 'rounded-full transition-colors',
-    label: '',
+    container: "inline-flex items-center gap-2",
+    base: "relative inline-flex items-center justify-center rounded-full border outline-none transition-colors",
+    dot: "rounded-full transition-colors",
+    label: "",
   },
   variants: {
     size: {
       sm: {
-        base: 'size-3.5',
-        dot: 'size-1.5',
+        base: "size-3.5",
+        dot: "size-1.5",
       },
       md: {
-        base: 'size-4',
-        dot: 'size-2',
+        base: "size-4",
+        dot: "size-2",
       },
     },
     checked: {
       true: {
-        base: 'border-primary',
-        dot: 'bg-primary',
+        base: "border-primary",
+        dot: "bg-primary",
       },
       false: {
-        base: 'border-disabled hover:border-primary',
-        dot: 'bg-transparent',
+        base: "border-disabled hover:border-primary",
+        dot: "bg-transparent",
       },
     },
     disabled: {
       true: {
-        base: 'cursor-not-allowed  bg-bg-card',
+        base: "cursor-not-allowed  bg-bg-card",
         // Do not override dot color when disabled; keep as per checked state
-        label: 'text-disabled',
+        label: "text-disabled",
       },
       false: {
-        base: 'cursor-pointer',
+        base: "cursor-pointer",
       },
     },
   },
@@ -47,12 +47,20 @@ const radioStyles = tv({
       checked: false,
       disabled: true,
       class: {
-        dot: 'bg-transparent',
+        dot: "bg-transparent",
+      },
+    },
+    {
+      checked: true,
+      disabled: true,
+      class: {
+        base: "border-disabled",
+        dot: "bg-disabled", // replace with your disabled color token
       },
     },
   ],
   defaultVariants: {
-    size: 'sm',
+    size: "sm",
     checked: false,
     disabled: false,
   },
@@ -60,14 +68,20 @@ const radioStyles = tv({
 
 type RadioVariants = VariantProps<typeof radioStyles>;
 
-const radioLabelVariant: Record<NonNullable<RadioVariants['size']>, TextVariantType> = {
-  md: 'body1',
-  sm: 'caption',
+const radioLabelVariant: Record<
+  NonNullable<RadioVariants["size"]>,
+  TextVariantType
+> = {
+  md: "body1",
+  sm: "caption",
 };
 
-interface RadioProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onChange'> {
+interface RadioProps extends Omit<
+  React.ButtonHTMLAttributes<HTMLButtonElement>,
+  "onChange"
+> {
   checked?: boolean;
-  size?: RadioVariants['size'];
+  size?: RadioVariants["size"];
   label?: string;
   className?: string;
   labelClassName?: string;
@@ -75,10 +89,10 @@ interface RadioProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>,
   onCheckedChange?: (checked: boolean) => void;
 }
 
-export const Radio: React.FC<RadioProps> = props => {
+export const Radio: React.FC<RadioProps> = (props) => {
   const {
     checked = false,
-    size = 'sm',
+    size = "sm",
     label,
     className,
     labelClassName,
@@ -88,7 +102,12 @@ export const Radio: React.FC<RadioProps> = props => {
     ...rest
   } = props;
 
-  const {container, base, dot, label: labelStyle} = radioStyles({size, checked, disabled});
+  const {
+    container,
+    base,
+    dot,
+    label: labelStyle,
+  } = radioStyles({ size, checked, disabled });
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!disabled) {
@@ -111,7 +130,10 @@ export const Radio: React.FC<RadioProps> = props => {
         {checked ? <span className={dot()} /> : null}
       </button>
       {label ? (
-        <Text variant={radioLabelVariant[size]} className={cn(labelStyle(), labelClassName)}>
+        <Text
+          variant={radioLabelVariant[size]}
+          className={cn(labelStyle(), labelClassName)}
+        >
           {label}
         </Text>
       ) : null}

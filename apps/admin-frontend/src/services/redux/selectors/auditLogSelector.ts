@@ -2,6 +2,7 @@ import {type RootState} from '../rootReducer';
 
 /** error/success selector */
 export const auditLogSuccess = (state: RootState) => state.auditLog.auditLogSuccess;
+export const authSuccess = (state: RootState) => state.auth.authSuccess;
 export const auditLogFailure = (state: RootState) => state.auditLog.auditLogError;
 
 /** loading selector */

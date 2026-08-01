@@ -3,7 +3,7 @@ import {LoadConfig} from './LoadConfig';
 import {LoadPreview} from './LoadPreview';
 import {LoadChart} from './LoadChart';
 import {useEffect, useMemo, useRef, useState} from 'react';
-import {saveLoadProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {getProjectSimulationSilentRequest, saveLoadProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {useDispatch, useSelector} from 'react-redux';
 import {RootState} from '@/services/redux/rootReducer';
 import {
@@ -14,6 +14,7 @@ import {
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {allProjectsData, authDataSelector, projectLoading} from '@/services/redux/selectors';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
+import {useParams} from 'react-router-dom';
 
 type Props = {
   readonly onSaveComplete?: () => void;
@@ -23,6 +24,8 @@ type Props = {
 
 export const LoadProfile = ({onSaveComplete, setIsStepsHidden, readOnly = false}: Props) => {
   const dispatch = useDispatch();
+  const {id: simulationIdFromUrl} = useParams();
+
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
 
@@ -81,6 +84,12 @@ export const LoadProfile = ({onSaveComplete, setIsStepsHidden, readOnly = false}
       }),
     );
   };
+
+  useEffect(() => {
+    if (simulationIdFromUrl) {
+      dispatch(getProjectSimulationSilentRequest({simulation_id: simulationIdFromUrl}));
+    }
+  }, [simulationIdFromUrl, dispatch]);
 
   const hasChangesComparedToSaved = useMemo(() => {
     if (!isAlreadySaved) return true;

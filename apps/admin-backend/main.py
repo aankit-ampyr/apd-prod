@@ -10,8 +10,9 @@ from middleware import (
     AuthMiddleware,
 )
 from router import register_routes
+from context import lifespan
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 
 # encryption middleware
@@ -36,6 +37,7 @@ app.add_middleware(
         "/health",
         "/api/v1/auth/login/send-otp",
         "/api/v1/auth/login/verify-otp",
+        "/api/v1/auth/refresh",
     ],
 )
 

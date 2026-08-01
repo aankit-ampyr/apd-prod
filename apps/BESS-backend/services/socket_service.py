@@ -10,7 +10,6 @@ import asyncio
 
 
 class SocketService:
-
     def get_ws_token(self, current_user: dict):
         ephemeral_ws_token = create_ephemeral_ws_token(current_user)
         return Res.success(
@@ -21,7 +20,7 @@ class SocketService:
             },
         )
 
-    async def handle_websocket_connection(self, db: AsyncSession, websocket: WebSocket):
+    async def handle_websocket_connection(self, websocket: WebSocket):
         user_id = None
         try:
             # ==============================================

@@ -1,8 +1,10 @@
-from services import OrganizationService
+from services.organization_service import OrganizationService
 from fastapi import Depends, Query
 from fastapi.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from db.dependencies import get_db,get_user_db, allowed_roles
+from context.dependencies import get_redis_conn
+from redis.asyncio import Redis
 from dtos import OrganizationCreate, OrganizationUpdate
 from constants.enums import UserRole
 from typing import Literal, List
@@ -44,9 +46,10 @@ class OrganizationController:
         request: Request,
         org: OrganizationCreate,
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user = Depends(allowed_roles(UserRole.ADMIN.value))
     ):
-        return await self.service.create_organization(db, org, current_user)
+        return await self.service.create_organization(db, redis, org, current_user)
 
     async def update_organization(
         self,
@@ -54,9 +57,10 @@ class OrganizationController:
         org_id: int,
         org: OrganizationUpdate,
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user = Depends(allowed_roles(UserRole.ADMIN.value))
     ):
-        return await self.service.update_organization(db, current_user, org_id, org)
+        return await self.service.update_organization(db, redis, current_user, org_id, org)
 
     async def get_organizations(
         self,

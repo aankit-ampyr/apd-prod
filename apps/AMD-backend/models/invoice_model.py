@@ -3,6 +3,7 @@ from sqlalchemy.ext.hybrid import hybrid_property
 from db.db_config import AMDBase as Base
 from datetime import datetime, timezone
 from sqlalchemy.orm import relationship
+from sqlalchemy import func, cast
 
 
 class PdfInvoice(Base):
@@ -19,7 +20,6 @@ class PdfInvoice(Base):
     @invoice_id.expression
     def invoice_id(cls):
         # Used when filtering at DB level: Model.query.filter_by(invoice_id=...)
-        from sqlalchemy import func, cast
 
         id_str = cast(cls.id, String)
         id_len = func.length(id_str)
@@ -71,7 +71,7 @@ class Settlement(Base):
     @settlement_id.expression
     def settlement_id(cls):
         # Used when filtering at DB level: Model.query.filter_by(settlement_id=...)
-        from sqlalchemy import func, cast
+        
 
         id_str = cast(cls.id, String)
         id_len = func.length(id_str)
@@ -90,5 +90,39 @@ class Settlement(Base):
     extracted_invoice_date = Column(Date, nullable=False)
     invoice_payment_date = Column(Date, nullable=False)
     uploaded_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
-    is_deleted = Column(Boolean, default=False, nullable=False)
     is_deleted     = Column(Boolean, default=False, nullable=False)  # soft delete flag
+
+
+class SummaryStatement(Base):
+    __tablename__ = "summary_statements"
+
+    id = Column(Integer, primary_key=True, index=True)
+
+    @hybrid_property
+    def statement_id(self):
+        if self.id is None:
+            return None
+        return f"SUM-{self.id:04d}"
+
+    @statement_id.expression
+    def statement_id(cls):
+        id_str = cast(cls.id, String)
+        id_len = func.length(id_str)
+        target = func.greatest(id_len, 4)
+        return func.concat("SUM-", func.lpad(cast(cls.id, String), target, "0"))
+
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False, index=True)
+    month = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False)
+
+    file_name = Column(String, nullable=False)
+    file_key = Column(String, nullable=False)
+    storage_server = Column(String, nullable=False)
+    file_size = Column(Integer, nullable=False)
+
+    total_energy_revenue = Column(Float, nullable=True)
+    total_ancillary_revenue = Column(Float, nullable=True)
+    reported_net_revenue = Column(Float, nullable=True)
+
+    uploaded_on = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    is_deleted = Column(Boolean, default=False, nullable=False)

@@ -1,12 +1,7 @@
-from typing import Optional, Tuple
-
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
-
+from fastapi import status
 from constants.enums import SimulationSetupProgress, SimulationJobStatus
-from constants.enums import UserRole
-from models.project_model import Project
 from models.simulation_model import (
     CustomSimulationJob,
     DetailGreenSimulationJob,
@@ -19,7 +14,10 @@ from utils.response_utils import Res
 
 
 async def progress_simulation_setup(
-    simulation_id: int, to: SimulationSetupProgress, db: AsyncSession
+    simulation_id: int,
+    to: SimulationSetupProgress,
+    db: AsyncSession,
+    commit: bool = True,
 ):
     response = await db.execute(
         select(Simulation).where(Simulation.id == simulation_id)
@@ -27,14 +25,16 @@ async def progress_simulation_setup(
     simulation = response.scalar_one_or_none()
 
     if not simulation:
-        return Res.error(status_code="E-20043", message="Simulation not found")
+        return Res.error(status_code="E-20043", message="Simulation not found", http_status_code=status.HTTP_404_NOT_FOUND)
 
     if simulation.step < to:
         simulation.step = to
 
     simulation.edit_step = to
 
-    await db.commit()
+    await db.flush()
+    if commit:
+        await db.commit()
 
 
 async def depreciate_simulation_job(
@@ -45,6 +45,7 @@ async def depreciate_simulation_job(
     include_multi_job: bool = True,
     include_green_job: bool = False,
     include_detailed_green_job: bool = False,
+    commit: bool = True,
 ):
     if include_sizing_job:
         await db.execute(
@@ -81,7 +82,9 @@ async def depreciate_simulation_job(
             .values(status=SimulationJobStatus.OUTDATED)
         )
 
-    await db.commit()
+    await db.flush()
+    if commit:
+        await db.commit()
 
 
 #

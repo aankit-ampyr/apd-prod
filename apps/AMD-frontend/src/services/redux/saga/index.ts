@@ -7,6 +7,8 @@ import digestSaga from './digestSaga';
 import settingSaga from './settingsSaga';
 import auditLogSaga from './auditLogSaga';
 import invoiceSaga from './invoiceSaga';
+import commentSaga from './commentSaga';
+import notificationSaga from './notificationSaga';
 
 const rootSaga = function* root() {
   yield all([
@@ -18,6 +20,8 @@ const rootSaga = function* root() {
     settingSaga(),
     auditLogSaga(),
     invoiceSaga(),
+    commentSaga(),
+    notificationSaga(),
   ]);
 };
 

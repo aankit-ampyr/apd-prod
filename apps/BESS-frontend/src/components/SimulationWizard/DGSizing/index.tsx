@@ -11,11 +11,13 @@ import {
   initiateSimulationData,
   projectSimulationData,
   simulationProgressData,
+  simulationProjectLoading,
+  simulationProgressLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData, projectLoading} from '@/services/redux/selectors';
 import {dgSizingRequest, getDGSizingRequest, simulationProgressRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
-import {Button, Icon, SelectInput, Skeleton, Text, TextInput} from '@/ui-kits';
+import {Alert, Button, Icon, SelectInput, Skeleton, Text, TextInput} from '@/ui-kits';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {useDispatch, useSelector} from 'react-redux';
@@ -106,7 +108,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
   const dispatch = useDispatch();
   const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
   const hasRequestedProjectListRef = useRef(false);
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
 
   const dgData = useSelector(generatorData);
   const simulData = useSelector(initiateSimulationData);
@@ -119,10 +121,12 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
   const allProjData = useSelector(allProjectsData);
   const isProjectLoading = useSelector(projectLoading);
   const projectId = simulData?.project_id ?? proSimulData?.project_id;
-  const currentProject = allProjData?.find(project => Number(project?.id) === projectId);
+  const currentProject = allProjData?.find((project: any) => Number(project?.id) === projectId);
   const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
-  const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some(user => user.id === authData.id));
+  const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some((user: any) => user.id === authData.id));
   const isReadOnly = isAssignedUser || isProjectAssignmentPending;
+  const isProSimulLoading = useSelector(simulationProjectLoading);
+  const dgProgressLoading = useSelector(simulationProgressLoading);
 
   const bessSavedData = useSelector(bessContainerConfigData);
   const loadData = useSelector(loadProfileData);
@@ -184,6 +188,10 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
     showCompletionSummary,
     simulationProgress,
     totalConfig,
+    isCurrentUserOwner,
+    stopSimulationStatus,
+    handleCloseStoppedPopup,
+    isOwnerRunning,
   } = useDGSizingSimulation({
     simulationId: simulation_id,
     currentUserId: authData?.id,
@@ -196,11 +204,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
 
   // Only show completion summary if not running, not in progress, and user has NOT edited since completion
   const shouldShowCompletionSummary =
-    !isProgressLoading &&
-    !isSimulationRunning &&
-    !showCompletionProgress &&
-    !hasUserEditedSinceCompletion &&
-    (showCompletionSummary || isSimulationCompletedPersisted);
+    !isProgressLoading && !showCompletionProgress && !hasUserEditedSinceCompletion && (showCompletionSummary || isSimulationCompletedPersisted);
 
   useEffect(() => {
     if (simulation_id) {
@@ -209,10 +213,10 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
   }, [dispatch, simulation_id]);
 
   useEffect(() => {
-    if (success === 'S-20025' || simulation_id) {
+    if (simulation_id) {
       dispatch(simulationProgressRequest({simulation_id: simulation_id!}));
     }
-  }, [simulation_id, success]);
+  }, [simulation_id]);
 
   useEffect(() => {
     if (!isProgressLoading) {
@@ -380,7 +384,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
   const hasConfigurationError = hasBessError || hasDgError || stepSizeFitError;
   const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
 
-  const shouldShowExternalSimulationMessage = !isSimulationRunning && (isBlocked || shouldBlock);
+  const shouldShowExternalSimulationMessage = !isSimulationRunning && !isCurrentUserOwner && (isBlocked || shouldBlock);
 
   useEffect(() => {
     // Only recalculate if there are no errors
@@ -428,9 +432,8 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
 
   const isSetupIncomplete = !(loadProfileSaved || loadData) || !(solarProfileSaved || solarData) || !bessSavedData || !generatorSaved || !dispatchRuleSaved;
   const isInputDisabled = isReadOnly || isSetupIncomplete;
-  const hasInitialData = sizingData !== undefined && sizingData !== null;
 
-  if (showInitialLoader) {
+  if (showInitialLoader || isProSimulLoading || !proSimulData?.project_id || dgProgressLoading || !currentProject) {
     return <DGSizingGhostLoader />;
   }
   const overviewItems = [
@@ -469,15 +472,32 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
     },
   ];
 
+  const hideSimulationCTAs = isOwnerRunning;
+
   return (
     <div>
-      <div className="bg-[#F7FDFC] p-4 mt-5 border-[1.4px] border-[#B6D7D3] rounded-[12px] w-full">
+      {shouldShowExternalSimulationMessage && (
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
+        </div>
+      )}
+      <div className="bg-[#F7FDFC] p-4 mt-5 border-[1.4px] border-[#B6D7D3] rounded-md w-full">
+        {/* Show blocking message if locked for other users */}
+
         <div className="flex items-center gap-3">
           <Icon name="sliders" className="text-black! size-6.75!" />
           <Text variant={'h4'} className="font-SpaceGroteskBold">
             Configuration Range
           </Text>
         </div>
+
         <div className="flex flex-col xl:flex-row gap-4 mt-1 items-stretch">
           <div className="bg-white p-4 mt-5 border-[1.4px] border-[#E2E4EA] rounded-[12px] w-full xl:w-1/2 tabular-nums flex flex-col h-full">
             <Text variant={'body1'} className="text-primary! font-InterSemiBold!">
@@ -683,8 +703,8 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
                 )}
               </>
             ) : (
-              <div className="bg-[#F8FCFF] border border-[#E2E4EA] rounded-[12px] flex flex-1 items-center justify-center w-full px-[14px] py-4 mt-6">
-                <div className="flex flex-col items-center text-center w-full max-w-[360px] gap-2">
+              <div className="bg-[#F8FCFF] border border-[#E2E4EA] rounded-md flex flex-1 items-center justify-center w-full px-[14px] py-4 mt-6">
+                <div className="flex flex-col items-center text-center w-full max-w-90 gap-2">
                   <svg width="22" height="22" viewBox="0 0 20 20" fill="none" aria-hidden="true" className="mb-1">
                     <circle cx="10" cy="10" r="9" stroke="#2F9C8F" strokeWidth="2" />
                     <circle cx="10" cy="6.15" r="1.1" fill="#2F9C8F" />
@@ -762,7 +782,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
 
       <div className="mt-6 flex justify-center gap-5">
         {/* Show Save and Continue and Run Sizing Simulation buttons only if not running, not showing completion, not assigned user, not blocked, and not shouldShowCompletionSummary */}
-        {!isSimulationRunning && !showCompletionProgress && !shouldShowCompletionSummary && !isReadOnly && !isBlocked && (
+        {!showCompletionProgress && !shouldShowCompletionSummary && !isReadOnly && !hideSimulationCTAs && (
           <Button
             variant="secondary"
             size="md"
@@ -773,7 +793,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
           </Button>
         )}
 
-        {!isSimulationRunning && !showCompletionProgress && !shouldShowCompletionSummary && !isBlocked && (
+        {!showCompletionProgress && !shouldShowCompletionSummary && !hideSimulationCTAs && (
           <Button
             size="md"
             className="w-50 my-6 flex justify-center"
@@ -783,18 +803,6 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
           </Button>
         )}
       </div>
-
-      {/* Show blocking message if locked for other users */}
-      {shouldShowExternalSimulationMessage && (
-        <div className="flex justify-center">
-          <div className="flex items-center gap-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-            </Text>
-          </div>
-        </div>
-      )}
 
       {/* Full-screen overlay when simulation is running or locked for other users */}
       {(isSimulationRunning || isBlocked || shouldBlock) &&
@@ -844,7 +852,15 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
                       Next → View Results
                     </Button>
                   </div>
-                  {isStopSimulationOpen && <StopSimulation open={isStopSimulationOpen} onCancel={handleCancelStopSimulation} onStop={handleStopSimulation} />}
+                  {isStopSimulationOpen && (
+                    <StopSimulation
+                      open={isStopSimulationOpen}
+                      onCancel={handleCancelStopSimulation}
+                      onStop={handleStopSimulation}
+                      status={stopSimulationStatus}
+                      onCloseSuccess={handleCloseStoppedPopup}
+                    />
+                  )}
                 </>
               )}
               {/* If not running (just completed), hide config details and stop button, enable Next button */}
@@ -858,7 +874,7 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
             </div>
           )}
           {/* After 3s, show only the completion summary, or show persisted completion summary if simulation is completed in backend and not dirty */}
-          {!isProgressLoading && shouldShowCompletionSummary ? (
+          {shouldShowCompletionSummary ? (
             <>
               <div className="mt-4 flex justify-center">
                 <div className="bg-primary-tint-2 p-3 flex items-center gap-3 w-fit rounded-sm">

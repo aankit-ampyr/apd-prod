@@ -6,8 +6,11 @@ import {
   verifyOtpRequest,
   verifyOtpSuccess,
   verifyOtpFailure,
+  logoutRequest,
+  logoutSuccess,
+  logoutFailure,
 } from '../slice/authSlice';
-import {login as loginOtpRequestAPI, verifyOtp as verifyOtpAPI} from '@/services/api';
+import {login as loginOtpRequestAPI, verifyOtp as verifyOtpAPI, logout} from '@/services/api';
 import {SUCCESS_KEY} from '@/constants/keys';
 
 function* loginOtpRequestSaga(action: any): Generator {
@@ -36,7 +39,21 @@ function* verifyOtpRequestSaga(action: any): Generator {
   }
 }
 
+function* LogoutSaga(): Generator {
+    try {
+        const response: any = yield call(logout);
+        if (response.data.status === SUCCESS_KEY) {
+            yield put(logoutSuccess(response.data));
+        } else {
+            yield put(logoutFailure(response.data));
+        }
+    } catch (error: any) {
+        yield put(logoutFailure(error.response));
+    }
+}
+
 export default function* AuthSaga(): Generator {
-  yield takeLatest(loginOtpRequest.type, loginOtpRequestSaga);
-  yield takeLatest(verifyOtpRequest.type, verifyOtpRequestSaga);
+    yield takeLatest(loginOtpRequest.type, loginOtpRequestSaga);
+    yield takeLatest(verifyOtpRequest.type, verifyOtpRequestSaga);
+    yield takeLatest(logoutRequest.type, LogoutSaga);
 }

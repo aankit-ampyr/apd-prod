@@ -62,24 +62,6 @@ export const CSVUpload = ({readOnly, onFileChange}: {readOnly?: boolean; onFileC
         file,
       }),
     );
-    // requestChangeConfigurationConfirmation({
-    //   onStay: () => {
-    //     dispatch(clearUploadSolarCSVData());
-    //     dispatch(clearSolarProfileData());
-    //     dispatch(resetUploadSolarCSVMessage());
-    //     dispatch(resetSolarProfileMessage());
-    //     if (!savedSolar?.source?.id) return;
-    //     dispatch(
-    //       solarProfileRequest({
-    //         simulation_id,
-    //         payload: {
-    //           type: savedSolar.source.type,
-    //           source_id: Number(savedSolar.source.id),
-    //         },
-    //       }),
-    //     );
-    //   },
-    // });
   };
 
   const handleFileRemove = () => {

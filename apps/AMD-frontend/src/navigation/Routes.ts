@@ -23,7 +23,7 @@ export type RouteKeys = (
   'USER_MANAGEMENT' |
   'ORGANIZATIONS' |
   'ASSET_MANAGEMENT' |
-  'DIGEST_MANAGEMENT' |
+  // 'DIGEST_MANAGEMENT' |
   'AUDIT_LOG' |
   'HELP' |
   'SETTINGS' |
@@ -87,16 +87,16 @@ export const AppRoutes: AppRoutesConfig = {
       section: 'CONFIGURATION',
     },
   },
-  DIGEST_MANAGEMENT: {
-    path: '/digest-management',
-    title: 'Digest Management',
-    roles: [UserRole.Admin],
-    sidebar: {
-      icon: 'book',
-      label: 'Digest Management',
-      section: 'CONFIGURATION',
-    },
-  },
+  // DIGEST_MANAGEMENT: {
+  //   path: '/digest-management',
+  //   title: 'Digest Management',
+  //   roles: [UserRole.Admin],
+  //   sidebar: {
+  //     icon: 'book',
+  //     label: 'Digest Management',
+  //     section: 'CONFIGURATION',
+  //   },
+  // },
   AUDIT_LOG: {
     path: '/audit-log',
     title: 'Audit Log',
@@ -196,7 +196,7 @@ export const AppRoutes: AppRoutesConfig = {
   INVOICE_ANALYSIS: {
     path: '/invoice-analysis',
     title: 'Invoice Analysis',
-    roles: [UserRole.Admin, UserRole.Analyst],
+    roles: [UserRole.Admin, UserRole.Analyst, UserRole.Management],
     sidebar: {
       icon: 'ticket',
       label: 'Invoice Analysis',
@@ -206,7 +206,7 @@ export const AppRoutes: AppRoutesConfig = {
   VIEW_INVOICE_ANALYSIS: {
     path: '/asset-management/:id/invoice-analysis',
     title: 'Invoice Analysis',
-    roles: [UserRole.Admin, UserRole.Analyst],
+    roles: [UserRole.Admin, UserRole.Analyst, UserRole.Management],
     allowBackButton: true,
   },
 };

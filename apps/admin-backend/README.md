@@ -29,5 +29,5 @@ uv run alembic upgrade head
 
 # Run server
 ```bash
-uv run uvicorn main:app --port 8000 --host 0.0.0.0
+uv run uvicorn main:app --port 8030 --host 0.0.0.0
 ```

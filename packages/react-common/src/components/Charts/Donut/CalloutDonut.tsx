@@ -1,10 +1,10 @@
-import React, { useMemo, useRef, type ReactNode } from "react";
-import { IconButton, Text } from "../../../ui-kit";
-import { useChartTooltip, useChartsActionV2 } from "../../../hooks";
-import { cn } from "../../../utils";
-import { WithFallback } from "../../SkelatonWrapper";
-import { arc, pie, PieArcDatum } from "d3-shape";
-import { Divider, DonutSegment } from "../../..";
+import React, {useMemo, useRef, type ReactNode} from 'react';
+import {IconButton, Text} from '../../../ui-kit';
+import {useChartTooltip, useChartsActionV2} from '../../../hooks';
+import {cn} from '../../../utils';
+import {WithFallback} from '../../SkelatonWrapper';
+import {arc, pie, PieArcDatum} from 'd3-shape';
+import {Divider, DonutSegment} from '../../..';
 
 /**
  * Extended DonutSegment with color for pie generator
@@ -32,8 +32,8 @@ const SEGMENTED_DONUT_SIZE = 240;
 const SEGMENTED_DONUT_STROKE_WIDTH = 20;
 const SEGMENTED_DONUT_SEGMENT_RADIUS = 8;
 const GHOST_DONUT_SEGMENTS: GhostDonutSegment[] = [
-  { value: 42, color: "#E9EAF0" },
-  { value: 58, color: "#DADADA" },
+  {value: 42, color: '#E9EAF0'},
+  {value: 58, color: '#DADADA'},
 ];
 
 const degToRad = (deg: number) => (deg * Math.PI) / 180;
@@ -58,21 +58,18 @@ function CalloutDonutGhostLoader({
   segmentRadius: number;
 }) {
   const ghostPieGenerator = pie<GhostDonutSegment>()
-    .value((d) => d.value)
+    .value(d => d.value)
     .sort(null)
     .padAngle(0.045)
     .startAngle(0)
     .endAngle(2 * Math.PI);
 
-  const ghostArcGenerator = arc<any>()
-    .innerRadius(innerRadius)
-    .outerRadius(radius)
-    .cornerRadius(segmentRadius);
+  const ghostArcGenerator = arc<any>().innerRadius(innerRadius).outerRadius(radius).cornerRadius(segmentRadius);
 
   const ghostArcs = ghostPieGenerator(GHOST_DONUT_SEGMENTS);
 
   return (
-    <div className="mx-auto animate-pulse" style={{ width: size, height: size }}>
+    <div className="mx-auto animate-pulse" style={{width: size, height: size}}>
       <svg width={size} height={size}>
         <g transform={`translate(${radius}, ${radius})`}>
           {ghostArcs.map((arcData, index) => (
@@ -96,7 +93,7 @@ interface CalloutDonutProps {
   downloadFileName?: string;
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
-  orientation?: "vertical" | "horizontal";
+  orientation?: 'vertical' | 'horizontal';
 
   // className
   actionWrapperClassName?: string;
@@ -107,6 +104,7 @@ interface CalloutDonutProps {
   legendColumnClassName?: string;
   legendItemClassName?: string;
   centerContentClassName?: string;
+  customActions?: ReactNode;
 
   // shapeConfig,
   shapeConfig?: {
@@ -125,19 +123,9 @@ interface CalloutDonutProps {
   renderCenterContent?: boolean;
   centerContentLabel?: string;
   centerContentChildren?: (isFullScreen?: boolean) => React.ReactNode;
-  legendRenderer?: (items: CalloutDonutLegendItem[]) => ReactNode | null;
-  renderTooltip?: (tooltip: {
-    label: string;
-    value: number;
-    percentage: number;
-    color: string;
-  }) => ReactNode;
-  customTooltipRenderer?: (tooltip: {
-    label: string;
-    value: number;
-    percentage: number;
-    color: string;
-  }) => ReactNode;
+  legendRenderer?: (items: CalloutDonutLegendItem[], isFullScreen?: boolean) => ReactNode | null;
+  renderTooltip?: (tooltip: {label: string; value: number; percentage: number; color: string}) => ReactNode;
+  customTooltipRenderer?: (tooltip: {label: string; value: number; percentage: number; color: string}) => ReactNode;
 }
 export function CalloutDonut(props: CalloutDonutProps) {
   const {
@@ -145,7 +133,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
     isLoading = false,
     downloadFileName,
     isFullScreenOverride,
-    orientation = "vertical",
+    orientation = 'vertical',
 
     // className
     actionWrapperClassName,
@@ -156,6 +144,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
     legendColumnClassName,
     legendItemClassName,
     centerContentClassName,
+    customActions,
 
     // shapeConfig,
     shapeConfig,
@@ -165,7 +154,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
 
     // centerContent
     renderCenterContent = false,
-    centerContentLabel = "",
+    centerContentLabel = '',
     centerContentChildren,
     legendRenderer,
     renderTooltip,
@@ -177,16 +166,14 @@ export function CalloutDonut(props: CalloutDonutProps) {
    * Hooks
    * ===================
    */
-  const { chartRef, handleDownLoad, onMaximize, onMinimize } =
-    useChartsActionV2({
-      downloadFileName: downloadFileName ?? "chart.png",
-      renderFullScreen: () => {
-        return <CalloutDonut {...props} isFullScreenOverride />;
-      },
-    });
+  const {chartRef, handleDownLoad, onMaximize, onMinimize} = useChartsActionV2({
+    downloadFileName: downloadFileName ?? 'chart.png',
+    renderFullScreen: () => {
+      return <CalloutDonut {...props} isFullScreenOverride />;
+    },
+  });
   const donutWrapperRef = useRef<HTMLDivElement | null>(null);
-  const { tooltip, handleMouseMove, handleMouseLeave } =
-    useChartTooltip<DonutDataSegment>(donutWrapperRef as any);
+  const {tooltip, handleMouseMove, handleMouseLeave} = useChartTooltip<DonutDataSegment>(donutWrapperRef as any);
 
   /**
    * ===================
@@ -201,8 +188,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
   /**
    * strokeWidth: the thickness of the donut segments, which affects the inner radius of the arcs. It also defaults to a predefined constant and can be customized via shapeConfig.
    */
-  const strokeWidth =
-    shapeConfig?.strokeWidth || getSizeUnits(SEGMENTED_DONUT_STROKE_WIDTH);
+  const strokeWidth = shapeConfig?.strokeWidth || getSizeUnits(SEGMENTED_DONUT_STROKE_WIDTH);
 
   /**
    * resolvedPadAngle: the padding angle between each segment of the donut chart. It defaults to a predefined constant but can be overridden by the shapeConfig prop.
@@ -223,7 +209,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
    * normalizedData: the input data is normalized to ensure that all values are positive and to calculate the percentage representation of each segment. This is important for the pie generator to correctly compute the angles for each segment based on their relative values. The normalization process also allows for consistent rendering of the chart, regardless of the original data format.
    */
   const normalizedData = useMemo(() => {
-    return data?.map((item) => ({
+    return data?.map(item => ({
       ...item,
       value: Math.abs(item.value),
     }));
@@ -231,7 +217,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
 
   const legendItems = useMemo<CalloutDonutLegendItem[]>(
     () =>
-      normalizedData.map((item) => ({
+      normalizedData.map(item => ({
         label: item.label,
         value: item.value,
         percentage: item.percentage,
@@ -249,35 +235,29 @@ export function CalloutDonut(props: CalloutDonutProps) {
   }, [normalizedData]);
 
   const tooltipRenderer = customTooltipRenderer ?? renderTooltip;
-  const isHorizontal = orientation === "horizontal";
-  const legendColumns = useMemo(
-    () => chunkIntoColumns(legendItems, 4),
-    [legendItems],
-  );
+  // In fullscreen always stack vertically (donut top, legend bottom)
+  const isHorizontal = !isFullScreenOverride && orientation === 'horizontal';
+  const legendColumns = useMemo(() => chunkIntoColumns(legendItems, 4), [legendItems]);
 
   /**
    * optimalStart: the optimal starting angle for the first segment of the donut chart, which is calculated to minimize visual imbalance. If the shapeConfig does not specify an offset, the findOptimalStartAngle function is used to determine the best starting angle based on the distribution of the data segments. This helps to ensure that the chart is visually balanced and that segments are distributed in a way that enhances readability and aesthetics.
    */
   const optimalStart = useMemo(
-    () =>
-      shapeConfig?.offset === undefined
-        ? findOptimalStartAngle(normalizedData, resolvedPadAngle)
-        : null,
+    () => (shapeConfig?.offset === undefined ? findOptimalStartAngle(normalizedData, resolvedPadAngle) : null),
     [normalizedData, resolvedPadAngle, shapeConfig?.offset],
   );
 
   /**
    * startAngleRad: the starting angle for the pie generator, which is determined based on either the optimal starting angle calculated from the data or a specified offset from the shapeConfig. This angle is crucial for the correct rendering of the donut chart, as it sets the initial position of the first segment and influences the overall layout and balance of the chart.
    */
-  const startAngleRad =
-    optimalStart !== null ? optimalStart : degToRad(shapeConfig?.offset ?? 0);
+  const startAngleRad = optimalStart !== null ? optimalStart : degToRad(shapeConfig?.offset ?? 0);
 
   /**
    * D3 Generators
     - pieGenerator: creates the data structure for the arcs based on the input data and configuration
    */
   const pieGenerator = pie<DonutDataSegment>()
-    .value((d) => d.value)
+    .value(d => d.value)
     .sort(null)
     .padAngle(shapeConfig?.padAngle || 0.04)
     .startAngle(startAngleRad)
@@ -305,8 +285,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
   const insideSquarePadding = useMemo(() => {
     // need to calculate the padding such that the inner circle inscribed in the square
     const offset = innerRadius - innerRadius / Math.sqrt(2);
-    const strokeWidth =
-      shapeConfig?.strokeWidth || SEGMENTED_DONUT_STROKE_WIDTH;
+    const strokeWidth = shapeConfig?.strokeWidth || SEGMENTED_DONUT_STROKE_WIDTH;
 
     const padding = offset + strokeWidth;
     return padding;
@@ -324,10 +303,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
     return unit;
   }
 
-  function findOptimalStartAngle(
-    data: DonutDataSegment[],
-    padAngle: number,
-  ): number {
+  function findOptimalStartAngle(data: DonutDataSegment[], padAngle: number): number {
     const n = data.length;
     const total = data.reduce((s, d) => s + Math.abs(d.value), 0);
     if (!total || !n) return 0;
@@ -378,7 +354,7 @@ export function CalloutDonut(props: CalloutDonutProps) {
           d={path!}
           fill={segment.color}
           className="cursor-pointer"
-          onMouseMove={(e) => handleMouseMove(e, segment)}
+          onMouseMove={e => handleMouseMove(e, segment)}
           onMouseLeave={handleMouseLeave}
         />
       </g>
@@ -403,10 +379,9 @@ export function CalloutDonut(props: CalloutDonutProps) {
         </Text>
         <div className="mt-2 flex flex-col gap-1">
           <Text variant="12M" className="text-text-secondary!">
-            Periods:{" "}
-            <span className="font-InterMedium text-text-primary">{value}</span>
+            Periods: <span className="font-InterMedium text-text-primary">{value}</span>
           </Text>
-          <Text variant="12M" style={{ color }}>
+          <Text variant="12M" style={{color}}>
             Share: {Math.abs(percentage).toFixed(1)}%
           </Text>
         </div>
@@ -418,39 +393,35 @@ export function CalloutDonut(props: CalloutDonutProps) {
     <div
       ref={chartRef}
       className={cn(
-        "bg-white px-12 py-6 flex flex-col gap-4 border border-border rounded-md",
+        'bg-white px-6 lg:px-12 py-6 flex flex-col gap-4 border border-border rounded-md',
+        isFullScreenOverride && 'flex-1 max-[1025px]:flex-none',
         className,
-      )}
-    >
-      <div className={cn("justify-between flex gap-6", headerClassName)}>
+      )}>
+      <div className={cn('justify-between flex gap-6', headerClassName)}>
         {title && <Text variant="h4">{title}</Text>}
         {!isLoading && (
-          <div
-            className={cn(
-              "gap-4 flex items-center chart-actions",
-              actionWrapperClassName,
-            )}
-          >
+          <div className={cn('gap-4 flex items-center shrink-0 flex-nowrap chart-actions', actionWrapperClassName)}>
+            {customActions}
             <IconButton
               name="download"
-              size={20}
-              className="hover:bg-primary-tint-2! cursor-pointer"
+              size={16}
+              className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
               onClick={handleDownLoad}
             />
             {!isFullScreenOverride ? (
               <IconButton
                 name="maximize"
-                size={20}
-                className="hover:bg-primary-tint-2! cursor-pointer"
+                size={16}
+                className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={isFullScreenOverride ? undefined : onMaximize}
               />
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
-                className="hover:bg-primary-tint-2! cursor-pointer"
+                size={16}
+                className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}
               />
@@ -467,30 +438,22 @@ export function CalloutDonut(props: CalloutDonutProps) {
             size={size}
             radius={radius}
             innerRadius={innerRadius}
-            segmentRadius={
-              shapeConfig?.segmentRadius || SEGMENTED_DONUT_SEGMENT_RADIUS
-            }
+            segmentRadius={shapeConfig?.segmentRadius || SEGMENTED_DONUT_SEGMENT_RADIUS}
           />
-        }
-      >
+        }>
         <div
           className={cn(
-            "flex w-full gap-8",
-            isHorizontal
-              ? "flex-row items-center justify-evenly"
-              : "flex-col items-center",
+            'flex w-full gap-8',
+            isFullScreenOverride && 'min-[1026px]:gap-18',
+            isHorizontal ? 'flex-row items-center justify-evenly' : 'flex-col items-center',
             chartWrapperClassName,
-          )}
-        >
+          )}>
           <div
             ref={donutWrapperRef}
-            className={cn("relative shrink-0", !isHorizontal && "mt-1")}
-            style={{ width: size, height: size }}
-          >
+            className={cn('relative shrink-0', !isHorizontal && 'mt-1')}
+            style={{width: size, height: size}}>
             <svg width={size} height={size}>
-              <g transform={`translate(${radius}, ${radius})`}>
-                {arcs.map(buildArc)}
-              </g>
+              <g transform={`translate(${radius}, ${radius})`}>{arcs.map(buildArc)}</g>
             </svg>
 
             {renderCenterContent && (
@@ -501,15 +464,11 @@ export function CalloutDonut(props: CalloutDonutProps) {
                   right: insideSquarePadding,
                   bottom: insideSquarePadding,
                 }}
-                className={cn(
-                  "absolute flex flex-col items-center justify-center",
-                  centerContentClassName,
-                )}
-              >
-                <Text variant={isFullScreenOverride ? "16M" : "caption"} className="text-text-secondary!">
-                  {centerContentLabel || "Total Periods"}
+                className={cn('absolute flex flex-col items-center justify-center', centerContentClassName)}>
+                <Text variant={isFullScreenOverride ? '16M' : 'caption'} className="text-text-secondary!">
+                  {centerContentLabel || 'Total Periods'}
                 </Text>
-                <Text variant={isFullScreenOverride ? "h2" : "h3"}>{total}</Text>
+                <Text variant={isFullScreenOverride ? 'h2' : 'h3'}>{total}</Text>
 
                 {centerContentChildren && (
                   <>
@@ -526,26 +485,20 @@ export function CalloutDonut(props: CalloutDonutProps) {
                 style={{
                   left: tooltip.x,
                   top: tooltip.y,
-                  transform: "translate(-50%, -120%)",
-                }}
-              >
+                  transform: 'translate(-50%, -120%)',
+                }}>
                 {tooltipRenderer ? (
                   tooltipRenderer({
                     label: tooltip.data.label,
                     value: tooltip.data.value,
-                    percentage:
-                      tooltip.data.percentage ??
-                      (total > 0 ? (tooltip.data.value / total) * 100 : 0),
+                    percentage: tooltip.data.percentage ?? (total > 0 ? (tooltip.data.value / total) * 100 : 0),
                     color: tooltip.data.color,
                   })
                 ) : (
                   <DefaultTooltip
                     label={tooltip.data.label}
                     value={tooltip.data.value}
-                    percentage={
-                      tooltip.data.percentage ??
-                      (total > 0 ? (tooltip.data.value / total) * 100 : 0)
-                    }
+                    percentage={tooltip.data.percentage ?? (total > 0 ? (tooltip.data.value / total) * 100 : 0)}
                     color={tooltip.data.color}
                   />
                 )}
@@ -553,37 +506,34 @@ export function CalloutDonut(props: CalloutDonutProps) {
             )}
           </div>
 
-          <div className={cn('shrink-0',legendWrapperClassName)}>
+          <div className={cn('shrink-0', isFullScreenOverride && 'w-full', legendWrapperClassName)}>
             {legendRenderer ? (
-              legendRenderer(legendItems)
+              legendRenderer(legendItems, isFullScreenOverride)
+            ) : isFullScreenOverride ? (
+              <div className="w-full flex flex-wrap gap-x-8 gap-y-8 pt-2 min-[1026px]:pl-10">
+                {legendItems.map(item => (
+                  <CalloutDonutLegendItem
+                    {...item}
+                    key={item.label}
+                    className={cn('w-[calc(20%-1.6rem)] min-w-0! shrink-0', legendItemClassName)}
+                  />
+                ))}
+              </div>
             ) : (
               <div
                 className={cn(
-                  "flex w-full",
-                  isHorizontal
-                    ? "gap-8 justify-start"
-                    : "flex-wrap items-start justify-between gap-x-20 gap-y-8 pt-2",
-                )}
-              >
+                  'flex w-full',
+                  isHorizontal ? 'gap-8 justify-start' : 'flex-wrap items-start justify-between gap-x-20 gap-y-8 pt-2',
+                )}>
                 {isHorizontal
                   ? legendColumns.map((column, columnIndex) => (
-                      <div
-                        key={columnIndex}
-                        className={cn(
-                          "flex flex-col gap-10",
-                          legendColumnClassName,
-                        )}
-                      >
-                        {column.map((item) => (
-                          <CalloutDonutLegendItem
-                            className={legendItemClassName}
-                            {...item}
-                            key={item.label}
-                          />
+                      <div key={columnIndex} className={cn('flex flex-col gap-10', legendColumnClassName)}>
+                        {column.map(item => (
+                          <CalloutDonutLegendItem className={legendItemClassName} {...item} key={item.label} />
                         ))}
                       </div>
                     ))
-                  : legendItems.map((item) => (
+                  : legendItems.map(item => (
                       <CalloutDonutLegendItem
                         className={cn('min-w-fit!', legendItemClassName)}
                         {...item}
@@ -603,16 +553,10 @@ export interface CalloutDonutLegendItemProps extends CalloutDonutLegendItem {
   className?: string;
 }
 export function CalloutDonutLegendItem(props: CalloutDonutLegendItemProps) {
-  const { color, label, value, className } = props;
+  const {color, label, value, className} = props;
   return (
-    <div
-      key={label}
-      className={cn("flex min-w-42.5 items-center gap-3", className)}
-    >
-      <span
-        className="h-10 w-1.5 shrink-0 rounded-r-lg"
-        style={{ backgroundColor: color }}
-      />
+    <div key={label} className={cn('flex min-[1025px]:min-w-42.5 min-w-fit items-center gap-3', className)}>
+      <span className="h-10 w-1.5 shrink-0 rounded-r-lg" style={{backgroundColor: color}} />
       <div className="flex flex-col gap-0.5">
         <Text variant="14M" className="text-text-primary! leading-none">
           {label}

@@ -1,3 +1,5 @@
+from typing import Optional
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -20,6 +22,7 @@ class BessDGService:
         payload: BessDgSizingPayload,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         stmt = (
             select(Simulation)
@@ -81,9 +84,12 @@ class BessDGService:
             simulation_id=simulation_id,
             to=SimulationSetupProgress.BESS_DG_CONFIG,
             db=bess_db,
+            commit=False,
         )
 
-        await depreciate_simulation_job(simulation_id=simulation_id, db=bess_db)
+        await depreciate_simulation_job(
+            simulation_id=simulation_id, db=bess_db, commit=False
+        )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
@@ -95,6 +101,7 @@ class BessDGService:
             after=after_config,
             remove_id=True,
             sim_module_type=SimulationLogStep.SIZING_CONFIGURATION,
+            redis=redis,
         )
 
         await bess_db.commit()

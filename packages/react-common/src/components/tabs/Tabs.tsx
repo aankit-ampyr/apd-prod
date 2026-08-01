@@ -30,6 +30,7 @@ interface TabsProps {
   tabButtonClassName?: string;
   activeTabButtonClassName?: string;
   activeTabIndicator?: string;
+  onChange?: (activeTab: string) => void;
 }
 
 interface ScreenProps extends PropsWithChildren {
@@ -45,6 +46,7 @@ const TabsRoot: React.FC<TabsProps> = ({
   tabButtonClassName,
   activeTabButtonClassName,
   activeTabIndicator,
+  onChange,
 }) => {
   // extract screens
   const screens = useMemo(() => {
@@ -72,7 +74,10 @@ const TabsRoot: React.FC<TabsProps> = ({
             return (
               <button
                 key={screen.props.name}
-                onClick={() => setActive(screen.props.name)}
+                onClick={() => {
+                  setActive(screen.props.name);
+                  onChange?.(screen.props.name);
+                }}
                 className={cn(
                   "relative shrink-0 pb-3 cursor-pointer text-lg transition-colors text-[16px] leading-[24px]",
                   isActive

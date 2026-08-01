@@ -4,7 +4,7 @@ from taskiq import TaskiqEvents
 from taskiq_redis import RedisAsyncResultBackend, RedisStreamBroker
 
 from config import REDIS_URL, BESS_DATABASE_URL
-from db.db_config import create_engine
+from db.db_config import create_engine_worker
 
 result_backend = RedisAsyncResultBackend(
     redis_url=REDIS_URL,
@@ -14,6 +14,7 @@ result_backend = RedisAsyncResultBackend(
 # We pass decode_responses=True here; it will be used by the underlying redis-py client
 broker = RedisStreamBroker(
     url=REDIS_URL,
+    queue_name="simulation_tasks",
     idle_timeout=3600000,
     unacknowledged_lock_timeout=3600000,
     socket_timeout=60,
@@ -28,7 +29,7 @@ async def setup_worker_state(state):
     state.redis_pool = redis.ConnectionPool.from_url(REDIS_URL, decode_responses=True)
 
     # Create a process-local DB engine and session factory
-    state.db_engine = create_engine(BESS_DATABASE_URL)
+    state.db_engine = create_engine_worker(BESS_DATABASE_URL)
     state.db_session_factory = async_sessionmaker(
         state.db_engine, expire_on_commit=False
     )

@@ -1,7 +1,5 @@
 {
-  "python.analysis.extraPaths": [
-    "./packages/python-common"
-  ],
+  "python.analysis.extraPaths": ["./packages/python-common"],
   "workbench.editorAssociations": {
     "*.svg": "default"
   },
@@ -15,5 +13,8 @@
   },
   "[typescript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[python]": {
+    "editor.defaultFormatter": "ms-python.black-formatter"
   }
 }

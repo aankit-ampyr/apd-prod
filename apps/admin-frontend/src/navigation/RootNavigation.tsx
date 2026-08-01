@@ -1,11 +1,14 @@
 import {BrowserRouter, Navigate, Route, Routes, useNavigate} from 'react-router-dom';
-import {AuditLog, Settings, UserManagement, LoginScreen, OTPVerificationScreen} from '@/screens';
+import {AuditLog, UserManagement, LoginScreen, OTPVerificationScreen, NotFound} from '@/screens';
 import {Routes as WebRoutes} from './Routes';
 import {DashboardLayout} from '@/components';
 import {useDispatch, useSelector} from 'react-redux';
 import {authStatus, authSuccessStatus} from '@/services/redux/selectors';
 import {useEffect} from 'react';
 import {resetAuthMessage} from '@/services/redux/slice';
+import {useRole} from '@/hooks';
+
+const getLandingRoute = (isSuperAdmin: boolean) => (isSuperAdmin ? WebRoutes.USER_MANAGEMENT : WebRoutes.LOGIN);
 
 export function RootNavigator() {
   return (
@@ -20,6 +23,7 @@ export function RoutesWrapper() {
   const isAuthenticated = useSelector(authStatus);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const {isSuperAdmin} = useRole();
   useEffect(() => {
     if (authSuccessState) {
       // S-10017: OTP sent successfully - navigate to OTP verification screen
@@ -30,10 +34,10 @@ export function RoutesWrapper() {
       // S-10018: OTP verified successfully - navigate to dashboard
       if (authSuccessState === 'S-10018') {
         dispatch(resetAuthMessage());
-        navigate(WebRoutes.USER_MANAGEMENT);
+        navigate(getLandingRoute(isSuperAdmin));
       }
     }
-  }, [authSuccessState, navigate, dispatch]);
+  }, [authSuccessState, navigate, dispatch, isSuperAdmin]);
 
   // Public routes for unauthenticated users
   if (!isAuthenticated) {
@@ -49,17 +53,20 @@ export function RoutesWrapper() {
   return (
     <Routes>
       <Route element={<DashboardLayout />}>
+        <Route path={WebRoutes.INDEX} element={<Navigate to={getLandingRoute(isSuperAdmin)} replace />} />
+        <Route path={WebRoutes.LOGIN} element={<Navigate to={getLandingRoute(isSuperAdmin)} replace />} />
+        <Route path={WebRoutes.OTP_VERIFICATION} element={<Navigate to={getLandingRoute(isSuperAdmin)} replace />} />
         <Route path={WebRoutes.USER_MANAGEMENT} element={<UserManagement />} />
         <Route path={WebRoutes.AUDIT_LOG} element={<AuditLog />} />
-        <Route path="*" element={<Navigate to={WebRoutes.USER_MANAGEMENT} />} />
       </Route>
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 }
 
 export function Root() {
   const isAuthenticated = useSelector(authStatus);
-  const initailRoute = WebRoutes.USER_MANAGEMENT;
+  const {isSuperAdmin} = useRole();
 
-  return isAuthenticated ? <Navigate to={initailRoute} /> : <Navigate to={WebRoutes.LOGIN} />;
+  return isAuthenticated ? <Navigate to={getLandingRoute(isSuperAdmin)} /> : <Navigate to={WebRoutes.LOGIN} />;
 }

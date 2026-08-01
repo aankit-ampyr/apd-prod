@@ -2,7 +2,7 @@ import {createBrowserRouter, Navigate, Outlet, RouterProvider, useLocation, useN
 import {
   AssetManagement,
   AuditLog,
-  DigestManagement,
+  // DigestManagement,
   Help,
   Organizations,
   SettingsScreen,
@@ -20,10 +20,11 @@ import {Routes as WebRoutes} from './Routes';
 import {DashboardLayout} from '@/components';
 import {useDispatch, useSelector} from 'react-redux';
 import {authStatus, authSuccessStatus} from '@/services/redux/selectors';
-import {useEffect} from 'react';
-import {resetAssetFileUploadError, resetAuthMessage, resetCurrentSelectedAsset} from '@/services/redux/slice';
+import {useEffect, useRef} from 'react';
+import {resetAssetFileUploadError, resetAuthMessage, resetCurrentSelectedAsset, setPendingDeepLink} from '@/services/redux/slice';
 import {useLandingRoute, useRole, useRouteLeave, useScreenOverride} from '@/hooks';
 import {toast} from 'sonner';
+import {CommentModule} from '@/constants';
 
 const ProtectedRoute = () => {
   const isAuthenticated = useSelector(authStatus);
@@ -34,8 +35,17 @@ const ProtectedRoute = () => {
 const PublicRoute = () => {
   const isAuthenticated = useSelector(authStatus);
   const defaultRoute = useLandingRoute();
+  const pendingDeepLink = useSelector((state: any) => state.notification.pendingDeepLink);
 
-  return isAuthenticated ? <Navigate to={defaultRoute} replace /> : <Outlet />;
+  if (isAuthenticated) {
+    if (pendingDeepLink) {
+      // Yield to AppLayout's deep link routing
+      return null;
+    }
+    return <Navigate to={defaultRoute} replace />;
+  }
+
+  return <Outlet />;
 };
 
 export const router = createBrowserRouter([
@@ -72,7 +82,7 @@ export const router = createBrowserRouter([
               {path: WebRoutes.VIEW_ASSET_ONBOARDING, element: <OnboardAssetScreen key={'VIEW_ASSET_ONBOARDING'} />},
               {path: WebRoutes.VIEW_ASSET, element: <OnboardAssetScreen key={'VIEW_ASSET'} />},
               {path: WebRoutes.VIEW_ASSET_ANALYSIS, element: <AssetAnalysis key={'integrated'} />},
-              {path: WebRoutes.DIGEST_MANAGEMENT, element: <DigestManagement />},
+              // {path: WebRoutes.DIGEST_MANAGEMENT, element: <DigestManagement />},
               {path: WebRoutes.AUDIT_LOG, element: <AuditLog />},
               {path: WebRoutes.HELP, element: <Help />},
               {path: WebRoutes.SETTINGS, element: <SettingsScreen />},
@@ -104,8 +114,38 @@ export function AppLayout() {
   const location = useLocation();
   const dispatch = useDispatch();
   const {hide} = useScreenOverride();
+  const pendingDeepLink = useSelector((state: any) => state.notification.pendingDeepLink);
 
   const {isManagement, isAnalyst} = useRole();
+  const isAuthenticated = useSelector(authStatus);
+
+  // Intercept deepLink synchronously before router redirects wipe it out
+  const deepLinkRef = useRef<string | null>(null);
+  if (deepLinkRef.current === null) {
+    const searchParams = new URLSearchParams(window.location.search);
+    deepLinkRef.current = searchParams.get('deepLink') || '';
+  }
+
+  useEffect(() => {
+    if (deepLinkRef.current) {
+      try {
+        const decodedString = atob(deepLinkRef.current);
+        const decodedMeta = JSON.parse(decodedString);
+        
+        dispatch(setPendingDeepLink(decodedMeta));
+
+        if (window.location.search.includes('deepLink=')) {
+          const searchParams = new URLSearchParams(window.location.search);
+          searchParams.delete('deepLink');
+          const newUrl = `${window.location.pathname}${searchParams.toString() ? '?' + searchParams.toString() : ''}`;
+          window.history.replaceState({}, '', newUrl);
+        }
+      } catch (e) {
+        console.error("Failed to parse deep link", e);
+      }
+    }
+  }, [dispatch]);
+
   const initailRoute = () => {
     if (isManagement) {
       return WebRoutes.VIEW_ANALYSIS;
@@ -126,7 +166,9 @@ export function AppLayout() {
       // S-10018: OTP verified successfully - navigate to dashboard
       if (authSuccessState === 'S-10018') {
         dispatch(resetAuthMessage());
-        navigate(initailRoute());
+        if (!pendingDeepLink) {
+          navigate(initailRoute());
+        }
       }
 
       // user logged out successfully
@@ -134,17 +176,38 @@ export function AppLayout() {
         navigate(WebRoutes.LOGIN);
       }
     }
-  }, [authSuccessState, navigate, dispatch]);
+  }, [authSuccessState, navigate, dispatch, pendingDeepLink]);
 
   // hide override when navigation changes
   useEffect(() => {
     hide();
   }, [hide, location.key]);
 
-  // Clear stale toasts when moving to a different route.
+
+
   useEffect(() => {
-    toast.dismiss();
-  }, [location.key]);
+    if (isAuthenticated && pendingDeepLink && pendingDeepLink.context_module) {
+      switch (pendingDeepLink.context_module) {
+        case CommentModule.ViewAnalysis:
+          navigate(WebRoutes.VIEW_ANALYSIS);
+          break;
+        case CommentModule.BenchmarkAnalysis:
+          navigate(WebRoutes.VIEW_BENCHMARK);
+          break;
+        case CommentModule.ExecutiveAnalysis:
+          if (isAnalyst) {
+            dispatch(setPendingDeepLink(null));
+            toast.error('You do not have access to Executive Analysis.');
+            break;
+          }
+          navigate(WebRoutes.EXECUTIVE_ANALYSIS);
+          break;
+        case CommentModule.InvoiceAnalysis:
+          navigate(WebRoutes.INVOICE_ANALYSIS);
+          break;
+      }
+    }
+  }, [pendingDeepLink, navigate, isAuthenticated, isAnalyst, dispatch]);
 
   // reset currentSelectedAsset, also its file upload error when go back to another screen other than asset onboard
   useRouteLeave(WebRoutes.VIEW_ASSET_ONBOARDING, () => {
@@ -191,7 +254,5 @@ export function Root() {
 function AuthAwareFallback() {
   const isAuthenticated = useSelector(authStatus);
 
-  return isAuthenticated
-    ? <NotFound />
-    : <Navigate to={WebRoutes.LOGIN} replace />;
-};
+  return isAuthenticated ? <NotFound /> : <Navigate to={WebRoutes.LOGIN} replace />;
+}

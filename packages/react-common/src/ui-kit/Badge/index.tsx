@@ -112,6 +112,10 @@ const badgeStyles = tv({
         text: "text-[#F97316]!",
         base: "bg-[#FFF7ED]",
       },
+      olive: {
+        text: "text-[#63A625]!",
+        base: "bg-[#EDFFE6]",
+      }
     },
   },
   defaultVariants: {

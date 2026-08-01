@@ -4,9 +4,11 @@ Uses BESS DB for projects; fetches user details from User DB when needed.
 """
 
 from datetime import datetime, time
+import json
 from math import ceil
 from os import stat
 from typing import Optional, Set
+from redis.asyncio import Redis
 from sqlalchemy import func, or_, select, Date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
@@ -110,6 +112,7 @@ class ProjectService:
         bess_db: AsyncSession,
         user_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         try:
             existing_project = await bess_db.execute(
@@ -242,6 +245,7 @@ class ProjectService:
                 resource_id=new_project.proj_id,
                 before=None,
                 after=f"Project Created: {new_project.name}",
+                redis=redis,
             )
 
             await bess_db.commit()
@@ -278,6 +282,7 @@ class ProjectService:
         bess_db: AsyncSession,
         user_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         try:
             # Re-fetch with assignments pre-loaded for update and response mapping
@@ -538,6 +543,7 @@ class ProjectService:
                     resource_id=project_proj_id,
                     before=reassignment_before,
                     after=reassignment_after,
+                    redis=redis,
                 )
 
             if before_changes:
@@ -550,6 +556,7 @@ class ProjectService:
                     resource_id=project_proj_id,
                     before=before_str,
                     after=after_str,
+                    redis=redis,
                 )
 
             await bess_db.commit()
@@ -585,6 +592,7 @@ class ProjectService:
         project_id: int,
         new_user_id: int,
         current_user: dict,
+        redis: Redis,
     ):
         """
         Reassign project responsibility to another user.
@@ -691,6 +699,7 @@ class ProjectService:
                     else f"Responsible User: {previous_owner_id}"
                 ),
                 after=f"Responsible User: {new_user.name}",
+                redis=redis,
             )
 
             await bess_db.commit()
@@ -878,6 +887,7 @@ class ProjectService:
         project_id: int,
         bess_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         project_request = await bess_db.execute(
             select(Project).where(Project.id == project_id)
@@ -922,6 +932,7 @@ class ProjectService:
             resource_id=project_data.proj_id,
             before=f"Project Name: {project_data.name}",
             after="Project: Deleted",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -932,6 +943,7 @@ class ProjectService:
         project_id: int,
         bess_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         project_request = await bess_db.execute(
             select(Project).where(Project.id == project_id)
@@ -978,6 +990,7 @@ class ProjectService:
             resource_id=project_data.proj_id,
             before=f"Project is {past_project_status.name.capitalize()}",
             after=f"Project is {new_status.capitalize()}",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -988,6 +1001,7 @@ class ProjectService:
         project_id: int,
         bess_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         project_request = await bess_db.execute(
             select(Project).where(Project.id == project_id)
@@ -1041,6 +1055,7 @@ class ProjectService:
             resource_id=project_data.proj_id,
             before=f"Project is {past_project_status.name.capitalize()}",
             after=f"Project is {new_status.capitalize()}",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -1051,6 +1066,7 @@ class ProjectService:
         project_id: int,
         bess_db: AsyncSession,
         current_user: dict,
+        redis: Redis,
     ):
         project_request = await bess_db.execute(
             select(Project).where(Project.id == project_id)
@@ -1103,6 +1119,7 @@ class ProjectService:
             resource_id=project_data.proj_id,
             before=f"Project is {past_project_status.name.capitalize()}",
             after=f"Project is {new_status.capitalize()}",
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -1254,7 +1271,7 @@ class ProjectService:
             return Res.error("E-20001")
 
     async def initiate_simulation(
-        self, bess_db: AsyncSession, project_id: int, current_user: dict
+        self, bess_db: AsyncSession, project_id: int, current_user: dict, redis: Redis
     ):
         try:
             project_query = await bess_db.execute(
@@ -1287,7 +1304,7 @@ class ProjectService:
 
             if not is_authorized:
                 return Res.error(
-                    "E-20004", message="Not authorized to perform the action."
+                    "E-20004", message="Not authorized to perform the action.", http_status_code=http_status.HTTP_403_FORBIDDEN
                 )
 
             count = getattr(sequence, "simulation_count") if sequence else 0
@@ -1325,11 +1342,16 @@ class ProjectService:
                 resource_id=project.proj_id,
                 before=None,
                 after=str(
-                    {
-                        "Simulation ID": new_sim.sim_id,
-                        "Simulation Name": new_sim.name,
-                    }
+                    json.dumps(
+                        {
+                            "SIMULATION INFO...": {
+                                "Simulation ID": new_sim.sim_id,
+                                "Simulation Name": new_sim.name,
+                            }
+                        }
+                    )
                 ),
+                redis=redis,
             )
 
             await bess_db.commit()

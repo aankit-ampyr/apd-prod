@@ -15,6 +15,7 @@ interface CorrelationMatrixProps {
   className?: string;
   isLoading?: boolean;
   downloadFileName?: string;
+  customActions?: React.ReactNode;
 }
 
 type ColorAndLabel = {
@@ -117,6 +118,7 @@ export function CorrelationMatrix(props: CorrelationMatrixProps) {
     className,
     isLoading = false,
     downloadFileName = "correlation_matrix.png",
+    customActions,
   } = props;
 
   /**
@@ -201,15 +203,18 @@ export function CorrelationMatrix(props: CorrelationMatrixProps) {
         className,
       )}
     >
-      {!isLoading && downloadFileName && (
-        <div className="flex justify-end chart-actions -translate-y-2">
-          <IconButton
-            name="download"
-            size={20}
-            className="hover:bg-primary-tint-2! cursor-pointer"
-            iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-            onClick={handleDownLoad}
-          />
+      {!isLoading && (
+        <div className="flex justify-end gap-3 items-center shrink-0 flex-nowrap chart-actions -translate-y-2">
+          {customActions}
+          {downloadFileName && (
+            <IconButton
+              name="download"
+              size={16}
+              className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
+              onClick={handleDownLoad}
+            />
+          )}
         </div>
       )}
       <div

@@ -10,6 +10,7 @@ from constants.enums import (
     APDAuditLogModules as AuditLogModules,
 )
 from utils.log_utils import audit_logs
+from redis.asyncio import Redis
 from python_common.utils import paginate
 from utils.mail_utils import MailUtils
 from utils.template_utils import template_utils
@@ -86,6 +87,7 @@ class UserService:
                 return Res.error(
                     "E-10013",
                     message="Admins must have access to at least AMD platform",
+                    http_status_code=403,
                 )
             query = query.where(
                 User.platform.overlap([Platform.AMD]), User.id != current_user.get("id")
@@ -144,8 +146,8 @@ class UserService:
 
         if total_results == 0:
             if filter_applied:
-                return Res.error("E-10015", message="No records match applied filters")
-            return Res.error("E-10014", message="No records match filter")
+                return Res.error("E-10015", message="No records match applied filters", http_status_code=404)
+            return Res.error("E-10014", message="No records match filter", http_status_code=404)
 
         # Fetch all UserOrganization mappings for these users
         user_ids = [user.id for user in users]
@@ -195,6 +197,7 @@ class UserService:
     async def assign_organization(
         self,
         db,
+        redis: Redis,
         current_user,
         user_db,
         user_id,
@@ -207,7 +210,7 @@ class UserService:
         )
         user = result.scalar_one_or_none()
         if not user:
-            return Res.error("E-10022", message="User not found")
+            return Res.error("E-10022", message="User not found", http_status_code=404)
 
         old_org = await db.execute(
             select(Organization)
@@ -219,7 +222,7 @@ class UserService:
         # Check organization
         org = await db.get(Organization, payload.organization_id)
         if not org or not org.status:
-            return Res.error("E-10021", message="Organization not active")
+            return Res.error("E-10021", message="Organization not active", http_status_code=409)
 
         # Check if mapping exists
         mapping_query = select(UserOrganization).where(
@@ -241,6 +244,7 @@ class UserService:
 
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=AuditLogModules.USER_MANAGEMENT.value,
@@ -254,6 +258,7 @@ class UserService:
             mapping.organization_id = org_id
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=AuditLogModules.USER_MANAGEMENT.value,

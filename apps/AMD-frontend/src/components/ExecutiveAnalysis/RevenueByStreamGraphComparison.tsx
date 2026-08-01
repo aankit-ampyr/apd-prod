@@ -20,6 +20,7 @@ interface RevenueByStreamGraphComparisonProps {
   className?: string;
   isFullScreenOverride?: boolean;
   downloadFileName?: string;
+  customActions?: React.ReactNode;
 }
 export function RevenueByStreamGraphComparison(props: RevenueByStreamGraphComparisonProps) {
   const {
@@ -28,6 +29,7 @@ export function RevenueByStreamGraphComparison(props: RevenueByStreamGraphCompar
     year,
     className,
     downloadFileName='',
+    customActions,
   } = props;
 
   /**
@@ -127,6 +129,7 @@ export function RevenueByStreamGraphComparison(props: RevenueByStreamGraphCompar
       className={className}
       showValues
       isLoading={loading}
+      customActions={customActions}
       positiveBarColor="#1EC590"
       negativeBarColor="#D64545"
       yAxisTickFormtter={v => formatNumber(Number(v))}

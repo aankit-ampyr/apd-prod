@@ -1,7 +1,7 @@
-import { AssetMarketAnalytics, DataTableColumn } from "@/interface";
-import { AnalyticsTable } from "../../../common";
-import { downloadAssetBestMarketsAnalysis } from "@/services/api";
-import { IconButton, Text } from "@/ui-kits";
+import {AssetMarketAnalytics, DataTableColumn} from '@/interface';
+import {AnalyticsTable} from '../../../common';
+import {downloadAssetBestMarketsAnalysis} from '@/services/api';
+import {IconButton, Text} from '@/ui-kits';
 
 type BestMarketRow = NonNullable<AssetMarketAnalytics['best_markets']['buying_markets']>[number];
 
@@ -15,10 +15,11 @@ interface BestMarketsTableProps {
   month?: number;
   year?: number;
   assetSystemGenerationId?: string;
+  customActions?: React.ReactNode;
 }
 
 export function BestMarketsTable(props: BestMarketsTableProps) {
-  const {title, rows, columns, loading, marketType, assetId, month, year, assetSystemGenerationId} = props;
+  const {title, rows, columns, loading, marketType, assetId, month, year, assetSystemGenerationId, customActions} = props;
   // ====================
   // states
   // ====================
@@ -54,13 +55,17 @@ export function BestMarketsTable(props: BestMarketsTableProps) {
           <Text variant="h4" className="text-text-primary! font-InterRegular!">
             {title}
           </Text>
-          <IconButton
-            name="download"
-            onClick={handleDownload}
-            disabled={loading || displayRows.length === 0}
-            className="hover:bg-primary-tint-2! cursor-pointer"
-            iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
-          />
+          <div className="flex items-center shrink-0 flex-nowrap gap-3">
+            {customActions}
+            <IconButton
+              name="download"
+              onClick={handleDownload}
+              disabled={loading || displayRows.length === 0}
+              size={16}
+              className="hover:bg-primary-tint-2! cursor-pointer charts-action"
+              iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1! "
+            />
+          </div>
         </div>
       }
       titleContainerClassName="px-5 py-4"

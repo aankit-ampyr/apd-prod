@@ -49,6 +49,10 @@ DB_POOL_PRE_PING = eval(getenv("DB_POOL_PRE_PING"))
 DB_POOL_RECYCLE = int(getenv("DB_POOL_RECYCLE"))
 DB_POOL_TIMEOUT = int(getenv("DB_POOL_TIMEOUT"))
 
+# Worker DB pool
+WORKER_DB_POOL_SIZE = int(getenv("WORKER_DB_POOL_SIZE"))
+WORKER_DB_MAX_OVERFLOW = int(getenv("WORKER_DB_MAX_OVERFLOW"))
+
 # Allowed Origins
 ALLOWED_ORIGINS = getenv("ALLOWED_ORIGINS").split(",")
 

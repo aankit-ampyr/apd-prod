@@ -60,31 +60,32 @@ export const LoadChart = ({setIsStepsHidden}: Readonly<{setIsStepsHidden?: (hidd
           el = el.parentElement;
         }
       }, 50);
-    } else {
-      setIsStepsHidden?.(false);
-      setTimeout(() => {
-        const el = chartRef.current;
-        if (!el) return;
-
-        // Find the scroll container
-        let scrollContainer: HTMLElement | null = el.parentElement;
-        while (scrollContainer) {
-          const {overflow, overflowY} = window.getComputedStyle(scrollContainer);
-          if (/(auto|scroll)/.test(overflow + overflowY) && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
-            break;
-          }
-          scrollContainer = scrollContainer.parentElement;
-        }
-
-        if (scrollContainer) {
-          const chartTop = el.getBoundingClientRect().top;
-          const containerTop = scrollContainer.getBoundingClientRect().top;
-          const offset = chartTop - containerTop + scrollContainer.scrollTop;
-          const targetScroll = offset - scrollContainer.clientHeight * 0.5;
-          scrollContainer.scrollTo({top: targetScroll, behavior: 'smooth'});
-        }
-      }, 50);
     }
+    //  else {
+    //   setIsStepsHidden?.(false);
+    //   setTimeout(() => {
+    //     const el = chartRef.current;
+    //     if (!el) return;
+
+    //     // Find the scroll container
+    //     let scrollContainer: HTMLElement | null = el.parentElement;
+    //     while (scrollContainer) {
+    //       const {overflow, overflowY} = window.getComputedStyle(scrollContainer);
+    //       if (/(auto|scroll)/.test(overflow + overflowY) && scrollContainer.scrollHeight > scrollContainer.clientHeight) {
+    //         break;
+    //       }
+    //       scrollContainer = scrollContainer.parentElement;
+    //     }
+
+    //     if (scrollContainer) {
+    //       const chartTop = el.getBoundingClientRect().top;
+    //       const containerTop = scrollContainer.getBoundingClientRect().top;
+    //       const offset = chartTop - containerTop + scrollContainer.scrollTop;
+    //       const targetScroll = offset - scrollContainer.clientHeight * 0.5;
+    //       scrollContainer.scrollTo({top: targetScroll, behavior: 'smooth'});
+    //     }
+    //   }, 50);
+    // }
   }, [isFullScreen, setIsStepsHidden]);
 
   // Use actual per-hour values so each custom window keeps its own load.
@@ -216,5 +217,4 @@ export const LoadChart = ({setIsStepsHidden}: Readonly<{setIsStepsHidden?: (hidd
       </div>
     </div>
   );
-}
-
+};

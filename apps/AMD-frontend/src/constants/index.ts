@@ -4,3 +4,4 @@ export * from './defaults';
 export * from './encryption';
 export * from './enums';
 export * from './keys';
+export * from './comment';

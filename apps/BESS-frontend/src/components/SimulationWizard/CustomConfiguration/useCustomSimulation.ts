@@ -44,16 +44,13 @@ export const useCustomSimulation = ({simulationId, onSimulationCompleted}: UseCu
 
   useEffect(() => {
     const unsubscribe = subscribe(event => {
-      console.log('CUSTOM HOOK', event.resource_type, ActionType[event.action_id] || event.action_id);
-
-      // only SimulationJob socket
       if (event.resource_type !== 10) {
         return;
       }
 
-      const action = ActionType[event.action_id] || event.action_id;
+      const action = event.action_id;
 
-      if (action === 'Started' || action === ActionType.Started) {
+      if (action === Number(ActionType.Started)) {
         const resourceId = Number(event.resource_id);
 
         activeResourceIdRef.current = resourceId;
@@ -71,17 +68,7 @@ export const useCustomSimulation = ({simulationId, onSimulationCompleted}: UseCu
         return;
       }
 
-      // completed
-      // if (
-      //     action === 'Completed' ||
-      //     action === ActionType.Completed
-      // ) {
-
-      //     // show result block
-      //     onSimulationCompleted();
-      // }
-
-      if (action === 'Completed' || action === ActionType.Completed) {
+      if (action === Number(ActionType.Completed)) {
         setIsSimulationRunning(false);
         setIsSimulationLocked(false);
         setIsCustomConfigRunning(false);
@@ -144,5 +131,6 @@ export const useCustomSimulation = ({simulationId, onSimulationCompleted}: UseCu
     handleRunSimulation,
     isBlocked,
     isSimulationRunning,
+    setIsSimulationRunning,
   };
 };

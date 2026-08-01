@@ -1,5 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Computed, Index, text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Index, text
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.hybrid import hybrid_property
 from sqlalchemy.dialects.postgresql import ARRAY
 from datetime import datetime, timezone
 from python_common.constants.defaults import CONSTRAINT_NAMES
@@ -18,12 +19,23 @@ class UserMixin:
     """
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(
-        String,
-        Computed(" 'USER-' || lpad(id::text, 3, '0')", persisted=True),
-        index=True,
-    ) 
+    @hybrid_property
+    def user_id(self):
+        if self.id is None:
+            return None
+        return f"USER-{self.id:04d}"  # USER-0001, USER-1001 — no truncation
 
+    @user_id.expression
+    def user_id(cls):
+        # Used when filtering at DB level: Model.query.filter_by(invoice_id=...)
+        from sqlalchemy import func, cast
+
+        id_str = cast(cls.id, String)
+        id_len = func.length(id_str)
+        target_len = func.greatest(id_len, 4)
+
+        return func.concat("USER-", func.lpad(cast(cls.id, String), target_len, "0"))
+    
     name = Column(String, nullable=False)
     email = Column(String, index=True, nullable=False)
 

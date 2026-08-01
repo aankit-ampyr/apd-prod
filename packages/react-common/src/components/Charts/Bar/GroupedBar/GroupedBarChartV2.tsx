@@ -58,6 +58,7 @@ export type GroupedBarDataPoint = {
   categoryId: string | number;
   label: string;
   values: Record<string, number>;
+  commentCounts?: Record<string, number>;
 };
 
 interface GroupedBarChartV2Props {
@@ -65,9 +66,14 @@ interface GroupedBarChartV2Props {
   isFullScreenOverride?: boolean;
   enableHorizontalScroll?: boolean;
   showLegends?: boolean;
+  barRoomWidth?: number;
+  customActions?: React.ReactNode;
   showTooltip?: boolean;
+  tooltipInteractionMode?: "hover" | "item";
   className?: string;
   header?: string | React.ReactNode;
+  headerNote?: React.ReactNode;
+  onBadgeClick?: (categoryId: string | number, seriesId: string) => void;
   isLoading?: boolean;
   data: GroupedBarDataPoint[];
   series: GroupedBarSeries[];
@@ -109,14 +115,17 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     isLoading = false,
     className,
     header,
+    headerNote,
+    onBadgeClick,
     data,
     series,
     barCategoryGap,
     barGap,
     customTooltipRenderer,
-    formatXAxisTick,
+    formatXAxisTick = (value) => String(value),
     showLegends,
     showTooltip,
+    tooltipInteractionMode = "hover",
     showValues,
     xAxisLabel,
     yAxisLabel,
@@ -130,6 +139,9 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     sepYChartMargins,
     barValueLabelFomatter,
     barValueLabelProps,
+    barRoomWidth = 35,
+    customActions,
+    formatYAxisTick = (value) => String(value),
   } = props;
 
   /**
@@ -153,6 +165,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
   const [hoveredBar, setHoveredBar] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const chartHostRef = useRef<HTMLDivElement | null>(null);
+  const innerChartRef = useRef<HTMLDivElement | null>(null);
 
   /**
    * ====================================
@@ -162,6 +175,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
   const chartData = useMemo(
     () =>
       data.map((item) => ({
+        ...item,
         label: item.label,
         ...item.values,
       })),
@@ -178,14 +192,64 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
    * Reusable UI
    * ====================================
    */
-  const barSeries = series.map((seriesItem) => (
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    left: number;
+    top: number;
+    data: GroupedBarTooltipData;
+  } | null>(null);
+  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showBarTooltip = (
+    event: React.MouseEvent<SVGRectElement>,
+    tooltipData: GroupedBarTooltipData,
+  ) => {
+    if (tooltipInteractionMode !== "item") return;
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+      tooltipTimeout.current = null;
+    }
+    // Use the inner relative div as the reference — this stays correct even when chart is scrolled
+    const containerRect = innerChartRef.current?.getBoundingClientRect();
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    if (!containerRect || !targetRect) return;
+    setHoverTooltip({
+      left: targetRect.left - containerRect.left + targetRect.width / 2,
+      top: targetRect.top - containerRect.top - 8,
+      data: tooltipData,
+    });
+  };
+
+  const hideBarTooltip = () => {
+    if (tooltipInteractionMode !== "item") return;
+    tooltipTimeout.current = setTimeout(() => {
+      setHoverTooltip(null);
+    }, 300);
+  };
+
+  const barSeries = series.map((seriesItem, seriesIdx) => (
     <Bar
       key={seriesItem.id}
       dataKey={seriesItem.id}
       name={seriesItem.label}
       isAnimationActive={false}
       shape={(shapeProps) => {
+        const isFirstSeries = seriesIdx === 0;
         const barKey = `${seriesItem.id}-${shapeProps.index}`;
+
+        // Only first series renders the badge (one badge per category group)
+        const commentCount = isFirstSeries
+          ? Object.values((shapeProps.payload.commentCounts || {}) as Record<string, number>).reduce((s, n) => s + n, 0)
+          : 0;
+
+        // Center X of the full bar group: first bar's x + half of total group width
+        const groupCenterX = isFirstSeries
+          ? Number(shapeProps.x) + (series.length * barWidth + Math.max(0, series.length - 1) * (barGap ?? 4)) / 2
+          : undefined;
+
+        // All series values so badge can find the tallest positive bar
+        const allSeriesValues = isFirstSeries
+          ? series.map(s => Number((shapeProps.payload as any)[s.id] ?? 0))
+          : undefined;
 
         return (
           <GroupedBarShape
@@ -198,6 +262,17 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
             showValues={showValues}
             barValueLabelFomatter={barValueLabelFomatter}
             barValueLabelProps={barValueLabelProps}
+            commentCount={commentCount}
+            isFirstSeries={isFirstSeries}
+            groupCenterX={groupCenterX}
+            allSeriesValues={allSeriesValues}
+            onBadgeClick={isFirstSeries && onBadgeClick ? () => onBadgeClick(shapeProps.payload.categoryId, seriesItem.id) : undefined}
+            showBarTooltip={tooltipInteractionMode === 'item' ? (event) => {
+              const payload = [{ dataKey: seriesItem.id, payload: shapeProps.payload }];
+              const tooltipData = buildTooltipData(payload as any[]);
+              if (tooltipData) showBarTooltip(event, tooltipData);
+            } : undefined}
+            hideBarTooltip={tooltipInteractionMode === 'item' ? hideBarTooltip : undefined}
           />
         );
       }}
@@ -210,6 +285,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
       tickLine={false}
       interval={0}
       axisLine={{ stroke: "var(--color-border)", strokeWidth: 2 }}
+      tickFormatter={(value) => formatYAxisTick(value)}
       tick={{
         fill: "var(--color-text-secondary)",
         fontSize: 12,
@@ -233,6 +309,29 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     </YAxis>
   );
 
+  const CustomXAxisTick = ({ x, y, payload }: any) => {
+    const lines = String(formatXAxisTick(payload.value)).split("\n");
+    return (
+      <g transform={`translate(${x},${y})`}>
+        <text
+          x={0}
+          y={10}
+          dy={16}
+          textAnchor="middle"
+          fill="var(--color-text-secondary)"
+          fontSize={12}
+          fontFamily="Inter-Regular"
+        >
+          {lines.map((line, index) => (
+            <tspan key={index} x={0} dy={index === 0 ? 0 : 14}>
+              {line}
+            </tspan>
+          ))}
+        </text>
+      </g>
+    );
+  };
+
   const yAxisChart = (
     <ResponsiveContainer width={yAxisWidth} height="100%">
       <BarChart
@@ -246,78 +345,96 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
   );
 
   const chartContent = (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        barSize={barWidth}
-        data={chartData}
-        barGap={barGap}
-        barCategoryGap={barCategoryGap}
-        margin={{ top: 20, right: 0, bottom: 20, left: 0, ...chartMargins }}
-      >
-        <CartesianGrid
-          vertical={false}
-          stroke="var(--color-border)"
-          strokeDasharray="4 4"
-        />
-
-        <ReferenceLine y={0} stroke="var(--color-border)" />
-
-        <XAxis
-          dataKey="label"
-          tickLine={false}
-          interval={0}
-          tickFormatter={formatXAxisTick}
-          axisLine={{ stroke: "var(--color-border)" }}
-          tick={{
-            fill: "var(--color-text-secondary)",
-            fontSize: 12,
-            fontFamily: "Inter-Regular",
-          }}
+    <div ref={innerChartRef} className="relative w-full h-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          barSize={barWidth}
+          data={chartData}
+          barGap={barGap}
+          barCategoryGap={barCategoryGap}
+          margin={{ top: 20, right: 0, bottom: 20, left: 0, ...chartMargins }}
         >
-          {!enableHorizontalScroll && (
-            <Label
-              value={xAxisLabel}
-              position="insideBottom"
-              offset={-10}
-              style={{
-                fill: "var(--color-text-primary)",
-                fontSize: 14,
-                fontWeight: 500,
-                textAnchor: "middle",
-                fontFamily: "Inter-Medium",
+          <CartesianGrid
+            vertical={false}
+            stroke="var(--color-border)"
+            strokeDasharray="4 4"
+          />
+
+          <ReferenceLine y={0} stroke="var(--color-border)" />
+
+          <XAxis
+            dataKey="label"
+            tickLine={false}
+            interval={0}
+            tickFormatter={formatXAxisTick}
+            axisLine={{ stroke: "var(--color-border)" }}
+            tick={<CustomXAxisTick />}
+          >
+            {!enableHorizontalScroll && (
+              <Label
+                value={xAxisLabel}
+                position="insideBottom"
+                offset={-10}
+                style={{
+                  fill: "var(--color-text-primary)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textAnchor: "middle",
+                  fontFamily: "Inter-Medium",
+                }}
+                {...xAxisLabelProps}
+              />
+            )}
+          </XAxis>
+
+          {!enableHorizontalScroll && YAxisComponent}
+          {barSeries}
+          {showTooltip && tooltipInteractionMode === "hover" && (
+            <Tooltip
+              shared={false}
+              cursor={{ fill: "transparent" }}
+              isAnimationActive={false}
+              animationDuration={0}
+              wrapperStyle={{ pointerEvents: "none" }}
+              content={({ payload }) => {
+                const tooltipData = buildTooltipData(payload as any[]);
+                if (!tooltipData) return null;
+                if (customTooltipRenderer)
+                  return customTooltipRenderer(tooltipData);
+                return <DefaultTooltip data={tooltipData} />;
               }}
-              {...xAxisLabelProps}
             />
           )}
-        </XAxis>
+        </BarChart>
+      </ResponsiveContainer>
 
-        {!enableHorizontalScroll && YAxisComponent}
-        {barSeries}
-        {showTooltip && (
-          <Tooltip
-            shared={false}
-            cursor={{
-              fill: "transparent",
-            }}
-            isAnimationActive={false}
-            animationDuration={0}
-            content={({ payload }) => {
-              const tooltipData = buildTooltipData(payload as any[]);
-
-              if (!tooltipData) {
-                return null;
-              }
-
-              if (customTooltipRenderer) {
-                return customTooltipRenderer(tooltipData);
-              }
-
-              return <DefaultTooltip data={tooltipData} />;
-            }}
-          />
-        )}
-      </BarChart>
-    </ResponsiveContainer>
+      {showTooltip && tooltipInteractionMode === "item" && hoverTooltip && (
+        <div
+          className="absolute z-50"
+          style={{
+            left: hoverTooltip.left,
+            top: hoverTooltip.top,
+            transform: "translate(-50%, -100%)",
+            pointerEvents: "auto",
+          }}
+          onMouseEnter={() => {
+            if (tooltipTimeout.current) {
+              clearTimeout(tooltipTimeout.current);
+              tooltipTimeout.current = null;
+            }
+          }}
+          onMouseLeave={() => {
+            setHoverTooltip(null);
+          }}
+        >
+          {customTooltipRenderer ? (
+            customTooltipRenderer(hoverTooltip.data)
+          ) : (
+            <DefaultTooltip data={hoverTooltip.data} />
+          )}
+        </div>
+      )}
+    </div>
   );
 
   /**
@@ -399,17 +516,19 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     >
       {/* header */}
       <div className="flex items-start flex-nowrap justify-between gap-4">
-        {!isLoading && (
-          <div className="flex shrink-0 w-full flex-wrap items-center justify-between gap-4">
-            {typeof header === "string" ? (
-              <Text variant="h4">{header}</Text>
-            ) : (
-              header
-            )}
-            <div className="flex items-center gap-3 chart-actions">
+        {typeof header === "string" ? (
+          <Text variant="h4">{header}</Text>
+        ) : (
+          header
+        )}
+        <div className="flex shrink-0 flex-wrap items-center justify-end gap-4">
+          {headerNote}
+          {!isLoading && (
+            <div className="flex shrink-0 items-center flex-nowrap gap-3 chart-actions">
+              {customActions}
               <IconButton
                 name="download"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={handleDownLoad}
@@ -417,7 +536,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
               {!isFullScreen ? (
                 <IconButton
                   name="maximize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMaximize}
@@ -425,15 +544,15 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
               ) : (
                 <IconButton
                   name="minimize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMinimize}
                 />
               )}
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* legends */}
@@ -586,6 +705,14 @@ interface GroupedBarShapeProps extends BarShapeProps {
   showValues?: boolean;
   barValueLabelFomatter: GroupedBarChartV2Props["barValueLabelFomatter"];
   barValueLabelProps: GroupedBarChartV2Props["barValueLabelProps"];
+  commentCount?: number;
+  onBadgeClick?: () => void;
+  showBarTooltip?: (event: React.MouseEvent<SVGRectElement>) => void;
+  hideBarTooltip?: () => void;
+  // Badge positioning helpers (only used when isFirstSeries=true)
+  isFirstSeries?: boolean;
+  groupCenterX?: number;          // horizontal center of all bars in this category
+  allSeriesValues?: number[];     // data values for every series in this category (to find tallest positive)
 }
 function GroupedBarShape({
   x,
@@ -601,6 +728,13 @@ function GroupedBarShape({
   showValues,
   barValueLabelFomatter = (v) => v.toString(),
   barValueLabelProps,
+  commentCount,
+  onBadgeClick,
+  showBarTooltip,
+  hideBarTooltip,
+  isFirstSeries,
+  groupCenterX,
+  allSeriesValues,
 }: GroupedBarShapeProps) {
   const numericValue = Number(value);
   const isNegative = numericValue < 0;
@@ -646,7 +780,6 @@ function GroupedBarShape({
     ? normalizedY + normalizedHeight + 16 // below negative bar
     : normalizedY - 8; // above positive bar
 
-  const hoverPadding = 8;
   return (
     <g>
       <Rectangle
@@ -656,12 +789,23 @@ function GroupedBarShape({
         height={normalizedHeight}
         radius={resolvedRadius as any}
         fill={fill}
-        onMouseEnter={() => onHover(barKey)}
-        onMouseLeave={() => onHover(null)}
+        onMouseEnter={(e) => {
+          onHover(barKey);
+          if (showBarTooltip)
+            showBarTooltip(e as unknown as React.MouseEvent<SVGRectElement>);
+        }}
+        onMouseMove={(e) => {
+          if (showBarTooltip)
+            showBarTooltip(e as unknown as React.MouseEvent<SVGRectElement>);
+        }}
+        onMouseLeave={() => {
+          onHover(null);
+          if (hideBarTooltip) hideBarTooltip();
+        }}
       />
       {showValues && (
         <text
-          x={x + width / 2}
+          x={Number(x) + Number(width) / 2}
           y={labelY}
           textAnchor="middle"
           fontSize={12}
@@ -673,15 +817,62 @@ function GroupedBarShape({
         </text>
       )}
 
-      {/* <Rectangle
-        x={x - hoverPadding}
-        y={normalizedY - hoverPadding}
-        width={width + hoverPadding * 2}
-        height={normalizedHeight + hoverPadding * 2}
-        fill="transparent"
-        onMouseEnter={() => onHover(barKey)}
-        onMouseLeave={() => onHover(null)}
-      /> */}
+      {/* Comment badge: rendered only from first series, centered on group, above tallest positive bar */}
+      {isFirstSeries && commentCount && commentCount > 0 ? (
+        <g
+          transform={(() => {
+            // horizontal center: use groupCenterX if provided, else center on this bar
+            const bx = groupCenterX !== undefined ? groupCenterX : Number(x) + Number(width) / 2;
+
+            // vertical: find tallest positive bar, estimate pixel Y via scale
+            let by: number;
+            // For positive bars: top of bar is normalizedY, so zero line = normalizedY + normalizedHeight
+            // For negative bars: normalizedY IS already the zero line (top of a downward bar)
+            const zeroLineY = isNegative ? normalizedY : normalizedY + normalizedHeight;
+            const maxPositive = allSeriesValues
+              ? Math.max(0, ...allSeriesValues.filter(v => v > 0))
+              : (numericValue > 0 ? numericValue : 0);
+
+            if (maxPositive > 0 && Math.abs(numericValue) > 0) {
+              // derive pixels-per-unit from this bar's own height/value (scale is the same for +/-)
+              const ppu = normalizedHeight / Math.abs(numericValue);
+              by = zeroLineY - maxPositive * ppu - 20;
+            } else {
+              // all negative / zero → place just above zero line
+              by = zeroLineY - 20;
+            }
+
+            return `translate(${bx}, ${by})`;
+          })()}
+          className={cn("pointer-events-none", {
+            "cursor-pointer pointer-events-auto": !!onBadgeClick,
+          })}
+          onClick={(e) => {
+            if (onBadgeClick) {
+              e.stopPropagation();
+              onBadgeClick();
+            }
+          }}
+        >
+          <foreignObject
+            x={-15}
+            y={-15}
+            width="30"
+            height="30"
+            className="overflow-visible"
+          >
+            <div className="relative flex items-center justify-center w-full h-full rounded-full border-[0.8px] border-[#E5F2F0] bg-white shadow-sm group hover:opacity-80 transition-opacity">
+              <Icon
+                name="message"
+                className="w-[14px] h-[14px] text-[#088477]"
+              />
+              <span className="absolute -top-1.5 -right-1.5 bg-[#2F9C8F] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm z-10 leading-none">
+                {commentCount > 99 ? "99+" : commentCount}
+              </span>
+            </div>
+          </foreignObject>
+        </g>
+      ) : null}
     </g>
   );
 }

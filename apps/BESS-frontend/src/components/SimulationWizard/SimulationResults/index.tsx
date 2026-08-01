@@ -1,6 +1,6 @@
 import {DataTable} from '@/components';
 import type {DataTableColumn, SimulationResults as ApiSimulationResult, SortType, IconTypes} from '@/interface';
-import {Checkbox, Icon, Sort, Text, Skeleton, Tooltip, MultiSelectInput, SearchableMultiSelectInput} from '@/ui-kits';
+import {Checkbox, Icon, Sort, Text, Skeleton, Tooltip, MultiSelectInput, SearchableMultiSelectInput, Alert} from '@/ui-kits';
 // Ghost loader row data for table skeleton
 const ghostTableRows = Array.from({length: 8}, (_, i) => ({id: i}));
 
@@ -72,11 +72,10 @@ import {
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {simulationResultsRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {getSimulationResultsExport} from '@/services/api';
-import {cn, getErrorMessage} from '@/utils';
+import {getErrorMessage} from '@/utils';
 import type {ErrorCodes} from '@/utils';
 import {Images} from '@lazarus/react-common/assets';
 import {DGDriggerType, DGRunScheduleMode, LoadProfilePattern, LoadServingPriority} from '@/constants';
-import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
 import {createPortal} from 'react-dom';
 import {SimulationStatusProvider, useSimulationStatus} from '../SimulationStatusContext';
 
@@ -249,9 +248,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   const bessSavedData = useSelector(bessContainerConfigData);
   const simulResErr = useSelector(simulationResultError);
   const simulResData = useSelector(simulationResultsData);
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
-
-  const {activeSimulationJobId, isSimulationRunning, isSimulationRunningByAnotherUser} = useChangeConfigurationConfirmation();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
 
   const simulation_id = simulData?.id ?? proSimulData?.id ?? (simulationIdFromUrl ? Number(simulationIdFromUrl) : undefined);
 
@@ -329,7 +326,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
 
     return durations.sort((a: any, b: any) => a - b).map((duration: any) => ({id: duration, label: String(duration)}));
   }, [bessSavedData?.containers]);
-  const durationFilterOptions = useMemo(() => durationOptions.map(option => ({...option, label: `${option.label}h`})), [durationOptions]);
+  const durationFilterOptions = useMemo(() => durationOptions.map((option: any) => ({...option, label: `${option.label}h`})), [durationOptions]);
 
   const updateFilter = (key: keyof SimulationResultFilter, values?: number[]) => {
     setFilter(prev => ({
@@ -344,27 +341,17 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     setShowFullDeliveryOnly(false);
     setShowZeroDgHoursOnly(false);
     setCurrentPage(1);
+    setSortFields([]);
   };
 
   // Called when user clicks a column header to sort
-  const handleSortChange = (field: string) => {
+  const handleSortChange = (field: string, direction: 'asc' | 'desc' | null) => {
     setSortFields(prev => {
-      // If already sorted by this field, toggle direction or remove
-      const idx = prev.findIndex(f => f.field === field);
-      if (idx === -1) {
-        // Add as ascending
-        return [...prev, {field, direction: 'asc'}];
-      } else {
-        const current = prev[idx];
-        if (current.direction === 'asc') {
-          // Switch to desc
-          return [...prev.slice(0, idx), {field, direction: 'desc'}, ...prev.slice(idx + 1)];
-        } else {
-          // Remove from sort
-          return [...prev.slice(0, idx), ...prev.slice(idx + 1)];
-        }
-      }
+      const others = prev.filter(f => f.field !== field);
+
+      return direction ? [...others, {field, direction}] : others;
     });
+
     setCurrentPage(1);
   };
 
@@ -400,23 +387,23 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   }, [currentPage, filter, showFullDeliveryOnly, showZeroDgHoursOnly, simulation_id, sortFields]);
 
   // Track if any filters are active
-  const hasActiveFilters = Boolean(
+  const hasActiveFilterValues = Boolean(
     (filter.duration_hr && filter.duration_hr.length > 0) ||
     (filter.dg_capacity && filter.dg_capacity.length > 0) ||
     (filter.bess_capacity && filter.bess_capacity.length > 0) ||
     showFullDeliveryOnly ||
     showZeroDgHoursOnly,
   );
+
+  const hasActiveFilters = hasActiveFilterValues || sortFields.length > 0;
+
   const hasResultRows = Array.isArray(simulResData?.results);
   const isInitialResultsPending = Boolean(simulation_id && !simulResData && !simulResErr && !hasActiveFilters);
   const shouldShowEmptyState =
     !hasActiveFilters &&
     !isInitialResultsPending &&
     !isLoading &&
-    (!simulation_id ||
-      simulResErr === 'E-20046' ||
-      (hasResultRows && simulResData.results.length === 0) ||
-      (!simulResData && activeSimulationJobId === null && !isSimulationRunning && !isSimulationRunningByAnotherUser));
+    (!simulation_id || simulResErr === 'E-20046' || (hasResultRows && simulResData.results.length === 0) || !simulResData);
 
   const handleDownload = async () => {
     const params = buildSimulationResultsParams();
@@ -448,7 +435,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Battery Size (MWh)"
           sort={getSortDirection('bess_mwh')}
-          onSortChange={() => handleSortChange('bess_mwh')}
+          onSortChange={direction => handleSortChange('bess_mwh', direction)}
           tooltip="Total battery storage capacity"
         />
       ),
@@ -462,7 +449,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Discharge Duration (hr)"
           sort={getSortDirection('duration_hr')}
-          onSortChange={() => handleSortChange('duration_hr')}
+          onSortChange={direction => handleSortChange('duration_hr', direction)}
           tooltip="Battery runtime at full power"
         />
       ),
@@ -476,7 +463,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Battery Power (MW)"
           sort={getSortDirection('power_mw')}
-          onSortChange={() => handleSortChange('power_mw')}
+          onSortChange={direction => handleSortChange('power_mw', direction)}
           tooltip="Charge/discharge speed"
         />
       ),
@@ -490,7 +477,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Containers"
           sort={getSortDirection('containers')}
-          onSortChange={() => handleSortChange('containers')}
+          onSortChange={direction => handleSortChange('containers', direction)}
           tooltip="Installed battery units"
         />
       ),
@@ -504,7 +491,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Generator Size (MW)"
           sort={getSortDirection('dg_mw')}
-          onSortChange={() => handleSortChange('dg_mw')}
+          onSortChange={direction => handleSortChange('dg_mw', direction)}
           tooltip="Backup generator capacity"
         />
       ),
@@ -518,7 +505,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Load Met (%)"
           sort={getSortDirection('delivery_percentage')}
-          onSortChange={() => handleSortChange('delivery_percentage')}
+          onSortChange={direction => handleSortChange('delivery_percentage', direction)}
           tooltip="% hours fully powered"
         />
       ),
@@ -532,7 +519,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Green Hours (%)"
           sort={getSortDirection('green_percentage')}
-          onSortChange={() => handleSortChange('green_percentage')}
+          onSortChange={direction => handleSortChange('green_percentage', direction)}
           tooltip="% hours without generator"
         />
       ),
@@ -546,7 +533,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Wastage Energy (%)"
           sort={getSortDirection('wastage_percentage')}
-          onSortChange={() => handleSortChange('wastage_percentage')}
+          onSortChange={direction => handleSortChange('wastage_percentage', direction)}
           tooltip="Unused solar energy"
         />
       ),
@@ -564,7 +551,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Hours Fully Served"
           sort={getSortDirection('delivery_hrs')}
-          onSortChange={() => handleSortChange('delivery_hrs')}
+          onSortChange={direction => handleSortChange('delivery_hrs', direction)}
           tooltip="Hours with full load met"
         />
       ),
@@ -578,7 +565,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Total Load Hours"
           sort={getSortDirection('load_hrs')}
-          onSortChange={() => handleSortChange('load_hrs')}
+          onSortChange={direction => handleSortChange('load_hrs', direction)}
           tooltip="Hours covered without DG"
         />
       ),
@@ -589,7 +576,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     {
       name: 'greenHrs',
       title: (
-        <ColumnHeader label="Green Hours" sort={getSortDirection('green_hrs')} onSortChange={() => handleSortChange('green_hrs')} tooltip="DG running hours" />
+        <ColumnHeader
+          label="Green Hours"
+          sort={getSortDirection('green_hrs')}
+          onSortChange={direction => handleSortChange('green_hrs', direction)}
+          tooltip="DG running hours"
+        />
       ),
       width: {minWidth: '128px'},
       align: 'center',
@@ -598,7 +590,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     {
       name: 'dgHrs',
       title: (
-        <ColumnHeader label="Generator Hours" sort={getSortDirection('dg_hrs')} onSortChange={() => handleSortChange('dg_hrs')} tooltip="DG running hours" />
+        <ColumnHeader
+          label="Generator Hours"
+          sort={getSortDirection('dg_hrs')}
+          onSortChange={direction => handleSortChange('dg_hrs', direction)}
+          tooltip="DG running hours"
+        />
       ),
       width: {minWidth: '112px'},
       align: 'center',
@@ -610,7 +607,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Generator Starts"
           sort={getSortDirection('dg_starts')}
-          onSortChange={() => handleSortChange('dg_starts')}
+          onSortChange={direction => handleSortChange('dg_starts', direction)}
           tooltip="Number of DG startups"
         />
       ),
@@ -624,7 +621,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Avg. Battery Cycles per day"
           sort={getSortDirection('bess_cycles')}
-          onSortChange={() => handleSortChange('bess_cycles')}
+          onSortChange={direction => handleSortChange('bess_cycles', direction)}
           tooltip="Battery usage cycles per day"
         />
       ),
@@ -638,7 +635,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
         <ColumnHeader
           label="Unmet Energy (MWh)"
           sort={getSortDirection('unserved_mwh')}
-          onSortChange={() => handleSortChange('unserved_mwh')}
+          onSortChange={direction => handleSortChange('unserved_mwh', direction)}
           tooltip="Unserved energy"
         />
       ),
@@ -649,7 +646,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     {
       name: 'fuel',
       title: (
-        <ColumnHeader label="Fuel Used (L)" sort={getSortDirection('fuel_l')} onSortChange={() => handleSortChange('fuel_l')} tooltip="Total diesel consumed" />
+        <ColumnHeader
+          label="Fuel Used (L)"
+          sort={getSortDirection('fuel_l')}
+          onSortChange={direction => handleSortChange('fuel_l', direction)}
+          tooltip="Total diesel consumed"
+        />
       ),
       width: {minWidth: '120px'},
       align: 'center',
@@ -662,20 +664,22 @@ export const SimulationResults = (props: SimulationResultsProps) => {
    * Side Effects
    * =======================================
    */
+  const prevPage = useRef(currentPage);
+
   useEffect(() => {
     const params = buildSimulationResultsParams();
+    if (!params) return;
 
-    if (!params || isSimulationRunningByAnotherUser || activeSimulationJobId !== null || isSimulationRunning) {
+    // Skip only the initial fullscreen mount
+    if (isFullScreen && prevPage.current === currentPage && !hasActiveFilters) {
+      prevPage.current = currentPage;
       return;
     }
 
-    const requestKey = JSON.stringify(params);
-    if (!shouldDispatchSimulationResultsRequest(requestKey)) {
-      return;
-    }
+    prevPage.current = currentPage;
 
     dispatch(simulationResultsRequest(params));
-  }, [activeSimulationJobId, buildSimulationResultsParams, dispatch, isSimulationRunning, isSimulationRunningByAnotherUser]);
+  }, [buildSimulationResultsParams, currentPage, isFullScreen]);
 
   useEffect(() => {
     setDgCapacityOptions([]);
@@ -714,13 +718,15 @@ export const SimulationResults = (props: SimulationResultsProps) => {
     return (
       <>
         {shouldBlock && (
-          <div className="mt-4 flex justify-center">
-            <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
-              <Icon name="infoCircle" className="size-4.5! text-warning!" />
-              <Text variant="14M" className="text-warning!">
-                Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-              </Text>
-            </div>
+          <div className="flex justify-center">
+            <Alert
+              textClassName="text-error-text! text-[14px]!"
+              iconClassName="mt-0! size-4.5!"
+              iconName="warning-triangle-sharp"
+              message={`${userName} is currently running this simulation. You can run it again once it completes`}
+              variant="error"
+              className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+            />
           </div>
         )}
         <div className="flex flex-col items-center justify-center min-h-full! gap-4 py-10">
@@ -742,13 +748,15 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   return (
     <div>
       {shouldBlock && (
-        <div className="mt-4 flex justify-center">
-          <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-            </Text>
-          </div>
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
         </div>
       )}
 
@@ -881,11 +889,11 @@ export const SimulationResults = (props: SimulationResultsProps) => {
                       />
                     </div>
 
-                    {hasActiveFilters && (
+                    {hasActiveFilterValues && (
                       <button
                         type="button"
                         onClick={clearFilters}
-                        className="border-primary hover:border-primary-hover active:border-primary-active flex h-[44px] w-fit items-center gap-2 rounded-sm border px-4">
+                        className="border-primary hover:border-primary-hover active:border-primary-active flex h-11 cursor-pointer w-fit items-center gap-2 rounded-sm border px-4">
                         <Icon name="cross" className="size-3 text-text-secondary!" />
                         <Text variant="caption" className="text-text-secondary!">
                           Clear filters
@@ -953,6 +961,7 @@ export const SimulationResults = (props: SimulationResultsProps) => {
               totalResult={simulResData?.total_configs ?? resultRows.length}
               onPageChange={setCurrentPage}
               stickyHeader
+              tableHeightWhenScrollable={700}
               persistHorizontalScrollKey={simulation_id ? `bess-simulation-results-${simulation_id}` : undefined}
             />
           </div>
@@ -1083,33 +1092,33 @@ function SimulationConfigurationSummary() {
             ? [
                 {
                   label: 'F0 (No Load)',
-                  value: dg?.no_load_coeff == null ? '-' : `${dg.no_load_coeff} L/hr/kW rated`,
+                  value: dg?.no_load_coeff == null ? '-' : `${dg?.no_load_coeff} L/hr/kW rated`,
                 },
                 {
                   label: 'F1 (Load)',
-                  value: dg?.load_coeff == null ? '-' : `${dg.load_coeff} L/kWh output`,
+                  value: dg?.load_coeff == null ? '-' : `${dg?.load_coeff} L/kWh output`,
                 },
               ]
             : [
                 {
                   label: 'Fuel Rate',
-                  value: dg?.flat_fuel_rate == null ? '-' : `${dg.flat_fuel_rate} L/kWh`,
+                  value: dg?.flat_fuel_rate == null ? '-' : `${dg?.flat_fuel_rate} L/kWh`,
                 },
               ]),
           {
             label: 'Min Load',
-            value: dg?.min_stable_load == null ? '-' : `${dg.min_stable_load}%`,
+            value: dg?.min_stable_load == null ? '-' : `${dg?.min_stable_load}%`,
           },
         );
       } else {
         config.push(
           {
             label: 'Fuel Rate',
-            value: dg?.flat_fuel_rate == null ? '-' : `${dg.flat_fuel_rate} L/kWh`,
+            value: dg?.flat_fuel_rate == null ? '-' : `${dg?.flat_fuel_rate} L/kWh`,
           },
           {
             label: 'Fuel Price',
-            value: dg?.fuel_price == null ? '-' : `${dg.fuel_price.toFixed(2)}$/L`,
+            value: dg?.fuel_price == null ? '-' : `${dg?.fuel_price.toFixed(2)}$/L`,
           },
         );
       }
@@ -1141,6 +1150,7 @@ function SimulationConfigurationSummary() {
     },
     () => {
       const dg = proSimulData?.config?.dg;
+      const isTakeoverFullLoad = proSimulData?.config?.dispatch?.is_dg_takeover_full_load;
 
       // If DG is not included
       if (!dg?.is_included) {
@@ -1177,17 +1187,23 @@ function SimulationConfigurationSummary() {
           label: 'DG Charges BESS',
           value: proSimulData?.config?.dispatch?.is_dg_charging_bess ? 'YES - Excess DG power' : 'NO - Solar only',
         },
-        {
-          label: 'Load Priority',
-          value: proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
-        },
+        // Show only when Takeover Mode is NO
+        ...(!isTakeoverFullLoad
+          ? [
+              {
+                label: 'Load Priority',
+                value:
+                  proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
+              },
+            ]
+          : []),
         {
           label: 'Takeover Mode',
           value: proSimulData?.config?.dispatch?.is_dg_takeover_full_load ? 'Yes - DG serves full load' : 'No - DG fills gap',
         },
         {
           label: 'DG Output Mode',
-          value: proSimulData?.config?.dispatch.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
+          value: proSimulData?.config?.dispatch?.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
         },
       ];
     },
@@ -1200,16 +1216,16 @@ function SimulationConfigurationSummary() {
       bgGradientEnd: '#F3FFF4',
     },
     () => {
-      const isDGTurnedOn = proSimulData?.config?.dg.is_included ?? false;
+      const isDGTurnedOn = proSimulData?.config?.dg?.is_included ?? false;
       const DGStats = isDGTurnedOn
         ? [
-            {label: 'DG Min', value: `${proSimulData?.config?.bess_dg_sizing.dg_min ?? 0} MW`},
-            {label: 'DG Max', value: `${proSimulData?.config?.bess_dg_sizing.dg_max ?? 0} MW`},
+            {label: 'DG Min', value: `${proSimulData?.config?.bess_dg_sizing?.dg_min ?? 0} MW`},
+            {label: 'DG Max', value: `${proSimulData?.config?.bess_dg_sizing?.dg_max ?? 0} MW`},
           ]
         : [];
       return [
-        {label: 'Battery Min', value: `${proSimulData?.config?.bess_dg_sizing.bess_min ?? 0} MWh`},
-        {label: 'Battery Max', value: `${proSimulData?.config?.bess_dg_sizing.bess_max ?? 0} MWh`},
+        {label: 'Battery Min', value: `${proSimulData?.config?.bess_dg_sizing?.bess_min ?? 0} MWh`},
+        {label: 'Battery Max', value: `${proSimulData?.config?.bess_dg_sizing?.bess_max ?? 0} MWh`},
         ...DGStats,
       ];
     },
@@ -1311,12 +1327,24 @@ function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
           const showTooltip = title === 'SOLAR' && point.label === 'Profile';
           return (
             <li key={`${point.label ?? point.value}-${index}`}>
-              <div className="flex items-center gap-1 min-w-0">
-                <Text variant="small" className="text-text-secondary! shrink-0">
-                  {point.label} :
+              {point.label ? (
+                <div className="flex items-center gap-1 min-w-0">
+                  <Text variant="small" className="text-text-secondary! shrink-0">
+                    {point.label}:
+                  </Text>
+                  {showTooltip ? (
+                    <TruncatedTextWithTooltip text={point.value} />
+                  ) : (
+                    <Text variant="12SB" className="leading-none!">
+                      {point.value}
+                    </Text>
+                  )}
+                </div>
+              ) : (
+                <Text variant="12SB" className="leading-none!">
+                  {point.value}
                 </Text>
-                {showTooltip ? <TruncatedTextWithTooltip text={point.value} /> : <Text variant="12SB">{point.value}</Text>}
-              </div>
+              )}
             </li>
           );
         })}

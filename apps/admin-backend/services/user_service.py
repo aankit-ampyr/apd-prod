@@ -111,6 +111,7 @@ class UserService:
                 return Res.error(
                     "E-10013",
                     message="Admins must have access to at least AMD platform",
+                    http_status_code=403,
                 )
             query = query.where(
                 User.platform.overlap([Platform.AMD]), User.id != current_user.get("id")
@@ -176,8 +177,8 @@ class UserService:
 
         if total_results == 0:
             if filter_applied:
-                return Res.error("E-10015", message="No data found")
-            return Res.error("E-10014", message="No records match applied filters")
+                return Res.error("E-10015", message="No data found", http_status_code=404)
+            return Res.error("E-10014", message="No records match applied filters", http_status_code=404)
 
         return Res.success(
             "S-10005",
@@ -198,22 +199,22 @@ class UserService:
             )
             existing = result.scalar_one_or_none()
             if existing:
-                return Res.error("E-10009", message="Email already exists")
+                return Res.error("E-10009", message="Email already exists", http_status_code=409)
 
             # 2. Role & Platform Validation
             role_value = int(user.role)
             if role_value not in [role.value for role in UserRole]:
-                return Res.error("E-10004", message="Invalid role")
+                return Res.error("E-10004", message="Invalid role", http_status_code=400)
 
             for p in user.platform:
                 if p not in [Platform.AMD, Platform.BESS]:
-                    return Res.error("E-10023", message="Invalid platform")
+                    return Res.error("E-10023", message="Invalid platform", http_status_code=400)
 
             if (
                 Platform.AMD.value in user.platform
                 and role_value == UserRole.VIEWER.value
             ):
-                return Res.error("E-10024", message="Invalid role for platform")
+                return Res.error("E-10024", message="Invalid role for platform", http_status_code=400)
 
             new_user = User(
                 name=user.name.strip(),
@@ -283,10 +284,10 @@ class UserService:
         db_user = result.scalar_one_or_none()
 
         if not db_user:
-            return Res.error("E-10014", message="User not found")
+            return Res.error("E-10014", message="User not found", http_status_code=404)
         
         if db_user.role == UserRole.SUPER_ADMIN.value:
-            return Res.error("E-10013", message="You are not authorized to update a Super Admin user")
+            return Res.error("E-10013", message="You are not authorized to update a Super Admin user", http_status_code=403)
 
         updated_fields = user_data.model_dump(exclude_unset=True)
         final_role = int(updated_fields.get("role", db_user.role))
@@ -294,7 +295,7 @@ class UserService:
 
         if "role" in updated_fields:
             if final_role not in [role.value for role in UserRole]:
-                return Res.error("E-10004", message="Invalid role")
+                return Res.error("E-10004", message="Invalid role", http_status_code=400)
 
         if "email" in updated_fields:
             result = await db.execute(
@@ -305,13 +306,13 @@ class UserService:
                 )
             )
             if result.scalar_one_or_none():
-                return Res.error("E-10009", message="Email already exists")
+                return Res.error("E-10009", message="Email already exists", http_status_code=409)
 
         if (
             Platform.AMD.value in final_platforms
             and final_role == UserRole.VIEWER.value
         ):
-            return Res.error("E-10024", message="Invalid role for platform")
+            return Res.error("E-10024", message="Invalid role for platform", http_status_code=400)
 
         if "platform" in updated_fields:
             db_user.organization = None
@@ -389,10 +390,10 @@ class UserService:
         db_user = result.scalar_one_or_none()
 
         if not db_user:
-            return Res.error("E-10022", message="User not found")
+            return Res.error("E-10022", message="User not found", http_status_code=404)
         
         if db_user.role == UserRole.SUPER_ADMIN.value:
-            return Res.error("E-10013", message="You are not authorized to delete a Super Admin user")
+            return Res.error("E-10013", message="You are not authorized to delete a Super Admin user", http_status_code=403)
 
         deleted_user_id = db_user.id
 

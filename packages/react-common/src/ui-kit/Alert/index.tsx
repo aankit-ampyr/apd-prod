@@ -109,7 +109,10 @@ export function AlertBox(props: AlertBoxProps) {
       <div className="flex flex-col gap-1">
         <Text
           variant="caption"
-          className={clsx("text-text-primary! font-InterMedium!", textClassName)}
+          className={clsx(
+            "text-text-primary! font-InterMedium!",
+            textClassName,
+          )}
         >
           {message}
         </Text>

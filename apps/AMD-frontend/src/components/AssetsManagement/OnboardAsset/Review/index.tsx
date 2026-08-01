@@ -8,6 +8,7 @@ import {
   filterAggregatorScadaFilesRequest,
   filterInvoiceFilesRequest,
   filterInvoiceSettlementFilesRequest,
+  filterInvoiceSummaryStatementFilesRequest,
   submitAssetForApprovalRequest,
   updateAssetInvoiceReportingPeriodRequest,
   updateAssetReportingPeriodRequest,
@@ -342,6 +343,14 @@ export function Review(props: ReviewProps) {
         year: [value.year],
       }),
     );
+
+    dispatch(
+      filterInvoiceSummaryStatementFilesRequest({
+        assetId: currentAsset.id,
+        month: [value.month],
+        year: [value.year],
+      }),
+    );
   }
 
   // ===============================================================
@@ -479,7 +488,7 @@ export function Review(props: ReviewProps) {
 
     // no invoice reporting period from backend
     if (!currentAsset?.invoice_active_period) {
-      const oldestReprtingPeriod = currentAsset?.available_periods?.[0];
+      const oldestReprtingPeriod = currentAsset?.available_invoice_periods?.[0];
       if (oldestReprtingPeriod && !invoiceReportingPeriod) {
         setInvoiceReportingPeriod(oldestReprtingPeriod);
         return;

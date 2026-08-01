@@ -1,3 +1,5 @@
+from typing import Optional
+from redis.asyncio import Redis
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status
@@ -9,8 +11,9 @@ from constants.enums import (
     DGTriggerType,
     SimulationLogStep,
     SimulationSetupProgress,
+    PSPAuditLogModules,
+    PSPAuditLogScenario,
 )
-from python_common.constants.enums import AuditLogModules, AuditLogScenario
 from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 from .service_support import (
@@ -255,6 +258,7 @@ class DispatchRuleService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         bess_min_soc, bess_max_soc = await self._get_bess_soc_bounds(
             simulation_id=simulation_id, bess_db=bess_db
@@ -300,19 +304,23 @@ class DispatchRuleService:
         )
 
         await depreciate_simulation_job(
-            simulation_id=simulation_id, db=bess_db, include_green_job=True
+            simulation_id=simulation_id,
+            db=bess_db,
+            include_green_job=True,
+            include_detailed_green_job=True,
         )
         await compare_and_log(
             db=bess_db,
             user_id=f"USER-{current_user.get('id')}",
-            user_role=current_user.get("role"),
-            module=AuditLogModules.SIMULATION.value,
-            action=AuditLogScenario.SIMULATION_EDITED.value,
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.SIMULATION_EDITED.value,
             resource_id=resource_id,
             before=before_config,
             after=after_config,
             remove_id=True,
             sim_module_type=SimulationLogStep.DISPATCH_RULE,
+            redis=redis,
         )
 
         await bess_db.commit()

@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
 from config import ENCRYPT, ALLOWED_ORIGINS
+from context import lifespan
 from middleware import (
     ClientInfoMiddleware,
     ExceptionHandlerMiddleware,
@@ -11,7 +12,7 @@ from middleware import (
 )
 from router import register_routes
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 
 # encryption middleware
@@ -37,7 +38,7 @@ app.add_middleware(
         "/health",
         "/api/v1/auth/login/send-otp",
         "/api/v1/auth/login/verify-otp",
-        "/api/v1/auth/token",
+        "/api/v1/auth/refresh",
         "/cache",
     ],
 )

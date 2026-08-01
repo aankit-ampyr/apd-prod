@@ -425,6 +425,7 @@ class MultiYearProjectionResult(BaseModel):
     delivery_met_mwh: float
     charging_loss: float
     discharging_loss: float
+    degradation_loss: float = 0
     unserved_mwh: float
     final_soc_pct: float
     solar_gen_during_load: float
@@ -503,7 +504,7 @@ class GreenResult(BaseModel):
                 (self.wastage_mw / self.solar_generation) * 100,
                 2,
             )
-            if self.solar_generation >= 1
+            if self.solar_generation > 0.001
             else 0
         )
         self.green_hours_mar_oct_pct = (

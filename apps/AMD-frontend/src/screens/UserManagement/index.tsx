@@ -6,23 +6,18 @@ import {Button, Text, Badge, IconButton, Sort} from '@/ui-kits';
 import {
   users,
   totalPages,
-  currentUserPage,
   userSuccess,
   userFailure,
   totalUserResults,
   allOrganizationsList,
+  userLoading,
 } from '@/services/redux/selectors';
 import {getAllOrganizationsListRequest, resetUserMessage, userListRequest} from '@/services/redux/slice';
 import type {User, DataTableColumn, UserListRequest, SortType} from '@/interface';
 import {NA, AMD_USER_ROLES, UserRole, STATUS_OPTIONS} from '@/constants';
 import {} from '@/utils/getMessages';
-import {useToast, useDropdownValues} from '@/hooks';
+import {useToast, useDropdownValues, useWindowDimensions} from '@/hooks';
 import {cn, formatDate, getErrorMessage, getSuccessMessage, type ErrorCodes, type SuccessCodes} from '@/utils';
-
-/**
- * Page Size for pagination
- */
-const PAGE_SIZE = 10;
 
 /**
  * Filter type for user list filtering
@@ -42,6 +37,8 @@ export function UserManagement() {
   // =================
   const dispatch = useDispatch();
   const {showToast} = useToast();
+  const {width} = useWindowDimensions();
+  const pageSize = width < 1025 ? 6 : 10;
   const allOrgs = useDropdownValues({
     fetchAction: getAllOrganizationsListRequest,
     selector: allOrganizationsList,
@@ -50,12 +47,12 @@ export function UserManagement() {
   // =================
   // selectors
   // =================
-  const usersData = useSelector(users).slice(0, PAGE_SIZE);
+  const usersData = useSelector(users).slice(0, pageSize);
   const totalPagesData = useSelector(totalPages);
-  const currentPage = useSelector(currentUserPage);
   const totalResult = useSelector(totalUserResults);
   const success = useSelector(userSuccess) as SuccessCodes;
   const failure = useSelector(userFailure) as ErrorCodes;
+  const loading = useSelector(userLoading);
 
   // =================
   // states
@@ -105,7 +102,7 @@ export function UserManagement() {
       width: {minWidth: '140px'},
       align: 'left',
       render: row => (
-        <Text variant="caption" className="text-secondary! text-wrap! break-all">
+        <Text variant="caption" className="text-secondary! text-wrap break-words">
           {row.name}
         </Text>
       ),
@@ -151,7 +148,7 @@ export function UserManagement() {
           <Sort sort={filter.sort ?? null} onSortChange={handleSort} />
         </div>
       ),
-      width: {minWidth: '90px'},
+      width: {minWidth: '120px'},
       align: 'left',
       render: row => {
         return (
@@ -200,7 +197,7 @@ export function UserManagement() {
   ];
 
   function fetchUsers() {
-    const payload: UserListRequest['params'] = {page, limit: PAGE_SIZE};
+    const payload: UserListRequest['params'] = {page, limit: pageSize};
     if (filter.search) {
       payload.search = filter.search;
     }
@@ -227,7 +224,7 @@ export function UserManagement() {
   // =================
   useEffect(() => {
     fetchUsers();
-  }, [filter, page]);
+  }, [filter, page, pageSize]);
 
   useEffect(() => {
     if (success) {
@@ -280,8 +277,8 @@ export function UserManagement() {
   }
 
   return (
-    <ScreenWrapper>
-      <div className="flex flex-col gap-6 p-4">
+    <ScreenWrapper className="min-h-0" wrapperClassName="min-h-0 p-4 sm:p-6" nestedWrapperClassName="min-h-0">
+      <div className="flex flex-col gap-6 h-full min-h-0">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <Text variant="subtitle1" className="text-text-primary">
@@ -302,7 +299,7 @@ export function UserManagement() {
             },
             {
               key: 'role',
-              placeholder: 'Select Role',
+              placeholder: 'All Roles',
               type: 'select',
               options: AMD_USER_ROLES,
               props: {
@@ -311,7 +308,7 @@ export function UserManagement() {
             },
             {
               key: 'organization',
-              placeholder: 'Select Organization',
+              placeholder: 'All Organizations',
               type: 'select',
               options: allOrgs,
               props: {
@@ -320,7 +317,7 @@ export function UserManagement() {
             },
             {
               key: 'status',
-              placeholder: 'Status',
+              placeholder: 'All Status',
               type: 'select',
               options: STATUS_OPTIONS,
               props: {
@@ -332,15 +329,23 @@ export function UserManagement() {
         />
 
         {/* Table */}
-        <DataTable
-          columns={columns}
-          data={usersData}
-          totalPages={totalPagesData}
-          currentPage={currentPage}
-          totalResult={totalResult}
-          errorMessage={tableMessage}
-          onPageChange={setPage}
-        />
+        <div className="relative w-full flex flex-col shrink min-h-0 [&>div]:gap-4">
+          <DataTable
+            columns={columns}
+            data={usersData}
+            collapsibleOnTablet
+            tabletVisibleColumns={['user_id', 'name', 'role', 'organization', 'status', 'actions']}
+            totalPages={totalPagesData}
+            currentPage={page}
+            pageSize={pageSize}
+            totalResult={totalResult}
+            errorMessage={tableMessage}
+            onPageChange={setPage}
+            loading={loading}
+            ghostRowCount={6}
+            stickyHeader
+          />
+        </div>
 
         {modalOpen === 'assign' && currentSelectUser && (
           <AssignOrgaznizationModal

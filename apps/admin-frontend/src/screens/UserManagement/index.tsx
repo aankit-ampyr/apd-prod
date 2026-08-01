@@ -9,7 +9,7 @@ import {
   userSuccess,
   userFailure,
   totalUserResults,
-  currentUserPage,
+  userLoading,
 } from '@/services/redux/selectors';
 import {resetUserMessage, userListRequest} from '@/services/redux/slice';
 import type {User, DataTableColumn, UserListRequest, SelectInputItem, SortType} from '@/interface';
@@ -72,7 +72,7 @@ export function UserManagement() {
   // =================
   const baseUsers = useSelector(users);
   const totalPagesData = useSelector(totalPages);
-  const currentPage = useSelector(currentUserPage);
+  const loading = useSelector(userLoading);
   const totalResult = useSelector(totalUserResults);
   const success = useSelector(userSuccess) as SuccessCodes;
   const failure = useSelector(userFailure) as ErrorCodes;
@@ -427,11 +427,13 @@ export function UserManagement() {
             }
             return true;
           })}
+          loading={loading}
           data={usersData}
           totalPages={totalPagesData}
           currentPage={page}
           pageSize={pageSize}
           totalResult={totalResult}
+          ghostRowCount={6}
           errorMessage={tableMessage}
           onPageChange={setPage}
         />

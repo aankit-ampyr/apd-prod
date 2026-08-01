@@ -2,6 +2,11 @@ from typing import Optional, Union, Literal
 from pydantic import BaseModel, Field
 from datetime import datetime, timezone
 from constants.enums import ResourceType, ActionType
+from python_common.dto.common_dto import AuditLogSchema
+
+
+class BaseEvent(BaseModel):
+    resource_type: ResourceType
 
 
 class ConfigDetails(BaseModel):
@@ -16,6 +21,7 @@ class GreenConfigDetails(ConfigDetails):
 
 class SimulationDataBase(BaseModel):
     simulation_id: int
+    user_name: str
 
 
 class StartedData(SimulationDataBase):
@@ -79,10 +85,13 @@ SimulationData = Union[
 ]
 
 
-class SocketEvent(BaseModel):
-    resource_type: ResourceType
+class SocketEvent(BaseEvent):
     resource_id: Union[int, str]
     action_id: ActionType
     data: Optional[SimulationData] = None
     status: Optional[Literal["success", "error"]] = None
     status_code: Optional[str] = None
+
+
+class SocketLogEvent(BaseEvent):
+    data: AuditLogSchema

@@ -6,16 +6,9 @@ import {SystemSetupTabs} from './SystemSetupTabs';
 import {useEffect, useMemo, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {useSelector} from 'react-redux';
-import {
-  bessConfigSuccess,
-  generatorSuccess,
-  loadProfileError,
-  loadProfileSaved,
-  projectSimulationData,
-  saveSolarProfileSuccess,
-} from '@/services/redux/selectors/simulationWizardSelector';
+import {projectSimulationData} from '@/services/redux/selectors/simulationWizardSelector';
 import {allProjectsData, authDataSelector} from '@/services/redux/selectors';
-import {Icon, Text} from '@/ui-kits';
+import {Alert} from '@/ui-kits';
 import {useSimulationStatus} from '../SimulationStatusContext';
 
 interface SystemSetupProps {
@@ -26,17 +19,13 @@ interface SystemSetupProps {
 export const SystemSetup: React.FC<SystemSetupProps> = ({setIsStepsHidden, onNextToDispatchRules}) => {
   const [activeTab, setActiveTab] = useState<string>('load');
 
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
-  const simulationError = useSelector(loadProfileError);
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
   const proSimulData = useSelector(projectSimulationData);
   const currentSimulationId = proSimulData?.id ?? null;
 
   const shouldBlock = isAnySimulationRunning && runningSimulationId === currentSimulationId;
-  console.log('currentSimulationId: ', currentSimulationId);
-  console.log('runningSimulationId: ', runningSimulationId);
-  console.log('shouldBlock: ', shouldBlock);
 
   useEffect(() => {
     if (!shouldBlock) return;
@@ -54,45 +43,82 @@ export const SystemSetup: React.FC<SystemSetupProps> = ({setIsStepsHidden, onNex
       document.removeEventListener('mousedown', handleClick, true);
     };
   }, [shouldBlock]);
+  useEffect(() => {
+    const screenWrapper = document.querySelector('.screen-wrapper');
+    let scrollContainer: HTMLElement | null = screenWrapper?.parentElement ?? null;
+
+    while (scrollContainer) {
+      const {overflow, overflowY} = window.getComputedStyle(scrollContainer);
+
+      if (/(auto|scroll)/.test(`${overflow}${overflowY}`)) {
+        scrollContainer.scrollTo({
+          top: 0,
+          behavior: 'auto',
+        });
+        return;
+      }
+
+      scrollContainer = scrollContainer.parentElement;
+    }
+
+    window.scrollTo({
+      top: 0,
+      behavior: 'auto',
+    });
+  }, [activeTab]);
 
   const isAssignedUser = Boolean(
     authData?.id &&
     allProjData?.some(project => Number(project?.id) === proSimulData?.project_id && project?.assigned_users?.some(user => user.id === authData.id)),
   );
 
-  const isLoadProfileComplete = useSelector(loadProfileSaved) === 'S-20004' && simulationError !== 'E-20026';
-  const isSolarProfileComplete = useSelector(saveSolarProfileSuccess) === 'S-20006' && simulationError !== 'E-20006';
-  const isBessConfigComplete = useSelector(bessConfigSuccess) === 'S-20011' && simulationError !== 'E-20026';
-  const generatorSuccessVal = useSelector(generatorSuccess);
-  const isGeneratorConfigComplete = isLoadProfileComplete && isSolarProfileComplete && isBessConfigComplete && generatorSuccessVal === 'S-20019';
+  const progress = Number(proSimulData?.progress ?? 0);
+  console.log('progress: ', progress);
 
   const completedTabs = useMemo(() => {
     return {
-      load: isLoadProfileComplete,
-      solar: isSolarProfileComplete,
-      battery: isBessConfigComplete,
-      generator: isGeneratorConfigComplete,
+      load: progress >= 1,
+      solar: progress >= 2,
+      battery: progress >= 3,
+      generator: progress >= 4,
     };
-  }, [isLoadProfileComplete, isSolarProfileComplete, isBessConfigComplete, isGeneratorConfigComplete]);
+  }, [progress]);
+
   return (
     <div>
-      <SystemSetupTabs activeTab={activeTab} onChange={setActiveTab} completedTabs={completedTabs} />
       {shouldBlock && (
-        <div className="mt-4 flex justify-center">
-          <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-            </Text>
-          </div>
+        <div className="flex justify-center my-3">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
         </div>
       )}
+      <SystemSetupTabs activeTab={activeTab} onChange={setActiveTab} completedTabs={completedTabs} />
 
       {activeTab === 'load' && <LoadProfile onSaveComplete={() => setActiveTab('solar')} setIsStepsHidden={setIsStepsHidden} readOnly={isAssignedUser} />}
-      {activeTab === 'solar' && <SolarProfile onSaveComplete={() => setActiveTab('battery')} readOnly={!isLoadProfileComplete} />}
-      {activeTab === 'battery' && <Bess onSaveComplete={() => setActiveTab('generator')} readOnly={!(isLoadProfileComplete && isSolarProfileComplete)} />}
+      {activeTab === 'solar' && (
+        <SolarProfile
+          onSaveComplete={() => setActiveTab('battery')}
+          readOnly={Boolean(Number(proSimulData?.progress) < 1)}
+          setIsStepsHidden={setIsStepsHidden}
+        />
+      )}
+      {activeTab === 'battery' && (
+        <Bess
+          onSaveComplete={() => setActiveTab('generator')}
+          readOnly={Boolean(Number(proSimulData?.progress) < 1 && Boolean(Number(proSimulData?.progress) < 2))}
+        />
+      )}
       {activeTab === 'generator' && (
-        <Generator onNextToDispatchRules={onNextToDispatchRules} readOnly={!(isLoadProfileComplete && isSolarProfileComplete && isBessConfigComplete)} />
+        <Generator
+          onNextToDispatchRules={onNextToDispatchRules}
+          readOnly={Boolean(Number(proSimulData?.progress) < 1) && Boolean(Number(proSimulData?.progress) < 2) && Boolean(Number(proSimulData?.progress) < 3)}
+        />
       )}
       {shouldBlock && createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
     </div>

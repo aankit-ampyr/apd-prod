@@ -47,25 +47,25 @@
        DATA VISUALIZATION (optional)
     ========================= */
   --color-blue: #0284c7;
-  --color-blue-2: #4E90BD;
+  --color-blue-2: #4e90bd;
   --color-blue-tint: #0ea5e9;
   --color-teal: #2a9d8f;
   --color-teal-tint: #14b8a6;
   --color-violet: #7f7fbd;
-  --color-magenta: #AC28FF;
+  --color-magenta: #ac28ff;
   --color-aqua: #c8fff8;
   --color-violet-tint: #8b93e5;
-  --color-pastel-green: #BBFF8D;
-  --color-yellow: #FFF170;
-  --color-blue-data: #4D9CD1;
-  --color-orange: #FFAC5A;
-  --color-pastel-mint: #70EFC3;
-  --color-purple: #BE83FF;
-  --color-light-blue: #A1E7F6;
-  --color-red-data: #FF6565;
-  --color-pink: #FFB6DC;
-  --color-link: #1D4ED8;
-  --color-mint: #31E6AD;
+  --color-pastel-green: #bbff8d;
+  --color-yellow: #fff170;
+  --color-blue-data: #4d9cd1;
+  --color-orange: #ffac5a;
+  --color-pastel-mint: #70efc3;
+  --color-purple: #be83ff;
+  --color-light-blue: #a1e7f6;
+  --color-red-data: #ff6565;
+  --color-pink: #ffb6dc;
+  --color-link: #1d4ed8;
+  --color-mint: #31e6ad;
 
   /* Spacing Scale */
   --spacing-1: 4px;
@@ -267,11 +267,34 @@ body {
 }
 
 .apd-heat-map-scroll-container {
-scrollbar-gutter: stable;
+  scrollbar-gutter: stable;
 }
 .apd-heat-map-scroll-container::-webkit-scrollbar {
   position: absolute;
   bottom: 0;
   left: 0;
   right: 0;
+}
+
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.thin-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }

@@ -1,4 +1,4 @@
-import { matchesRoute } from '@/utils/common-functions';
+import {matchesRoute} from '@/utils/common-functions';
 
 export const Routes = {
   INDEX: '/',
@@ -24,7 +24,7 @@ export const DashboardRouteHeaderTitles = {
 } as const;
 
 export type RouteKeys = keyof typeof Routes;
-export type RouteValues = typeof Routes[RouteKeys];
+export type RouteValues = (typeof Routes)[RouteKeys];
 export const LinkedRoutes: Record<string, string> = {};
 
 export function getNormalizedRoute(route: string): string | null {

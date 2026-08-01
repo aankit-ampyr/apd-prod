@@ -13,6 +13,19 @@ services:
       - ./apps/AMD-backend/.env
     ports:
       - "8011:8010"
+  
+  amd-worker:
+    image: lazarus/amd-backend:dev
+    build:
+      context: .
+      dockerfile: ./apps/AMD-backend/Dockerfile
+    container_name: lazarus-AMD-worker-dev
+    env_file:
+      - ./apps/AMD-backend/.env
+    depends_on:
+      - lazarus-redis
+    command:
+      ["/app/.venv/bin/taskiq", "worker", "broker:broker", "--workers", "1"]
 
   amd-frontend:
     image: lazarus/amd-frontend:dev

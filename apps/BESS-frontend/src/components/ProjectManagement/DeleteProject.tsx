@@ -67,6 +67,7 @@ const DeleteProject: React.FC<DeleteProjectProps> = ({open, projectName, onCance
             required
             value={confirmName}
             onChange={e => setConfirmName(e)}
+            maxLength={100}
             onBlur={() => setInputTouched(true)}
             touched={inputTouched}
             error={inputTouched && confirmName !== projectName ? 'Project name does not match' : ''}

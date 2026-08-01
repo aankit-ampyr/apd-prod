@@ -17,6 +17,7 @@ async def audit_logs(
     after: str | dict | None,
     resource_id: Optional[str] = None,
     db: Optional[AsyncSession] = None,
+    **kwargs,
 ):
     own_session = db is None
 
@@ -53,21 +54,22 @@ async def audit_logs(
         if own_session:
             await db.close()
 
+
 # async def log_logout_async(user_role, user_name, user_id, user_scope, db, request, session_id=None):
 #     module_id = AccessModule.PATIENT_DASHBOARD.value
 
-#     if user_role == UserRole.SPECIALIST.value: 
+#     if user_role == UserRole.SPECIALIST.value:
 #         module_id = AccessModule.SPECIALIST_DASHBOARD.value
 
-#     if user_role == UserRole.SUPER_ADMIN.value: 
+#     if user_role == UserRole.SUPER_ADMIN.value:
 #         module_id = AccessModule.USER_MANAGEMENT.value
 
-#     if user_role == UserRole.HOSPITAL_POC.value: 
+#     if user_role == UserRole.HOSPITAL_POC.value:
 #         module_id = AccessModule.HOSPITAL_POC_DASHBOARD.value
 
-#     if user_role == UserRole.ADMIN.value and user_scope == AdminRoleEnum.FINANCE_ADMIN: 
+#     if user_role == UserRole.ADMIN.value and user_scope == AdminRoleEnum.FINANCE_ADMIN:
 #         module_id = AccessModule.PROCESS_PATIENT_PAYMENTS.value
-    
+
 #     if user_role == UserRole.ADMIN.value and user_scope == AdminRoleEnum.PATIENT_ADMIN:
 #         module_id = AccessModule.MANAGE_PATIENT_CONSULTATIONS.value
 
@@ -79,7 +81,7 @@ async def audit_logs(
 
 #     if user_role == UserRole.ADMIN.value and user_scope == AdminRoleEnum.SUPPORT_ADMIN:
 #         module_id = AccessModule.MANAGE_SUPPORT_TICKETS.value
-    
+
 #     await audit_logs_async(
 #         access_id=module_id,
 #         action_type=ActionType.LOGOUT.value,
@@ -95,12 +97,13 @@ async def audit_logs(
 #         db=db,
 #     )
 #     await db.commit()
-    # await websocket_manager.send_personal_message(
-    #     SocketEvent(
-    #         action_id=ActionType.LOGOUT.value,
-    #         resource_type=ResourceType.USER.value,
-    #         resource_id=user_id,
-    #         data={"session_id": session_id},
-    #     ).model_dump(),
-    #     user_id
-    # )
+# await websocket_manager.send_personal_message(
+#     SocketEvent(
+#         action_id=ActionType.LOGOUT.value,
+#         resource_type=ResourceType.USER.value,
+#         resource_id=user_id,
+#         data={"session_id": session_id},
+#     ).model_dump(),
+#     user_id
+# )
+

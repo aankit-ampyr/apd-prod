@@ -1,8 +1,10 @@
-from services import UserService
+from services.user_service import UserService
 from fastapi.requests import Request
 from sqlalchemy.ext.asyncio import AsyncSession as Session
 from fastapi import Depends, Query, BackgroundTasks
 from db.dependencies import get_user_db, get_db, allowed_roles
+from context.dependencies import get_redis_conn
+from redis.asyncio import Redis
 from constants.enums import UserRole
 from dtos.user_dto import AssignOrganization
 from typing import List, Literal
@@ -51,7 +53,8 @@ class UserController:
             payload: AssignOrganization,
             user_db=Depends(get_user_db),
             db=Depends(get_db),
+            redis: Redis = Depends(get_redis_conn),
             current_user=Depends(allowed_roles(UserRole.ADMIN.value)),
             background_tasks: BackgroundTasks = BackgroundTasks()
     ):
-        return await self.service.assign_organization(db, current_user, user_db, user_id, payload, background_tasks)
+        return await self.service.assign_organization(db, redis, current_user, user_db, user_id, payload, background_tasks)

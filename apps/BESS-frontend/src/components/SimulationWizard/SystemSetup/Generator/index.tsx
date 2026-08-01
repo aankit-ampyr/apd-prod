@@ -7,13 +7,19 @@ import {
   projectSimulationData,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData} from '@/services/redux/selectors';
-import {generatorDgFuelCurveRequest, generatorDgRequest, getGeneratorDgRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {
+  generatorDgFuelCurveRequest,
+  generatorDgRequest,
+  getGeneratorDgRequest,
+  getProjectSimulationSilentRequest,
+} from '@/services/redux/slice/simulationWizardSlice';
 import {Alert, Button, Checkbox, Icon, Radio, Text, Toggle, Tooltip} from '@/ui-kits';
 import {downloadElementAsImage} from '@/utils';
 import {Accordion, IOSProgressSlider, NumberStepperInput} from '@lazarus/react-common/components';
-import {useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {useChangeConfigurationConfirmation} from '../../ChangeConfigurationContext';
+import {useScreenOverride} from '@/hooks';
 
 interface GeneratorProps {
   onNextToDispatchRules?: () => void;
@@ -34,6 +40,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
   const [noLoadCoeff, setNoLoadCoeff] = useState('0.03');
   const [loadCoeff, setLoadCoeff] = useState('0.22');
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const {setFullscreenExitHandler} = useScreenOverride();
 
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
@@ -143,6 +150,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
     // On mount, fetch existing DG config if it exists to pre-populate form
     if (simulation_id) {
       dispatch(getGeneratorDgRequest({simulation_id}));
+      dispatch(getProjectSimulationSilentRequest({simulation_id: simulation_id}));
     }
   }, [simulation_id]);
 
@@ -257,7 +265,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
     });
   };
 
-  const handleMinimizeFullscreen = () => {
+  const handleMinimizeFullscreen = useCallback(() => {
     setIsFullscreen(false);
 
     setTimeout(() => {
@@ -278,7 +286,15 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
         scrollContainer = scrollContainer.parentElement;
       }
     }, 50);
-  };
+  }, []);
+
+  useEffect(() => {
+    setFullscreenExitHandler?.(isFullscreen ? handleMinimizeFullscreen : null);
+
+    return () => {
+      setFullscreenExitHandler?.(null);
+    };
+  }, [handleMinimizeFullscreen, isFullscreen, setFullscreenExitHandler]);
 
   const isChanged = () => {
     if (!dgData) return true;
@@ -307,7 +323,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
   const isAlreadySaved = success === 'S-20019';
   const disableSaveButton = isReadOnly || (isAlreadySaved && !isChanged());
   // For assigned users, always enable the Next button
-  const disableNextButton = isAssignedUser ? false : isChanged() || !isAlreadySaved;
+  const disableNextButton = isChanged() || !isAlreadySaved;
 
   useEffect(() => {
     if (!saveLoading && success === 'S-20019' && isSavingRef.current && onNextToDispatchRules) {

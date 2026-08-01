@@ -1,5 +1,7 @@
 import {cn} from '../../utils/common.utils';
-import React, {forwardRef, type PropsWithChildren, HTMLProps} from 'react';
+import {forwardRef, type PropsWithChildren, HTMLProps} from 'react';
+import {useWindowDimensions} from '../../hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '../../constants';
 
 export const TextVariants = {
   // space grotesk headings
@@ -24,28 +26,28 @@ export const TextVariants = {
   btnSmall: 'text-btn-small leading-btn-small font-InterSemiBold',
 
   // special variants
-  "16B": "text-body-1 leading-body font-InterBold",
-  "16SB": "text-body-1 leading-body font-InterSemiBold",
-  "16M": "text-body-1 leading-body font-InterMedium",
-  "16R": "text-body-1 leading-body font-InterRegular",
-  
-  "14L": "text-caption leading-caption font-InterLight",
-  "14R": "text-caption leading-caption font-InterRegular",
-  "14M": "text-caption leading-caption font-InterMedium",
-  "14SB": "text-caption leading-caption font-InterSemiBold",
-  "14B": "text-caption leading-caption font-InterBold",
-  
-  "18R": "text-large-body leading-large-body font-InterRegular",
-  "18M": "text-large-body leading-large-body font-InterMedium",
-  "18SB" : "text-large-body leading-large-body font-InterSemiBold",
-  "18B": "text-large-body leading-large-body font-InterBold",
-  
-  "12R": "text-small leading-small font-InterRegular",
-  "12M": "text-small leading-small font-InterMedium",
-  "12SB": "text-small leading-small font-InterSemiBold",
+  '16B': 'text-body-1 leading-body font-InterBold',
+  '16SB': 'text-body-1 leading-body font-InterSemiBold',
+  '16M': 'text-body-1 leading-body font-InterMedium',
+  '16R': 'text-body-1 leading-body font-InterRegular',
+
+  '14L': 'text-caption leading-caption font-InterLight',
+  '14R': 'text-caption leading-caption font-InterRegular',
+  '14M': 'text-caption leading-caption font-InterMedium',
+  '14SB': 'text-caption leading-caption font-InterSemiBold',
+  '14B': 'text-caption leading-caption font-InterBold',
+
+  '18R': 'text-large-body leading-large-body font-InterRegular',
+  '18M': 'text-large-body leading-large-body font-InterMedium',
+  '18SB': 'text-large-body leading-large-body font-InterSemiBold',
+  '18B': 'text-large-body leading-large-body font-InterBold',
+
+  '12R': 'text-small leading-small font-InterRegular',
+  '12M': 'text-small leading-small font-InterMedium',
+  '12SB': 'text-small leading-small font-InterSemiBold',
 
   // otp out of variants
-  free: ""
+  free: '',
 };
 
 export type TextVariantType = keyof typeof TextVariants;
@@ -57,16 +59,23 @@ interface TextProps extends PropsWithChildren<HTMLProps<HTMLParagraphElement>> {
 
 export const Text = forwardRef<HTMLParagraphElement, TextProps>((props, ref) => {
   const {children, className, variant = 'body1', style, ...rest} = props;
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
+
+  let appliedVariantClass = TextVariants[variant];
+  if (isTablet && variant === 'h1') {
+    appliedVariantClass = 'text-h2 leading-h2 font-InterBold';
+  }
+
   return (
     <p
       ref={ref}
       style={{
         color: 'var(--color-text-primary)',
-        ...style
+        ...style,
       }}
-      className={cn(className, TextVariants[variant])}
-      {...rest}
-    >
+      className={cn(className, appliedVariantClass)}
+      {...rest}>
       {children}
     </p>
   );

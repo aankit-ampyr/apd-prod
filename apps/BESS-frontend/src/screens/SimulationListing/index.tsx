@@ -11,6 +11,8 @@ import {
   projectSimulationSuccess,
   simulationListData,
   simulationListError,
+  simulationListLoading,
+  simulationListSuccess,
   updateSimulationError,
   updateSimulationSuccess,
 } from '@/services/redux/selectors/simulationWizardSelector';
@@ -28,7 +30,7 @@ import {
   updateProjectSimulationRequest,
 } from '@/services/redux/slice/simulationWizardSlice';
 import {DeleteSimulation, DiscardSimulation} from '@/components/SimulationWizard/DeleteSimulation';
-import {Badge, Button, Icon, SelectInput, Sort, Text, TextInput} from '@/ui-kits';
+import {Badge, Button, Icon, Sort, Text, TextInput, Skeleton, SearchableSelectInput} from '@/ui-kits';
 import {Images} from '@lazarus/react-common/assets';
 import {useFormik} from 'formik';
 import {useDispatch, useSelector} from 'react-redux';
@@ -71,6 +73,36 @@ const initialValues: FormType = {
 };
 
 const PAGE_SIZE = 10;
+const GHOST_TABLE_ROWS = Array.from({length: 8}, (_, id) => ({id}));
+
+function SimulationListingGhostLoader() {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-[#D9E1E7]">
+      <table className="w-full min-w-max">
+        <thead className="bg-[#E9FAF8]">
+          <tr>
+            {Array.from({length: 5}).map((_, index) => (
+              <th key={index} className="px-4 py-3">
+                <Skeleton animation="wave" variant="rounded" width={100} height={18} className="rounded-full!" />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {GHOST_TABLE_ROWS.map(row => (
+            <tr key={row.id}>
+              {Array.from({length: 5}).map((_, index) => (
+                <td key={index} className="px-4 py-4">
+                  <Skeleton animation="wave" variant="rounded" width={index === 1 ? 160 : 100} height={16} className="rounded-full!" />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
 
 const STATUS_FILTER_MAP: Record<number, SimulationStatus> = {
   1: 'completed',
@@ -85,6 +117,8 @@ export const SimulationListing = () => {
   const navigate = useNavigate();
 
   const simulationError = useSelector(simulationListError);
+  const simulationListSuccessCode = useSelector(simulationListSuccess);
+  const isSimulationListLoading = useSelector(simulationListLoading);
 
   const simulData = useSelector(initiateSimulationData);
   const simulListData = useSelector(simulationListData);
@@ -100,6 +134,9 @@ export const SimulationListing = () => {
   const updateFailure = useSelector(updateSimulationError) as ErrorCodes;
 
   const [simulations, setSimulations] = useState<SimulationRow[]>([]);
+  const [showGhostLoader, setShowGhostLoader] = useState(false);
+  const hasObservedSimulationListLoading = useRef(false);
+  const pendingSimulationList = useRef<typeof simulListData | null>(null);
   const [page, setPage] = useState(1);
   const [filter, setFilter] = useState<FilterType>({});
   const [sort, setSort] = useState<SortType>(null);
@@ -108,6 +145,7 @@ export const SimulationListing = () => {
   const [selectedSimulation, setSelectedSimulation] = useState<SimulationRow | null>(null);
   const [activeModal, setActiveModal] = useState<SimulationModalType | null>(null);
   const [tableMessage, setTableMessage] = useState('');
+  const [projectInitialized, setProjectInitialized] = useState(false);
 
   const {errors, values, handleBlur, setFieldValue, touched} = useFormik({
     initialValues,
@@ -118,6 +156,25 @@ export const SimulationListing = () => {
   });
 
   const hasActiveFilters = Boolean(filter.search || filter.status !== undefined || filter.start_date || filter.end_date);
+
+  useEffect(() => {
+    if (isSimulationListLoading) {
+      hasObservedSimulationListLoading.current = true;
+      return;
+    }
+
+    if (hasObservedSimulationListLoading.current) {
+      hasObservedSimulationListLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [isSimulationListLoading]);
+
+  useEffect(() => {
+    if (hasObservedSimulationListLoading.current && (simulationListSuccessCode || simulationError)) {
+      hasObservedSimulationListLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [simulationListSuccessCode, simulationError]);
 
   useEffect(() => {
     if (values.project) {
@@ -137,6 +194,7 @@ export const SimulationListing = () => {
     if (savedProjectId) {
       setFieldValue('project', Number(savedProjectId));
     }
+    setProjectInitialized(true);
   }, []);
 
   useEffect(() => {
@@ -198,6 +256,12 @@ export const SimulationListing = () => {
     selector: allProjectsList,
   });
 
+  const isProjectLoading = allProjects?.length === 0;
+
+  useEffect(() => {
+    dispatch(getAllProjectListRequest());
+  }, [allProjects.length, dispatch]);
+
   const isAssignedUser = Boolean(
     authData?.id && allProjData?.some(project => Number(project?.id) === values.project && project?.assigned_users?.some(user => user.id === authData.id)),
   );
@@ -206,6 +270,7 @@ export const SimulationListing = () => {
   const isProjectSelected = Boolean(values.project);
   const shouldDisableFilters = !isProjectSelected || simulationError === 'E-20006';
   const shouldDisableStartSimulation = !isProjectSelected;
+  const isPermissionLoading = values.project && authData?.id && !allProjData?.length;
 
   const handleFilterChange = (values: FilterType) => {
     const toApiDate = (date: Date | string | null | undefined) => {
@@ -237,6 +302,9 @@ export const SimulationListing = () => {
   function fetchSimulations() {
     if (!values.project) return;
 
+    pendingSimulationList.current = simulListData;
+    setShowGhostLoader(true);
+
     const payload: any = {
       project_id: values.project,
       page,
@@ -255,6 +323,14 @@ export const SimulationListing = () => {
   useEffect(() => {
     fetchSimulations();
   }, [filter, page, sort, values.project]);
+
+  useEffect(() => {
+    if (pendingSimulationList.current !== simulListData) {
+      pendingSimulationList.current = null;
+      hasObservedSimulationListLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [simulListData]);
 
   function handleStartEditSimulation(row: SimulationRow) {
     setEditingSimulationId(row.id);
@@ -311,7 +387,7 @@ export const SimulationListing = () => {
     if (editedStep === 8 || editedStep === 9) return 'Custom Configuration';
     if (editedStep === 10 || editedStep === 11) return 'Multi Year Projection';
     if (editedStep === 12) return 'Green Energy Analysis';
-    if (editedStep === 13) return 'Completed';
+    if (editedStep >= 13) return 'Completed';
 
     return 'System Setup';
   };
@@ -323,7 +399,7 @@ export const SimulationListing = () => {
       const editedStep = Number(item.edited_step) || 1;
 
       // Only step 13 should be completed
-      if (editedStep !== 13 && status === 'completed') {
+      if (editedStep < 13 && status === 'completed') {
         status = 'in_progress';
       }
 
@@ -411,12 +487,14 @@ export const SimulationListing = () => {
             <Text variant="caption" className="text-text-primary! font-InterMedium!">
               {row.simulation}
             </Text>
-            <button
-              type="button"
-              onClick={() => handleStartEditSimulation(row)}
-              className="opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer">
-              <Icon name="pencil" size={16} className="text-primary!" />
-            </button>
+            {!isAssignedUser && (
+              <button
+                type="button"
+                onClick={() => handleStartEditSimulation(row)}
+                className="opacity-0 transition-opacity group-hover:opacity-100 cursor-pointer">
+                <Icon name="pencil" size={16} className="text-primary!" />
+              </button>
+            )}
           </div>
         );
       },
@@ -454,6 +532,10 @@ export const SimulationListing = () => {
   ];
 
   const renderContent = () => {
+    if ((!projectInitialized || showGhostLoader || isPermissionLoading) && !sort) {
+      return <SimulationListingGhostLoader />;
+    }
+
     if (!values.project) {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4 py-10">
@@ -503,10 +585,14 @@ export const SimulationListing = () => {
           <Text variant="subtitle1" className="text-text-primary">
             View, resume, and analyze your simulation runs
           </Text>
-          {!isAssignedUser && (
-            <Button onClick={handleNewSimulation} leftIcon="plus" disabled={shouldDisableStartSimulation} className="flex items-center gap-2">
-              Start New Simulation
-            </Button>
+          {(!projectInitialized || showGhostLoader || isPermissionLoading) && !sort ? (
+            <Skeleton animation="wave" variant="rounded" width={180} height={40} />
+          ) : (
+            !isAssignedUser && (
+              <Button onClick={handleNewSimulation} leftIcon="plus" disabled={shouldDisableStartSimulation} className="flex items-center gap-2">
+                Start New Simulation
+              </Button>
+            )
           )}
         </div>
 
@@ -515,33 +601,38 @@ export const SimulationListing = () => {
             <Text variant="16M" className="text-text-primary">
               Select Project :
             </Text>
-            <SelectInput
-              required
-              placeholder="Select Project"
-              options={allProjects}
-              onChange={item => {
-                setPage(1);
-                setFilter({});
 
-                if (!item?.id) {
-                  setFieldValue('project', null);
-                  localStorage.removeItem('selectedProjectId');
-                  return;
-                }
+            {isProjectLoading ? (
+              <Skeleton animation="wave" variant="rounded" width={210} height={40} className="rounded-md!" />
+            ) : (
+              <SearchableSelectInput
+                required
+                placeholder="Select Project"
+                options={allProjects}
+                onChange={item => {
+                  setPage(1);
+                  setFilter({});
 
-                const projectId = Number(item.id);
-                setFieldValue('project', projectId);
-                localStorage.setItem('selectedProjectId', String(projectId));
+                  if (!item?.id) {
+                    setFieldValue('project', null);
+                    localStorage.removeItem('selectedProjectId');
+                    return;
+                  }
 
-                dispatch(getSimulationListRequest({project_id: projectId}));
-              }}
-              onBlur={handleBlur('project')}
-              value={values.project}
-              touched={touched.project}
-              error={errors.project}
-              className="w-52"
-              isFilter
-            />
+                  const projectId = Number(item.id);
+                  setFieldValue('project', projectId);
+                  localStorage.setItem('selectedProjectId', String(projectId));
+
+                  dispatch(getSimulationListRequest({project_id: projectId}));
+                }}
+                onBlur={handleBlur('project')}
+                value={values.project}
+                touched={touched.project}
+                error={errors.project}
+                className="w-52"
+                isFilter
+              />
+            )}
           </div>
 
           <FilterGroup
@@ -624,7 +715,7 @@ function SimulationActionCell({
   }, [projSimlSuccess, proSimulData, dispatch, navigate]);
 
   if (isAssignedUser) {
-    if (row.editedStep === 13) {
+    if (row.editedStep >= 13) {
       return (
         <div className="flex items-center gap-3">
           <ActionButton icon="eye" label="View Results" variant="teal" onClick={handleResumeSetup} />
@@ -639,7 +730,7 @@ function SimulationActionCell({
     );
   }
 
-  if (row.editedStep === 13) {
+  if (row.editedStep >= 13) {
     return (
       <div className="flex items-center gap-3">
         <ActionButton icon="eye" label="View Results" variant="teal" onClick={handleResumeSetup} />
@@ -694,7 +785,7 @@ function ActionButton({
     <button
       type="button"
       onClick={onClick}
-      className={`inline-flex h-9 items-center gap-2 rounded-sm border bg-white px-4 shadow-sm cursor-pointer ${variants[variant].button}`}>
+      className={`inline-flex h-9 items-center whitespace-nowrap gap-2 rounded-sm border bg-white px-4 shadow-sm cursor-pointer ${variants[variant].button}`}>
       <Icon name={icon} size={16} className={variants[variant].content} />
       <Text variant="btnSmall" className={`font-InterSemibold! ${variants[variant].content}`}>
         {label}

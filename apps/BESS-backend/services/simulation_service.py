@@ -24,6 +24,7 @@ from models.simulation_model import (
     SolarProfileSource,
 )
 from models.project_model import Project, ProjectUserAssignment
+from redis.asyncio import Redis
 from utils.log_utils import audit_logs
 from utils.response_utils import Res
 
@@ -35,6 +36,7 @@ class SimulationService:
         project_id: int,
         user_id: int,
         current_user: dict,
+        redis: Redis,
     ):
         # Check if project exists
         project_query = select(Project).where(Project.id == project_id)
@@ -94,6 +96,7 @@ class SimulationService:
                     "Simulation Name": new_simulation.name,
                 }
             ),
+            redis=redis,
         )
 
         await bess_db.commit()
@@ -231,6 +234,7 @@ class SimulationService:
         name: str,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         try:
             user_id = int(current_user.get("id"))  # type: ignore
@@ -302,6 +306,7 @@ class SimulationService:
                 resource_id=resource_id,
                 before=str({"Simulation Name": before_name}),
                 after=str({"Simulation Name": simulation.name}),
+                redis=redis,
             )
 
             await bess_db.commit()
@@ -336,6 +341,7 @@ class SimulationService:
         simulation_id: int,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         try:
             sim = await bess_db.get(Simulation, simulation_id)
@@ -367,6 +373,7 @@ class SimulationService:
                     }
                 ),
                 after=None,
+                redis=redis,
             )
 
             await bess_db.delete(sim)
@@ -513,3 +520,31 @@ class SimulationService:
                 status_code="E-20001",
                 http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+    async def fetch_simulation_step(
+        self,
+        bess_db: AsyncSession,
+        simulation_id: int,
+    ):
+        query = select(Simulation).where(Simulation.id == simulation_id)
+        result = await bess_db.execute(query)
+        simulation = result.scalar_one_or_none()
+
+        if not simulation:
+            return Res.error(
+                status_code="E-20043",
+                message="Simulation not found",
+                http_status_code=status.HTTP_404_NOT_FOUND,
+            )
+
+        return {
+            "status": "success",
+            "status_code": "S-20031",
+            "data": {
+                "id": simulation.id,
+                "step": simulation.step,
+                "last_edited": simulation.edit_step,
+                "created_at": simulation.created_at.isoformat(),
+                "updated_at": simulation.updated_at.isoformat(),
+            },
+        }

@@ -1,9 +1,11 @@
-import { AnalyticsTable, SectionHeader } from "../../../common";
-import { useChartsActionV2 } from "@/hooks";
-import { AssetAncillaryServiceAnalytics, DataTableColumn } from "@/interface";
-import { downloadAssetAncillaryServiceRevenueBreakdown } from "@/services/api";
-import { IconButton } from "@/ui-kits";
-import { cn } from "@/utils";
+import {AnalyticsTable, SectionHeader} from '../../../common';
+import {useChartsActionV2} from '@/hooks';
+import {AssetAncillaryServiceAnalytics, DataTableColumn} from '@/interface';
+import {downloadAssetAncillaryServiceRevenueBreakdown} from '@/services/api';
+import {IconButton} from '@/ui-kits';
+import {cn} from '@/utils';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 
 export type AncillaryRevenueBreakdownRow = NonNullable<
   AssetAncillaryServiceAnalytics['revenue_breakdown']
@@ -18,16 +20,20 @@ type ServiceBreakSectionProps = {
   month?: number;
   year?: number;
   assetSystemGenerationId?: string;
+  customActions?: React.ReactNode;
 };
 
 export function ServiceBreakSection(props: ServiceBreakSectionProps) {
-  const {isFullScreen = false, columns, loading = false, data, assetId, month, year, assetSystemGenerationId} = props;
+  const {isFullScreen = false, columns, loading = false, data, assetId, month, year, assetSystemGenerationId, customActions} = props;
 
   /**
    * ==============================
    * Hooks
    * ==============================
    */
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
+
   const {chartRef, onMaximize, onMinimize} = useChartsActionV2({
     downloadFileName: '',
     renderFullScreen: () => <ServiceBreakSection {...props} isFullScreen />,
@@ -50,10 +56,11 @@ export function ServiceBreakSection(props: ServiceBreakSectionProps) {
         <SectionHeader icon="table" title="Ancillary Service Breakdown" subtitle="Detailed performance per service" />
 
         {!loading && (
-          <div className={cn('flex items-center gap-4 chart-actions')}>
+          <div className={cn('flex shrink-0 items-center flex-nowrap gap-3 chart-actions')}>
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleExportDownload}
@@ -61,7 +68,7 @@ export function ServiceBreakSection(props: ServiceBreakSectionProps) {
             {!isFullScreen ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -69,7 +76,7 @@ export function ServiceBreakSection(props: ServiceBreakSectionProps) {
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}
@@ -81,7 +88,7 @@ export function ServiceBreakSection(props: ServiceBreakSectionProps) {
       <AnalyticsTable
         titleContainerClassName="px-5 py-4"
         wrapperClassName="rounded-2xl border border-border shadow-[0_1px_0_rgba(17,19,43,0.04)]"
-        tableClassName="table-auto"
+        tableClassName={cn('table-auto', isTablet && '[&_th]:px-2 [&_td]:px-2')}
         headerColor="#EEF0F5"
         data={data}
         columns={columns}

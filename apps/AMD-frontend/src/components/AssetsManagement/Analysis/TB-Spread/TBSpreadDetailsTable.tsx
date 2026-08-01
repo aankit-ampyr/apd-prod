@@ -10,9 +10,10 @@ interface TBSpreadDetailsTableProps {
   columns: DataTableColumn<TBSpreadDetail>[];
   month: number;
   isFullScreenOverride?: boolean;
+  customActions?: React.ReactNode;
 }
 export function TBSpreadDetailsTable(props: TBSpreadDetailsTableProps) {
-  const {data, loading, onDownload, columns, month, isFullScreenOverride: isFullScreen} = props;
+  const {data, loading, onDownload, columns, month, isFullScreenOverride: isFullScreen, customActions} = props;
 
   /**
    * ====================================
@@ -37,13 +38,16 @@ export function TBSpreadDetailsTable(props: TBSpreadDetailsTableProps) {
           <div className="p-4 flex justify-between items-center">
             <Text variant="h4">Daily TB Spread Details</Text>
             {!loading && (
-              <div className="flex items-center gap-3 chart-actions">
-              <div className="ml-auto px-4 py-2 rounded-sm mr-3 bg-primary">
-                <Text variant='16SB' className='text-white!'>{CALENDAR_MONTH_NAMES[month - 1]}</Text>
-              </div>
+              <div className="flex shrink-0 items-center flex-nowrap gap-3 chart-actions">
+                <div className="bg-[#3A9E8D] flex items-center px-4 py-2 rounded-[8px]">
+                  <Text variant="16SB" className="text-white!">
+                    {CALENDAR_MONTH_NAMES[month - 1]}
+                  </Text>
+                </div>
+                {customActions}
                 <IconButton
                   name="download"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onDownload}
@@ -51,7 +55,7 @@ export function TBSpreadDetailsTable(props: TBSpreadDetailsTableProps) {
                 {!isFullScreen ? (
                   <IconButton
                     name="maximize"
-                    size={20}
+                    size={16}
                     className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                     iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                     onClick={onMaximize}
@@ -59,7 +63,7 @@ export function TBSpreadDetailsTable(props: TBSpreadDetailsTableProps) {
                 ) : (
                   <IconButton
                     name="minimize"
-                    size={20}
+                    size={16}
                     className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                     iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                     onClick={onMinimize}

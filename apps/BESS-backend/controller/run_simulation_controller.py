@@ -1,8 +1,8 @@
 from datetime import datetime
 from fastapi import Depends, Query
 from typing import List, Optional
-from context.dependency import get_resource_id
-from context.dependency import get_redis_conn
+from redis.asyncio import Redis
+from context.dependency import get_resource_id, get_redis_conn
 from constants.enums import UserRole, Month
 from db.dependencies import allowed_roles, get_bess_db
 from services import (
@@ -32,19 +32,21 @@ class RunSimulationController(SimulationSetupController):
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_sizing_sim_service.run_sizing_simulation(
             simulation_id=simulation_id,
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def stop_simulation(
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        redis=Depends(get_redis_conn),
+        redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
     ):
@@ -83,6 +85,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_sizing_sim_service.get_simulation_results(
             simulation_id=simulation_id,
@@ -97,6 +100,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def export_simulation_results(
@@ -109,6 +113,13 @@ class RunSimulationController(SimulationSetupController):
         delivery_percentage: Optional[float] = Query(None),
         dg_runtime_hours: Optional[float] = Query(None),
         sort: Optional[List[str]] = Query(None),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN, UserRole.MANAGEMENT, UserRole.ANALYST, UserRole.VIEWER
+            )
+        ),
+        resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_sizing_sim_service.export_simulation_results(
             simulation_id=simulation_id,
@@ -119,6 +130,9 @@ class RunSimulationController(SimulationSetupController):
             delivery_percentage=delivery_percentage,
             dg_runtime_hours=dg_runtime_hours,
             sort=sort,
+            current_user=current_user,
+            resource_id=resource_id,
+            redis=redis,
         )
 
     # Single Sizing simulation
@@ -128,12 +142,14 @@ class RunSimulationController(SimulationSetupController):
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_single_sim_service.run_simulation(
             simulation_id=simulation_id,
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_single_hourly_simulation_results(
@@ -191,6 +207,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_single_sim_service.export_simulation_results(
             simulation_id=simulation_id,
@@ -200,6 +217,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_single_simulation_results(
@@ -231,19 +249,21 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_multi_year_sim_service.run_simulation(
             simulation_id=simulation_id,
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def stop_multi_year_simulation(
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        redis=Depends(get_redis_conn),
+        redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
@@ -272,6 +292,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_multi_year_sim_service.get_simulation_results(
             simulation_id=simulation_id,
@@ -280,6 +301,7 @@ class RunSimulationController(SimulationSetupController):
             current_user=current_user,
             resource_id=resource_id,
             sort=sort,
+            redis=redis,
         )
 
     async def get_multi_year_simulation_progress(
@@ -303,6 +325,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_multi_year_sim_service.export_simulation_results(
             simulation_id=simulation_id,
@@ -311,6 +334,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_monthly_simulation_result(
@@ -325,6 +349,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_single_sim_service.get_monthly_simulation_result(
             simulation_id=simulation_id,
@@ -333,6 +358,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def export_monthly_simulation_results(
@@ -347,6 +373,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_single_sim_service.export_monthly_simulation_results(
             simulation_id=simulation_id,
@@ -355,6 +382,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def run_green_energy_simulation(
@@ -368,19 +396,21 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_green_energy_sim_service.run_sizing_simulation(
             simulation_id=simulation_id,
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def stop_green_energy_simulation(
         self,
         simulation_id: int,
         bess_db: AsyncSession = Depends(get_bess_db),
-        redis=Depends(get_redis_conn),
+        redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN,
@@ -426,6 +456,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_green_energy_sim_service.get_simulation_results(
             simulation_id=simulation_id,
@@ -442,6 +473,7 @@ class RunSimulationController(SimulationSetupController):
             viable_only=viable_only,
             delivery_100_only=delivery_100_only,
             zero_dg_hours_only=zero_dg_hours_only,
+            redis=redis,
         )
 
     async def export_green_energy_simulation_results(
@@ -462,6 +494,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_green_energy_sim_service.export_simulation_results(
             simulation_id=simulation_id,
@@ -476,6 +509,7 @@ class RunSimulationController(SimulationSetupController):
             sort=sort,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def run_detailed_green_simulation(
@@ -484,12 +518,14 @@ class RunSimulationController(SimulationSetupController):
         bess_db: AsyncSession = Depends(get_bess_db),
         current_user: dict = Depends(allowed_roles(UserRole.ADMIN, UserRole.ANALYST)),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return await self.run_detailed_green_sim_service.run_simulation(
             simulation_id=simulation_id,
             bess_db=bess_db,
             current_user=current_user,
             resource_id=resource_id,
+            redis=redis,
         )
 
     async def get_detailed_green_simulation_results(
@@ -520,6 +556,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return (
             await self.run_detailed_green_sim_service.export_hourly_simulation_results(
@@ -527,6 +564,7 @@ class RunSimulationController(SimulationSetupController):
                 bess_db=bess_db,
                 current_user=current_user,
                 resource_id=resource_id,
+                redis=redis,
             )
         )
 
@@ -540,6 +578,7 @@ class RunSimulationController(SimulationSetupController):
             )
         ),
         resource_id: str = Depends(get_resource_id),
+        redis: Redis = Depends(get_redis_conn),
     ):
         return (
             await self.run_detailed_green_sim_service.export_monthly_simulation_results(
@@ -547,6 +586,7 @@ class RunSimulationController(SimulationSetupController):
                 current_user=current_user,
                 resource_id=resource_id,
                 bess_db=bess_db,
+                redis=redis,
             )
         )
 

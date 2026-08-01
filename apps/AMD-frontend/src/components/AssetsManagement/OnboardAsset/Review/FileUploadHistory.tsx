@@ -1,4 +1,4 @@
-import {AssetReportFile, DataTableColumn, Invoice, InvoiceSettlement, MonthYear} from '@/interface';
+import {AssetReportFile, DataTableColumn, Invoice, InvoiceSettlement, InvoiceStatementSummary, MonthYear} from '@/interface';
 import {currentAssetFilesLoading, currentSelectedAsset, currentSelectedAssetFiles} from '@/services/redux/selectors';
 import {currentAssetFilesRequest} from '@/services/redux/slice';
 import {useEffect, useState} from 'react';
@@ -14,14 +14,16 @@ import {
 } from '@/constants';
 import {formatDate} from '@/utils';
 import {AnalyticsTable, ClearFilterButton} from '@lazarus/react-common';
-import {downloadAssetFile, downloadInvoice, exportInvoiceSettlement} from '@/services/api';
+import {downloadAssetFile, downloadInvoice, exportInvoiceSettlement, downloadAssetInvoiceStatementSummary} from '@/services/api';
 import {
   invoiceListData,
   invoiceListLoading,
   invoiceSettlementListData,
   invoiceSettlementListLoading,
+  invoiceSummaryStatementListData,
+  invoiceSummaryStatementListLoading,
 } from '@/services/redux/selectors/invoiceSelector';
-import {getInvoicesListRequest, getInvoicesSettlementListRequest} from '@/services/redux/slice/invoiceSlice';
+import {getInvoicesListRequest, getInvoicesSettlementListRequest, getInvoicesSummaryStatementListRequest} from '@/services/redux/slice/invoiceSlice';
 
 /**
  * ===============
@@ -56,7 +58,13 @@ export type InvoiceSettlementFileHistoryRow = BaseFileHistoryRow & {
   original: InvoiceSettlement;
 };
 
-export type FileHistoryRow = AssetFileHistoryRow | InvoiceFileHistoryRow | InvoiceSettlementFileHistoryRow;
+export type InvoiceSummaryStatementFileHistoryRow = BaseFileHistoryRow & {
+  source: 'invoice-summary-statement';
+  type: null;
+  original: InvoiceStatementSummary;
+};
+
+export type FileHistoryRow = AssetFileHistoryRow | InvoiceFileHistoryRow | InvoiceSettlementFileHistoryRow | InvoiceSummaryStatementFileHistoryRow;
 
 interface UploadFileHistoryProps {}
 
@@ -82,6 +90,9 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
 
   const invoiceSettlements = useSelector(invoiceSettlementListData);
   const invoiceSettlementsLoading = useSelector(invoiceSettlementListLoading);
+
+  const invoiceSummaryStatements = useSelector(invoiceSummaryStatementListData);
+  const invoiceSummaryStatementLoading = useSelector(invoiceSummaryStatementListLoading);
 
   /**
    * ==============
@@ -210,6 +221,19 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
             />
           );
         }
+        if (row.source === 'invoice-summary-statement') {
+          return (
+            <Badge
+              message={`Summary`}
+              size="sm"
+              color={'olive'}
+              className="min-w-26"
+              textStyle={{
+                fontFamily: 'Inter-Medium',
+              }}
+            />
+          );
+        }
         return null;
       },
     },
@@ -273,13 +297,28 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
     }),
   );
 
+  const modifiedInvoiceSummaryStatemantFiles = invoiceSummaryStatements.map(
+    (statement): InvoiceSummaryStatementFileHistoryRow => ({
+      id: statement.id,
+      assetId: currentAsset?.id,
+      name: statement.file_name,
+      type: null,
+      uploadedAt: statement.uploaded_on,
+      month: statement.month ?? undefined,
+      year: statement.year ?? undefined,
+      source: 'invoice-summary-statement',
+      original: statement,
+    }),
+  );
+
   const combinedFiles: FileHistoryRow[] = [
     ...modifiedAssetReportFiles,
     ...modifiedInvoiceFiles,
     ...modifiedInvoiceSettlementFiles,
+    ...modifiedInvoiceSummaryStatemantFiles,
   ].sort((a, b) => {
-    const isFileAIar = a.source === 'asset-files' && a.type === AssetFileType.IAR;
-    const isFileBIar = b.source === 'asset-files' && b.type === AssetFileType.IAR;
+    const isFileAIar = a.type === AssetFileType.IAR;
+    const isFileBIar = b.type === AssetFileType.IAR;
 
     if (isFileAIar) {
       return 1; // a comes after b
@@ -328,10 +367,13 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
       downloadAssetFile({fileId, assetId, fileName});
     }
     if (fileSource === 'invoice') {
-      downloadInvoice({assetId, invoiceId: fileId, fileName});
+      downloadInvoice({assetId, invoiceId: fileId, fileName, source: 'upload_history'});
     }
     if (fileSource === 'invoice-settlement') {
       exportInvoiceSettlement({assetId, settlementId: fileId, fileName});
+    }
+    if (fileSource === 'invoice-summary-statement'){
+      downloadAssetInvoiceStatementSummary({assetId, statementId: fileId, fileName})
     }
   }
 
@@ -366,6 +408,13 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
           year: payload.year,
         }),
       );
+      dispatch(
+        getInvoicesSummaryStatementListRequest({
+          assetId: currentAsset?.id,
+          month: payload.month,
+          year: payload.year,
+        }),
+      );
     }
   }, [currentAsset?.id, open, monthYear]);
 
@@ -394,7 +443,7 @@ export function UploadFileHistory(_props: UploadFileHistoryProps) {
           <AnalyticsTable
             rowHover
             rowAlign="items-start"
-            loading={isLoading || invoicesLoading || invoiceSettlementsLoading}
+            loading={isLoading || invoicesLoading || invoiceSettlementsLoading || invoiceSummaryStatementLoading}
             tableClassName="table-auto! min-w-[1200px] shrink-0"
             wrapperClassName="border-none rounded-none! overflow-x-auto"
             data={combinedFiles}

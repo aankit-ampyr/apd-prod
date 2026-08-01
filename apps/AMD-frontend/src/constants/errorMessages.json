@@ -1113,5 +1113,165 @@
     "key": "invoice_pdf_invalid_file_type",
     "message": "Only PDF files are supported. Please upload a valid PDF invoice.",
     "type": "validation_error"
+  },
+  "E-10239": {
+    "key": "asset_name_already_exists",
+    "message": "This organization already has an asset named \"<asset_name>\"",
+    "type": "validation_error"
+  },
+  "E-10240": {
+    "key": "inactive_asset_action_not_allowed",
+    "message": "This action cannot be performed on inactive assets. Please activate the asset first and then try again.",
+    "type": "validation_error"
+  },
+  "E-10241": {
+    "key": "invalid_summary_statement_file_name",
+    "message": "Invalid file name. Summary Statement file name should start with Northwold.",
+    "type": "validation_error"
+  },
+  "E-10242": {
+    "key": "summary_sheet_missing",
+    "message": "Invalid Summary Statement file. The Summary sheet is missing.",
+    "type": "validation_error"
+  },
+  "E-10243": {
+    "key": "detail_sheet_missing",
+    "message": "Invalid Summary Statement file. The Detail sheet is missing.",
+    "type": "validation_error"
+  },
+  "E-10244": {
+    "key": "summary_statement_reporting_period_mismatch",
+    "message": "Uploaded Summary Statement file does not match the selected reporting period.",
+    "type": "validation_error"
+  },
+  "E-10245": {
+    "key": "mandatory_detail_column_missing",
+    "message": "Mandatory column is missing in the Detail sheet.",
+    "type": "validation_error"
+  },
+  "E-10246": {
+    "key": "detail_sheet_timestamp_validation_failed",
+    "message": "Timestamp validation failed. Please check the timestamps in the Detail sheet.",
+    "type": "validation_error"
+  },
+  "E-10247": {
+    "key": "invalid_detail_sheet_revenue",
+    "message": "Invalid revenue value found in the Detail sheet.",
+    "type": "validation_error"
+  },
+  "E-10248": {
+    "key": "summary_statement_file_not_found",
+    "message": "Summary Statement file not found.",
+    "type": "validation_error"
+  },
+  "E-10249": {
+    "key": "summary_statement_file_size_exceeded",
+    "message": "Summary Statement file size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10250": {
+    "key": "invalid_summary_statement_file_type",
+    "message": "Summary Statement file must be in Excel (.xlsx) format only.",
+    "type": "validation_error"
+  },
+  "E-10252": {
+    "key": "comment_not_found",
+    "message": "Comment not found.",
+    "type": "not_found_error"
+  },
+  "E-10253": {
+    "key": "unauthorized_comment_edit",
+    "message": "You are not authorized to edit or delete this comment.",
+    "type": "permission_error"
+  },
+  "E-10255": {
+    "key": "comment_title_content_empty",
+    "message": "Please enter a title or comment.",
+    "type": "validation_error"
+  },
+  "E-10256": {
+    "key": "comment_timeout",
+    "message": "Comments can only be edited or deleted within 15 minutes of posting.",
+    "type": "validation_error"
+  },
+  "E-10257": {
+    "key": "comment_title_min_length",
+    "message": "Title should be at least 3 characters.",
+    "type": "validation_error"
+  },
+  "E-10258": {
+    "key": "comment_title_max_length",
+    "message": "Title should not exceed 100 characters.",
+    "type": "validation_error"
+  },
+  "E-10260": {
+    "key": "comment_content_min_length",
+    "message": "Comment should be at least 5 characters.",
+    "type": "validation_error"
+  },
+  "E-10261": {
+    "key": "comment_content_max_length",
+    "message": "Comment should not exceed 3000 characters.",
+    "type": "validation_error"
+  },
+  "E-10262": {
+    "key": "comment_reply_min_length",
+    "message": "Reply should be at least 2 characters.",
+    "type": "validation_error"
+  },
+  "E-10263": {
+    "key": "comment_restricted_content",
+    "message": "Contains restricted content. Please remove scripts or code and try again.",
+    "type": "validation_error"
+  },
+  "E-10264": {
+    "key": "comment_meaningful_text",
+    "message": "Should contain meaningful text.",
+    "type": "validation_error"
+  },
+  "E-10265": {
+    "key": "comment_title_spaces",
+    "message": "Title cannot contain only spaces.",
+    "type": "validation_error"
+  },
+  "E-10266": {
+    "key": "comment_content_spaces",
+    "message": "Comment cannot contain only spaces.",
+    "type": "validation_error"
+  },
+  "E-10267": {
+    "key": "comment_reply_spaces",
+    "message": "Reply cannot contain only spaces.",
+    "type": "validation_error"
+  },
+  "E-10268": {
+    "key": "delete_comment_with_replies",
+    "message": "Cannot delete comment with replies. Please delete replies first.",
+    "type": "validation_error"
+  },
+  "E-10269": {
+    "key": "unsupported_title_characters",
+    "message": "Title contains unsupported characters.",
+    "type": "validation_error"
+  },
+  "E-10270": {
+    "key": "unsupported_comment_characters",
+    "message": "Comment contains unsupported characters.",
+    "type": "validation_error"
+  },
+  "E-10271": {
+    "key": "unsupported_reply_characters",
+    "message": "Reply contains unsupported characters.",
+    "type": "validation_error"
+  },
+  "E-10272": {
+    "key": "no_organizations_found",
+    "message": "You are not assigned to any organizations. Please contact your administrator.",
+    "type": "data_error"
+  },
+  "E-10273": {
+    "key": "unauthorized_access",
+    "message": "You are not authorized to access this platform.",
+    "type": "data_error"
   }
 }

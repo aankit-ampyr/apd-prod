@@ -1,4 +1,4 @@
-import {useToast} from '@/hooks';
+import {useToast, useWindowDimensions} from '@/hooks';
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {Images} from '@/assets/images';
@@ -9,17 +9,13 @@ import {
   organizationSuccess,
   organizationError,
   organizationTotalResults,
+  organizationLoading,
 } from '@/services/redux/selectors';
 import {resetOrganizationMessage, organizationListRequest} from '@/services/redux/slice';
 import type {Organization, DataTableColumn, OrganizationListRequest, SortType} from '@/interface';
 import {NA, STATUS_OPTIONS} from '@/constants';
 import {getErrorMessage, getSuccessMessage, type ErrorCodes, type SuccessCodes, formatDate} from '@/utils';
-import {DataTable, FilterGroup, OrganizationEntry} from '@/components';
-
-/**
- * Page Size for pagination
- */
-const PAGE_SIZE = 10;
+import {DataTable, FilterGroup, OrganizationEntry, ScreenWrapper} from '@/components';
 
 /**
  * Filter type for user list filtering
@@ -40,11 +36,14 @@ export function Organizations() {
   // =================
   // selectors
   // =================
-  const organizations = useSelector(organizationList).slice(0, PAGE_SIZE);
+  const {width} = useWindowDimensions();
+  const pageSize = width < 1025 ? 6 : 10;
+  const organizations = useSelector(organizationList).slice(0, pageSize);
   const totalPages = useSelector(organizationTotalPages);
   const totalResult = useSelector(organizationTotalResults);
   const success = useSelector(organizationSuccess) as SuccessCodes;
   const failure = useSelector(organizationError) as ErrorCodes;
+  const isLoading = useSelector(organizationLoading);
 
   // =================
   // states
@@ -142,7 +141,7 @@ export function Organizations() {
   // side effects
   // =========================
   useEffect(() => {
-    const payload: OrganizationListRequest['params'] = {page, limit: PAGE_SIZE};
+    const payload: OrganizationListRequest['params'] = {page, limit: pageSize};
     if (filter.search) {
       payload.search = filter.search;
     }
@@ -153,7 +152,7 @@ export function Organizations() {
       payload.sort = filter.sort;
     }
     dispatch(organizationListRequest(payload));
-  }, [filter, page]);
+  }, [filter, page, pageSize]);
 
   useEffect(() => {
     if (success) {
@@ -212,8 +211,8 @@ export function Organizations() {
   }
 
   return (
-    <div className="bg-bg-card p-8 grow flex flex-col">
-      <div className="flex flex-col gap-6 p-10 bg-white rounded-lg shadow grow">
+    <ScreenWrapper className="min-h-0" wrapperClassName="min-h-0 p-4 sm:p-6" nestedWrapperClassName="min-h-0">
+      <div className="flex flex-col gap-6 h-full min-h-0">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <Text variant="subtitle1" className="text-text-primary">
             Manage organizations and their status across the platform.
@@ -246,15 +245,21 @@ export function Organizations() {
           onChange={setFilter}
         />
         {/* Table */}
-        <DataTable
-          columns={columns}
-          data={organizations}
-          totalPages={totalPages}
-          currentPage={page}
-          totalResult={totalResult}
-          onPageChange={setPage}
-          errorMessage={tableMessage}
-        />
+        <div className="relative w-full flex flex-col shrink min-h-0 [&>div]:gap-4">
+          <DataTable
+            columns={columns}
+            data={organizations}
+            totalPages={totalPages}
+            currentPage={page}
+            pageSize={pageSize}
+            totalResult={totalResult}
+            onPageChange={setPage}
+            errorMessage={tableMessage}
+            stickyHeader
+            loading={isLoading}
+            ghostRowCount={6}
+          />
+        </div>
 
         {(modalOpen == 'add' || modalOpen == 'edit') && (
           <OrganizationEntry
@@ -265,6 +270,6 @@ export function Organizations() {
           />
         )}
       </div>
-    </div>
+    </ScreenWrapper>
   );
 }

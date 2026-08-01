@@ -5,7 +5,12 @@ import {
   InvoiceListRequest,
   InvoiceSettlementListRequest,
   InvoiceSummaryRequest,
-  AssetCapacityMarketRequest,
+  AssetCapacityMarketSummaryRequest,
+  AssetCapacityMarketPaymentsRequest,
+  AssetCapacityMarketPaymentTrendRequest,
+  AssetInvoiceRevenueReconciliationSummaryRequest,
+  AssetInvoiceRevenueReconciliationPerStreamComparisonRequest,
+  AssetInvoiceSummaryStatementListRequest,
 } from '@/interface';
 
 const initialState: InvoiceSliceInitialState = {
@@ -40,11 +45,49 @@ const initialState: InvoiceSliceInitialState = {
     nextPage: null,
     data: [],
   },
-  capacityMarket: {
+
+  summaryStatementList: {
     loading: false,
     error: false,
     success: false,
-    data: null,
+    totalResults: 0,
+    data: [],
+  },
+
+  capacityMarket2: {
+    summary: {
+      loading: false,
+      error: false,
+      success: false,
+      data: null,
+    },
+    payment_trend: {
+      loading: false,
+      error: false,
+      success: false,
+      data: null,
+    },
+    payments: {
+      loading: false,
+      error: false,
+      success: false,
+
+      data: null,
+    },
+  },
+  revenueReconciliation: {
+    summary: {
+      loading: false,
+      error: false,
+      success: false,
+      data: null,
+    },
+    per_stream_comparison: {
+      loading: false,
+      error: false,
+      success: false,
+      data: null,
+    },
   },
 };
 
@@ -142,23 +185,155 @@ const invoiceSlice = createSlice({
     },
 
     // ====================================
-    // Get Capacity Market Analytics
+    // Get Invoices Summary Statement List
     // ====================================
-    getCapacityMarketRequest(state, _action: PayloadAction<AssetCapacityMarketRequest['params']>) {
-      state.capacityMarket.loading = true;
-      state.capacityMarket.error = false;
-      state.capacityMarket.success = false;
+    getInvoicesSummaryStatementListRequest(
+      state,
+      _action: PayloadAction<AssetInvoiceSummaryStatementListRequest['params']>,
+    ) {
+      state.summaryStatementList.loading = true;
+      state.summaryStatementList.error = false;
+      state.summaryStatementList.success = false;
     },
-    getCapacityMarketSuccess(state, action: PayloadAction<AssetCapacityMarketRequest['response']>) {
-      state.capacityMarket.loading = false;
-      state.capacityMarket.success = action.payload.status_code;
+    getInvoicesSummaryStatementListSuccess(
+      state,
+      action: PayloadAction<AssetInvoiceSummaryStatementListRequest['response']>,
+    ) {
+      state.summaryStatementList.loading = false;
+      state.summaryStatementList.success = action.payload.status_code;
       if (action.payload.data) {
-        state.capacityMarket.data = action.payload.data;
+        state.summaryStatementList.data = action.payload.data?.summary_statements || [];
+        state.summaryStatementList.totalResults = action.payload.data?.total_files || 0;
       }
     },
-    getCapacityMarketFailure(state, action: PayloadAction<APIResponse>) {
-      state.capacityMarket.loading = false;
-      state.capacityMarket.error = action.payload.status_code;
+    getInvoicesSummaryStatementListFailure(state, action: PayloadAction<APIResponse>) {
+      state.summaryStatementList.loading = false;
+      state.summaryStatementList.error = action.payload.status_code;
+    },
+
+    // ====================================
+    // Get Capacity Market Summary
+    // ====================================
+    getCapacityMarketSummaryRequest(state, _action: PayloadAction<AssetCapacityMarketSummaryRequest['params']>) {
+      state.capacityMarket2.summary.loading = true;
+      state.capacityMarket2.summary.error = false;
+      state.capacityMarket2.summary.success = false;
+      state.capacityMarket2.summary.data = null;
+    },
+    getCapacityMarketSummarySuccess(state, action: PayloadAction<AssetCapacityMarketSummaryRequest['response']>) {
+      state.capacityMarket2.summary.loading = false;
+      state.capacityMarket2.summary.success = action.payload.status_code;
+      if (action.payload.data) {
+        state.capacityMarket2.summary.data = action.payload.data;
+      }
+    },
+    getCapacityMarketSummaryFailure(state, action: PayloadAction<APIResponse>) {
+      state.capacityMarket2.summary.loading = false;
+      state.capacityMarket2.summary.error = action.payload.status_code;
+    },
+
+    // ====================================
+    // Get Capacity Market Payments
+    // ====================================
+    getCapacityMarketPaymentsRequest(state, _action: PayloadAction<AssetCapacityMarketPaymentsRequest['params']>) {
+      state.capacityMarket2.payments.loading = true;
+      state.capacityMarket2.payments.error = false;
+      state.capacityMarket2.payments.success = false;
+      state.capacityMarket2.payments.data = null;
+    },
+    getCapacityMarketPaymentsSuccess(state, action: PayloadAction<AssetCapacityMarketPaymentsRequest['response']>) {
+      state.capacityMarket2.payments.loading = false;
+      state.capacityMarket2.payments.success = action.payload.status_code;
+      if (action.payload.data) {
+        state.capacityMarket2.payments.data = action.payload.data;
+      }
+    },
+    getCapacityMarketPaymentsFailure(state, action: PayloadAction<APIResponse>) {
+      state.capacityMarket2.payments.loading = false;
+      state.capacityMarket2.payments.error = action.payload.status_code;
+    },
+
+    // ====================================
+    // Get Capacity Market Payment Trend
+    // ====================================
+    getCapacityMarketPaymentTrendRequest(
+      state,
+      _action: PayloadAction<AssetCapacityMarketPaymentTrendRequest['params']>,
+    ) {
+      state.capacityMarket2.payment_trend.loading = true;
+      state.capacityMarket2.payment_trend.error = false;
+      state.capacityMarket2.payment_trend.success = false;
+      state.capacityMarket2.payment_trend.data = null;
+    },
+    getCapacityMarketPaymentTrendSuccess(
+      state,
+      action: PayloadAction<AssetCapacityMarketPaymentTrendRequest['response']>,
+    ) {
+      state.capacityMarket2.payment_trend.loading = false;
+      state.capacityMarket2.payment_trend.success = action.payload.status_code;
+      if (action.payload.data) {
+        state.capacityMarket2.payment_trend.data = action.payload.data;
+      }
+    },
+    getCapacityMarketPaymentTrendFailure(state, action: PayloadAction<APIResponse>) {
+      state.capacityMarket2.payment_trend.loading = false;
+      state.capacityMarket2.payment_trend.error = action.payload.status_code;
+    },
+
+    // ====================================
+    // Get Revenue Reconciliation Summary
+    // ====================================
+    getRevenueReconciliationSummaryRequest(
+      state,
+      _action: PayloadAction<AssetInvoiceRevenueReconciliationSummaryRequest['params']>,
+    ) {
+      state.revenueReconciliation.summary.loading = true;
+      state.revenueReconciliation.summary.error = false;
+      state.revenueReconciliation.summary.success = false;
+      state.revenueReconciliation.summary.data = null;
+    },
+    getRevenueReconciliationSummarySuccess(
+      state,
+      action: PayloadAction<AssetInvoiceRevenueReconciliationSummaryRequest['response']>,
+    ) {
+      state.revenueReconciliation.summary.loading = false;
+      state.revenueReconciliation.summary.success = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.revenueReconciliation.summary.data = action.payload.data;
+      }
+    },
+    getRevenueReconciliationSummaryFailure(state, action: PayloadAction<APIResponse>) {
+      state.revenueReconciliation.summary.loading = false;
+      state.revenueReconciliation.summary.error = action.payload.status_code;
+    },
+
+    // ====================================
+    // Get Revenue Reconciliation Per Stream Comparison
+    // ====================================
+    getRevenueReconciliationPerStreamComparisonRequest(
+      state,
+      _action: PayloadAction<AssetInvoiceRevenueReconciliationPerStreamComparisonRequest['params']>,
+    ) {
+      state.revenueReconciliation.per_stream_comparison.loading = true;
+      state.revenueReconciliation.per_stream_comparison.error = false;
+      state.revenueReconciliation.per_stream_comparison.success = false;
+      state.revenueReconciliation.per_stream_comparison.data = null;
+    },
+    getRevenueReconciliationPerStreamComparisonSuccess(
+      state,
+      action: PayloadAction<AssetInvoiceRevenueReconciliationPerStreamComparisonRequest['response']>,
+    ) {
+      state.revenueReconciliation.per_stream_comparison.loading = false;
+      state.revenueReconciliation.per_stream_comparison.success = action.payload.status_code;
+
+      if (action.payload.data) {
+        state.revenueReconciliation.per_stream_comparison.data = action.payload.data;
+      }
+    },
+    getRevenueReconciliationPerStreamComparisonFailure(state, action: PayloadAction<APIResponse>) {
+      state.revenueReconciliation.per_stream_comparison.loading = false;
+      state.revenueReconciliation.per_stream_comparison.error = action.payload.status_code;
     },
   },
 });
@@ -180,8 +355,33 @@ export const {
   getInvoicesSettlementListRequest,
   getInvoicesSettlementListSuccess,
 
-  // capacity market
-  getCapacityMarketRequest,
-  getCapacityMarketSuccess,
-  getCapacityMarketFailure,
+  // get invoices summary statement list
+  getInvoicesSummaryStatementListRequest,
+  getInvoicesSummaryStatementListSuccess,
+  getInvoicesSummaryStatementListFailure,
+
+  // capacity market summary
+  getCapacityMarketSummaryRequest,
+  getCapacityMarketSummarySuccess,
+  getCapacityMarketSummaryFailure,
+
+  // capacity market payments
+  getCapacityMarketPaymentsRequest,
+  getCapacityMarketPaymentsSuccess,
+  getCapacityMarketPaymentsFailure,
+
+  // capacity market payment trend
+  getCapacityMarketPaymentTrendRequest,
+  getCapacityMarketPaymentTrendSuccess,
+  getCapacityMarketPaymentTrendFailure,
+
+  // revenue reconciliation summary
+  getRevenueReconciliationSummaryFailure,
+  getRevenueReconciliationSummaryRequest,
+  getRevenueReconciliationSummarySuccess,
+
+  // revenue reconciliation per stream comparison
+  getRevenueReconciliationPerStreamComparisonFailure,
+  getRevenueReconciliationPerStreamComparisonRequest,
+  getRevenueReconciliationPerStreamComparisonSuccess,
 } = invoiceSlice.actions;

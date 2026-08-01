@@ -11,8 +11,8 @@ import {
   assetExecutiveSummaryResult,
 } from '@/services/redux/selectors';
 import {RevenueByStream} from './RevenueByStream';
-import {CompositeChart, SectionHeader} from '@/components';
-import {CALENDAR_MONTHS_SHORT_NAMES} from '@/constants';
+import {CompositeChart, SectionHeader, CommentTrigger} from '@/components';
+import {CALENDAR_MONTHS_SHORT_NAMES, CommentContextType, CommentModule, ExecutiveAnalysisWidgets} from '@/constants';
 import {IconButton, Text} from '@/ui-kits';
 import {downloadChart, formatCurrencyToPound} from '@/utils';
 import {RevenueByStreamGraphComparison} from './RevenueByStreamGraphComparison';
@@ -22,6 +22,8 @@ import {
   getExecutiveAnalysisRevenueByStreamRequest,
   getExecutiveAnalysisSummaryRequest,
 } from '@/services/redux/slice';
+import { fetchCommentsRequest } from '@/services/redux/slice/commentSlice';
+import { useWidgetComments } from '@/hooks';
 import {
   getAssetExecutiveAnalysisMonthRevenueComparisonExport,
   getAssetExecutiveAnalysisRevenueByStreamExport,
@@ -58,6 +60,12 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
 
   const summaryKpiData = useSelector(assetExecutiveSummaryResult);
   const summaryKpiLoading = useSelector(assetExecutiveSummaryLoading);
+  const { getCommentCountForDataPoint, handleBadgeClick } = useWidgetComments(
+    CommentModule.ExecutiveAnalysis,
+    null,
+    asset_id,
+    year
+  );
 
   /**
    * ===========================
@@ -80,6 +88,9 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
       actual_revenue: item.actual_revenue ?? 0,
       optmized_revenue: item.optimized_revenue ?? 0,
       capture_rate: item.capture_rate ?? 0,
+      commentCounts: {
+        _category: getCommentCountForDataPoint(ExecutiveAnalysisWidgets.ActualVsOptimal, `${CALENDAR_MONTHS_SHORT_NAMES[item.month - 1]} ${year}`)
+      }
     }));
   })();
 
@@ -155,10 +166,22 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
   useEffect(() => {
     if (!asset_id || !year) return;
 
-    dispatch(getExecutiveAnalysisSummaryRequest({assetId: asset_id, year}));
+    dispatch(
+      getExecutiveAnalysisSummaryRequest({
+        assetId: asset_id,
+        year,
+      }),
+    );
+    dispatch(
+      fetchCommentsRequest({
+        assetId: Number(asset_id),
+        context_module: CommentModule.ExecutiveAnalysis,
+        context_year: year ?? undefined,
+      }),
+    );
     dispatch(getExecutiveAnalysisRevenueByStreamRequest({assetId: asset_id, year}));
     dispatch(getExecutiveAnalysisMonthlyRevenueComparisonRequest({assetId: asset_id, year}));
-  }, [asset_id, year]);
+  }, [asset_id, year, dispatch]);
 
   /**
    * ===========================
@@ -227,7 +250,7 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
           const optmized = payload.find(item => item.dataKey === 'optmized_revenue');
           const capture_rate = payload.find(item => item.dataKey === 'capture_rate');
           return (
-            <div className="bg-white rounded-md border border-border px-4 py-2">
+            <div className="bg-white rounded-md border border-border px-4 py-2 shadow-md">
               <Text variant="14M">{label}</Text>
               <Text variant="14M" className="text-text-secondary!">
                 {actual?.name}:{' '}
@@ -247,13 +270,36 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
                   {Number(capture_rate?.value ?? 0)}%
                 </span>
               </Text>
+              <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+                <CommentTrigger
+                  contextModule={CommentModule.ExecutiveAnalysis}
+                  contextTab={null}
+                  contextWidget={ExecutiveAnalysisWidgets.ActualVsOptimal}
+                  contextType={CommentContextType.DataPoint}
+                  contextAssetId={asset_id}
+                  contextYear={year}
+                  contextDataPoint={label as string}
+                  variant="icon-with-text"
+                  label="Add Comment"
+                  className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                  iconClassName="w-4 h-4 text-[#088477]"
+                  labelClassName="text-[#088477]"
+                />
+              </div>
             </div>
           );
+        }}
+        onBadgeClick={(categoryId, _seriesId) => {
+          const [monthStr] = String(categoryId).split(' ');
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const monthIndex = months.indexOf(monthStr) + 1;
+          handleBadgeClick(ExecutiveAnalysisWidgets.ActualVsOptimal, String(categoryId), monthIndex || undefined);
         }}
         xAxisLabel="Months"
         axes={{
           left: {
             label: 'Revenue (£)',
+            domainMaxMultiplier: 1.01,
           },
           right: {
             label: 'Capture Rate (%)',
@@ -262,28 +308,44 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
         }}
         series={[
           {
-            key: 'optmized_revenue',
-            color: '#357199',
-            label: 'Optmized Revenue',
+            key: 'actual_revenue',
+            label: 'Actual Revenue',
+            color: '#25C693',
             type: 'bar',
             yAxisId: 'left',
+            tooltipLabel: 'Actual Revenue',
           },
           {
-            key: 'actual_revenue',
-            color: '#00EDA2',
-            label: 'Actual Revenue',
+            key: 'optmized_revenue',
+            label: 'Optimal Revenue',
+            color: '#247CB6',
             type: 'bar',
             yAxisId: 'left',
+            tooltipLabel: 'Optimal Revenue',
           },
           {
             key: 'capture_rate',
-            color: '#FE7B09',
-            label: 'Capture Rate',
+            label: 'Capture Rate (%)',
+            color: '#FEA809',
             type: 'line',
             yAxisId: 'right',
+            tooltipLabel: 'Capture Rate',
           },
         ]}
         xAxisKey="label"
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ExecutiveAnalysis}
+            contextTab={null}
+            contextWidget={ExecutiveAnalysisWidgets.ActualVsOptimal}
+            contextType={CommentContextType.Widget}
+            contextAssetId={asset_id}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
 
       <Text variant="14R" className="text-text-secondary!">
@@ -298,6 +360,19 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
         year={year}
         onDownload={handleDownloadMonthyRevenueComparison}
         loading={monthlyRevenueComparisonDataLoading || assetLoading}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ExecutiveAnalysis}
+            contextTab={null}
+            contextWidget={ExecutiveAnalysisWidgets.MonthlyRevenueComparison}
+            contextType={CommentContextType.Widget}
+            contextAssetId={asset_id}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
 
       {/* revenue by stream graph */}
@@ -306,6 +381,19 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
         year={year}
         downloadFileName={`${assetSystemGenerationId}_${year}_executive_revenue_by_stream.png`}
         loading={revenueByStreamDataLoading || assetLoading}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ExecutiveAnalysis}
+            contextTab={null}
+            contextWidget={ExecutiveAnalysisWidgets.ActualRevenueByStream}
+            contextType={CommentContextType.Widget}
+            contextAssetId={asset_id}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
 
       {/* revenue by stream comparison */}
@@ -314,6 +402,19 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
         year={year}
         loading={revenueByStreamDataLoading || assetLoading}
         onDownload={handleDownloadRevenueByStream}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.ExecutiveAnalysis}
+            contextTab={null}
+            contextWidget={ExecutiveAnalysisWidgets.MonthlyRevenueByStream}
+            contextType={CommentContextType.Widget}
+            contextAssetId={asset_id}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
     </div>
   );

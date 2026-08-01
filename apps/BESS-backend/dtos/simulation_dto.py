@@ -405,8 +405,8 @@ class SolarConfigResponse(BaseModel):
                     "name": data.source.name,
                     "year": data.source.year,
                 },
-                "total_generation": data.total_generation,
-                "peak_generation": data.peak_generation,
+                "total_generation": round(data.total_generation, 2),
+                "peak_generation": round(data.peak_generation, 2),
                 "avg_generation": data.avg_generation,
                 "generation_hours": data.generation_hours,
                 "max_storable": data.max_storable,
@@ -524,6 +524,12 @@ class SimulationResponse(BaseModel):
 
 
 class MonthlySimulationMetrics(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True, populate_by_name=True, extra="ignore"
+    )
+
+    simulation_id: int
+    job_id: int
     month: str
     load_met_pct: float
     green_energy_pct: float
@@ -534,7 +540,8 @@ class MonthlySimulationMetrics(BaseModel):
     green_energy_to_load_mwh: float
     dg_to_load_mwh: float
     curtailed_mwh: float
-    month_int: int = Field(exclude=True)
+    month_int: int
+    year_int: int
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -777,6 +784,7 @@ class MultiYearProjectionResult(BaseModel):
     delivery_met_mwh: float
     charging_loss: float
     discharging_loss: float
+    degradation_loss: float
     final_soc_pct: float
     unserved_mwh: float
     solar_gen_during_load: float
@@ -808,11 +816,20 @@ class EnergyOutMetrics(BaseModel):
     dg_curtailed_mwh: float
     charging_loss_mwh: float
     discharging_loss_mwh: float
+    degradation_loss_mwh: float
     cycle_loss: float
     final_bess_soc: float
     final_bess_energy: float
     total_bess_energy: float
     total_energy: float
+
+    @field_validator(
+        "degradation_loss_mwh",
+        mode="before",
+    )
+    @classmethod
+    def round_to_two(cls, v):
+        return round(float(v), 2)
 
 
 class MultiYearSummary(BaseModel):

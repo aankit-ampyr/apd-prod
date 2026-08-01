@@ -1,9 +1,8 @@
-import React, { ReactElement, ReactNode, useState } from "react";
+import React, { ReactElement, ReactNode, useState, useRef } from "react";
 import {
   Bar,
   BarChart,
   CartesianGrid,
-  Cell,
   Label,
   ReferenceLine,
   ResponsiveContainer,
@@ -12,7 +11,7 @@ import {
 } from "recharts";
 import { useChartsActionV2, useChartTooltip } from "../../../../hooks";
 import { cn } from "../../../../utils";
-import { IconButton, Text, Skeleton } from "../../../../ui-kit";
+import { IconButton, Text, Skeleton, Icon } from "../../../../ui-kit";
 import { WithFallback } from "../../../SkelatonWrapper";
 
 type BarValue = string | number;
@@ -21,6 +20,7 @@ export type BarDataPoint = {
   label: string;
   value: BarValue;
   color?: string;
+  commentCount?: number;
 } & Record<string, BarValue | undefined>;
 
 interface ThresholdBarGraphProps {
@@ -30,8 +30,9 @@ interface ThresholdBarGraphProps {
   downloadFileName: string;
   title?: string;
 
-  // flags
+  tooltipYLabel?: string;
   isFullScreenOverride?: boolean;
+  customActions?: React.ReactNode;
   isLoading?: boolean;
   useBuiltInTooltip?: boolean;
 
@@ -86,6 +87,7 @@ interface ThresholdBarGraphProps {
   ) => ReactNode;
 
   xTickFormatter?: (value: string | number, index: number) => string;
+  onBadgeClick?: (item: BarDataPoint) => void;
 
   xAxisLabelProps?: {
     position?:
@@ -132,7 +134,9 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
     headerClassName,
     title,
     titleClassName,
+    tooltipYLabel,
     isFullScreenOverride = false,
+    customActions,
     isLoading = false,
     actionWrapperClassName,
     data,
@@ -167,9 +171,11 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
     lowLabel = "Normal",
     highLabel = "High",
     legendRenderer,
+    onBadgeClick,
   } = props;
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tooltipState, setTooltipState] = useState<{
     left: number;
     top: number;
@@ -208,10 +214,10 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
     angle: -90,
     ...yAxisLabelProps,
   };
-  const resolvedTooltipXLabel =
+  const resolvedXAxisLabel =
     xAxisLabel?.replace(/\s*\(.*?\)\s*/g, "").trim() || "Label";
 
-  const resolvedTooltipYLabel = yAxisLabel || "Value";
+  const resolvedYAxisLabel = tooltipYLabel || yAxisLabel || "Value";
 
   const evaluatedBarColor = (index: number, isThresholdExceeded: boolean) => {
     // This function can be expanded to evaluate bar color based on more complex conditions
@@ -232,6 +238,11 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
     isThresholdExceeded: boolean,
   ) {
     if (!useBuiltInTooltip || !tooltipRenderer) return;
+
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+      tooltipTimeout.current = null;
+    }
 
     const containerRect = chartRef.current?.getBoundingClientRect();
     const targetRect = event.currentTarget.getBoundingClientRect();
@@ -318,13 +329,14 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
         {!isLoading && (
           <div
             className={cn(
-              "flex items-center gap-4 chart-actions",
+              "flex shrink-0 items-center gap-3 chart-actions flex-nowrap",
               actionWrapperClassName,
             )}
           >
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleDownLoad}
@@ -333,7 +345,7 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
             {!isFullScreenOverride ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -549,59 +561,108 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
                     index,
                     isThresholdExceeded,
                   );
-                      return (
-                        <g>
-                          <rect
-                            x={x}
-                            y={y}
-                            width={width}
-                            height={height}
-                            rx={barRadius}
-                            ry={barRadius}
-                            fill={resolvedColor}
-                            onMouseEnter={event => {
-                              setActiveIndex(index);
-                              showTooltip(event, item, isThresholdExceeded);
-                            }}
-                            onMouseMove={event => {
-                              showTooltip(event, item, isThresholdExceeded);
-                            }}
-                            onMouseLeave={() => {
-                              setActiveIndex(null);
-                              setTooltipState(null);
-                            }}
-                          />
-                          <rect
-                            x={x}
-                            y={y + height - barRadius}
-                            width={width}
-                            height={barRadius}
-                            fill={resolvedColor}
-                            onMouseEnter={event => {
-                              setActiveIndex(index);
-                              showTooltip(event, item, isThresholdExceeded);
-                            }}
-                            onMouseMove={event => {
-                              showTooltip(event, item, isThresholdExceeded);
-                            }}
-                            onMouseLeave={() => {
-                              setActiveIndex(null);
-                              setTooltipState(null);
-                            }}
-                          />
+                  return (
+                    <g>
+                      <rect
+                        x={x}
+                        y={y}
+                        width={width}
+                        height={height}
+                        rx={barRadius}
+                        ry={barRadius}
+                        fill={resolvedColor}
+                        onMouseEnter={(event) => {
+                          setActiveIndex(index);
+                          showTooltip(event, item, isThresholdExceeded);
+                        }}
+                        onMouseMove={(event) => {
+                          showTooltip(event, item, isThresholdExceeded);
+                        }}
+                        onMouseLeave={() => {
+                          setActiveIndex(null);
+                          tooltipTimeout.current = setTimeout(() => {
+                            setTooltipState(null);
+                          }, 300);
+                        }}
+                      />
+                      <rect
+                        x={x}
+                        y={y + height - barRadius}
+                        width={width}
+                        height={barRadius}
+                        fill={resolvedColor}
+                        onMouseEnter={(event) => {
+                          setActiveIndex(index);
+                          showTooltip(event, item, isThresholdExceeded);
+                        }}
+                        onMouseMove={(event) => {
+                          showTooltip(event, item, isThresholdExceeded);
+                        }}
+                        onMouseLeave={() => {
+                          setActiveIndex(null);
+                          tooltipTimeout.current = setTimeout(() => {
+                            setTooltipState(null);
+                          }, 300);
+                        }}
+                      />
+                      {item.commentCount && item.commentCount > 0 ? (
+                        <g
+                          transform={`translate(${x + width / 2}, ${y - 20})`}
+                          className={cn("pointer-events-none", {
+                            "cursor-pointer pointer-events-auto":
+                              !!onBadgeClick,
+                          })}
+                          onClick={(e) => {
+                            if (onBadgeClick) {
+                              e.stopPropagation();
+                              onBadgeClick(item);
+                            }
+                          }}
+                        >
+                          <foreignObject
+                            x={-15}
+                            y={-15}
+                            width="30"
+                            height="30"
+                            className="overflow-visible"
+                          >
+                            <div className="relative flex items-center justify-center w-full h-full rounded-full border-[0.8px] border-[#E5F2F0] bg-white shadow-sm group hover:opacity-80 transition-opacity">
+                              <Icon
+                                name="message"
+                                className="w-[14px] h-[14px] text-[#088477]"
+                              />
+                              <span className="absolute -top-1.5 -right-1.5 bg-[#2F9C8F] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm z-10 leading-none">
+                                {item.commentCount > 99
+                                  ? "99+"
+                                  : item.commentCount}
+                              </span>
+                            </div>
+                          </foreignObject>
                         </g>
-                      );
-                    }}
-                  ></Bar>
+                      ) : null}
+                    </g>
+                  );
+                }}
+              ></Bar>
             </BarChart>
 
             {useBuiltInTooltip && tooltipState && tooltipRenderer && (
               <div
-                className="absolute pointer-events-none z-50"
+                className="absolute z-50"
                 style={{
                   left: tooltipState.left,
                   top: tooltipState.top,
                   transform: "translate(-50%, -100%)",
+                  pointerEvents: "auto",
+                }}
+                onMouseEnter={() => {
+                  if (tooltipTimeout.current) {
+                    clearTimeout(tooltipTimeout.current);
+                    tooltipTimeout.current = null;
+                  }
+                }}
+                onMouseLeave={() => {
+                  setTooltipState(null);
                 }}
               >
                 {tooltipRenderer(tooltipState.item, tooltipState.barData)}

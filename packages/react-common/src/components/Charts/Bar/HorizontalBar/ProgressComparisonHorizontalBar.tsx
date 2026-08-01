@@ -8,6 +8,8 @@ export type ProgressHorizontalBarComparisonData = {
   name: string;
   value: number;
   color?: string;
+  smallXtickFormatter?: (value: number | string) => string | number;
+  customActions?: React.ReactNode;
 };
 
 interface ProgressComparisonHorizontalBarProps {
@@ -24,6 +26,7 @@ interface ProgressComparisonHorizontalBarProps {
   barRadius?: number;
   barGap?: number;
   valueTextColor?: string;
+  customActions?: React.ReactNode;
 }
 export function ProgressComparisonHorizontalBar(
   props: ProgressComparisonHorizontalBarProps,
@@ -43,6 +46,7 @@ export function ProgressComparisonHorizontalBar(
     barRadius = 4,
     data,
     valueTextColor,
+    customActions,
   } = props;
   /**
    * ====================================
@@ -84,10 +88,11 @@ export function ProgressComparisonHorizontalBar(
         )}
 
         {!isLoading && (
-          <div className="flex items-center gap-3 chart-actions">
+          <div className="flex shrink-0 items-center flex-nowrap gap-3 chart-actions">
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleDownLoad}
@@ -95,7 +100,7 @@ export function ProgressComparisonHorizontalBar(
             {!isFullScreen ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -103,7 +108,7 @@ export function ProgressComparisonHorizontalBar(
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}

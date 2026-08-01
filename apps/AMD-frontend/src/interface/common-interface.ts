@@ -11,14 +11,18 @@ import type {
   InvoiceType,
   Platform,
   UserRole,
+  CommentContextType,
+  CommentModule,
 } from '@/constants';
-import {AuditLog, DonutSegment, MonthYear, Nullable, ScheduleTime} from '@lazarus/react-common/interface';
+import {AuditLog, MonthYear, Nullable, ScheduleTime} from '@lazarus/react-common/interface';
 export {Auth, Nullable, AuditLog} from '@lazarus/react-common/interface';
 
 // utlilities
 export type ENV = 'loc' | 'dev' | 'qa' | 'uat' | 'prod';
 export type HTTPMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type SSEEvent = 'progress' | 'success' | 'error';
+
+export type ActionWithCallback<T = unknown> = {onSuccess?: (data: T) => void; onFailure?: (data: T) => void};
 
 export type AssetMarket = 'multi' | 'epex_daily' | 'epex_efa' | 'actual';
 
@@ -106,15 +110,18 @@ export interface Asset {
   // invoice files
   invoice_file?: Nullable<Invoice>;
   invoice_settlement_file?: Nullable<InvoiceSettlement>;
+  invoice_summary_statement?: Nullable<InvoiceStatementSummary>;
 
   // meta data
   active_period: Nullable<MonthYear>;
   invoice_active_period: Nullable<MonthYear>;
   available_periods?: Array<MonthYear>;
   available_invoice_periods?: Array<MonthYear>;
+  available_summary_statement_periods?: Array<MonthYear>;
 
   // attributes flags
   analysis_available?: boolean;
+  has_iar?: boolean;
   is_asset_alert_seen_before?: boolean;
 
   // ownership info
@@ -141,46 +148,48 @@ export interface Asset {
 // asset analysis
 export interface AssetOperationAnalytics {
   revenue: {
-    sffr: number;
-    ida1: number;
-    epex_30_da: number;
-    imbalance_revenue: number;
-    imbalance_charge: number;
-    net_imbalance: number;
-    total_net_revenue: number;
+    trading_analysis: {
+      sffr: number;
+      ida1: number;
+      epex_30_da: number;
+      imbalance_revenue: number;
+      imbalance_charge: number;
+      net_imbalance: number;
+      total_net_revenue: number;
+    };
+    revenue_distribution: Array<{
+      name: string;
+      value: number;
+      percentage: number;
+    }>;
   };
-  revenue_distribution: DonutSegment[];
-  soc_distribution: Array<{
-    range: {
-      min: number;
-      max: number;
+  market_summary: {
+    month: number;
+    year: number;
+    market_prices: {
+      day_ahead: {
+        avg: number;
+        min: number;
+        max: number;
+        std_dev: number;
+      };
+      intraday: {
+        avg: number;
+        min: number;
+        max: number;
+      };
+      spread: number;
     };
-    count: number;
-  }>;
-
-  market_price: {
-    day_ahead: {
-      avg: number;
-      min: number;
-      max: number;
-      std_dev: number;
+    trading_activity: {
+      avg_da_mw: number;
+      avg_epex_30_da_mw: number;
+      avg_ida1_mw: number;
     };
-    intraday: {
-      avg: number;
-      min: number;
-      max: number;
-    };
-    spread: number;
-  };
-  ancillary_services_revenue: Array<{
-    service: string;
-    avg_clearing_price: number;
-    avg_availability_mw: number;
-  }>;
-  trading_activity: {
-    avg_da_mw: number;
-    avg_epex_30_da_mw: number;
-    avg_ida1_mw: number;
+    ancillary_services: Array<{
+      service: string;
+      avg_clearing_price: number;
+      avg_availability_mw: number;
+    }>;
   };
   energy_price_comparison: Array<{
     timestamp: string;
@@ -565,14 +574,14 @@ export interface AssetTBSpreadAnalytics {
     avg_tb3: number;
     avg_arbitrage_revenue: number;
     tb2_capture_rate: number;
-    tb_spread_benchmark: number;
-    benchmark_gap: number;
+    tb_spread_benchmark: number | null;
+    benchmark_gap: number | null;
   };
   details: {
     asset_id: number;
     month: number;
     year: number;
-    tb_spread_benchmark: number;
+    tb_spread_benchmark: number | null;
     tb_spread: Array<{
       date: string;
       tb1: number;
@@ -798,29 +807,6 @@ export type UploadInvoiceProgress = {
   description: string;
 };
 
-export interface AssetCapacityMarketAnalytics {
-  kpis: {
-    capacity_payments: number | null;
-    emr_invoices: number | null;
-    average_monthly_payment: number | null;
-  };
-  payment_trend: Array<{
-    month: number;
-    year: number;
-    monthly_payment: number | null;
-    cumulative_payment: number | null;
-  }>;
-  capacity_market_payments: Array<{
-    capacity_month: number;
-    capacity_year: number;
-    invoice_number: string | null;
-    invoice_date: string | null;
-    payment_date: string | null;
-    amount: number | null;
-    absolute_amount: number | null;
-  }>;
-}
-
 export type InvalidInvoiceFile = {
   file_name: string;
   reason: string;
@@ -838,6 +824,111 @@ export type InvoiceSettlement = {
   year: number;
 };
 
+export type InvoiceStatementSummary = {
+  id: number;
+  summary_id: string;
+  file_name: string;
+  file_size: number;
+  uploaded_on: string;
+  month: number;
+  year: number;
+  revenue_values: {
+    total_energy_revenue: number;
+    total_ancillary_revenue: number;
+    reported_net_revenue: number;
+  };
+};
+
+// ===============================
+// Invoice Analysis
+// ===============================
+export interface AssetCapacityMarketAnalytics2 {
+  summary: {
+    asset_id: number;
+    asset_name: string;
+    year: number;
+    month: number | null;
+    has_data: boolean;
+    kpis?: {
+      capacity_payments: number | null;
+      emr_invoices: number | null;
+      average_monthly_payment: number | null;
+    };
+  };
+  payment_trend: {
+    asset_id: number;
+    asset_name: string;
+    year: number;
+    month: number | null;
+    has_data: boolean;
+    payment_trend: Array<{
+      month: number;
+      monthly_payment: number | null;
+      cumulative_payment: number | null;
+    }>;
+  };
+  payments: {
+    asset_id: number;
+    asset_name: string;
+    year: number;
+    month: number | null;
+    has_data: boolean;
+    capacity_market_payments: Array<{
+      invoice_id: number;
+      capacity_month: number;
+      capacity_year: number;
+      invoice_number: string | null;
+      invoice_date: string | null;
+      payment_date: string | null;
+      amount: number | null;
+      absolute_amount: number | null;
+    }>;
+  };
+}
+
+
+export interface AssetInvoiceRevenueReconciliation {
+  summary: {
+    asset_id: number;
+    asset_name: string;
+    year: number;
+    gross_revenue?: number | null;
+    gridbeyond_fee?: number | null;
+    expected_net?: number | null;
+    reported_net?: number | null;
+    variance?: number | null;
+    has_data?: boolean;
+  };
+  per_stream_comparison: {
+    asset_id: number;
+    asset_name: string;
+    year: number;
+    per_stream_comparison: Array<{
+      stream: string;
+      gross_revenue: number;
+      expected_net: number;
+      reported_net: number;
+      variance: number;
+      variance_percentage: number;
+      monthly_breakdown: Array<{
+        month: number;
+        gross_revenue: number;
+        expected_net: number;
+        reported_net: number;
+        variance: number;
+        variance_percentage: number;
+      }>;
+    }>;
+    total_stream_data: {
+      gross_revenue: number;
+      expected_net: number;
+      reported_net: number;
+      variance: number;
+      variance_percentage: number;
+    };
+  };
+}
+
 // ===============================
 // APD Audit Logs
 // ===============================
@@ -851,4 +942,96 @@ export interface APDAuditLog extends Omit<AuditLog, 'module' | 'action'> {
     id: APDAuditLogScenario;
     name: string;
   };
+}
+
+// ===============================
+// Comments
+// ===============================
+
+export interface CommentContentBlock {
+  text?: string;
+  user?: {
+    id: number;
+    name: string;
+  };
+  user_id?: number;
+  type: 'text' | 'mention';
+}
+
+export interface Comment {
+  id: number;
+  comment_id?: string;
+  parent_comment_id?: number | null;
+  title: string;
+  content: CommentContentBlock[];
+  owner: {
+    id: number;
+    name: string;
+  };
+  created_at: string;
+  updated_at?: string;
+  is_edited: boolean;
+  is_read?: boolean;
+  is_owner?: boolean;
+  replies?: Comment[];
+
+  // Context mapping fields
+  context_type: CommentContextType | string;
+  context_module: CommentModule | string | null;
+  context_tab: string | null;
+  context_widget: string | null;
+  context_data_point: string | null;
+  context_asset_id: number | null;
+  context_year: number | null;
+  context_month: number | null;
+}
+
+export type CreateCommentPayload = Pick<
+  Comment,
+  | 'title'
+  | 'content'
+  | 'parent_comment_id'
+  | 'context_type'
+  | 'context_module'
+  | 'context_tab'
+  | 'context_widget'
+  | 'context_data_point'
+  | 'context_asset_id'
+  | 'context_year'
+  | 'context_month'
+>;
+
+// ===============================
+// Notifications
+// ===============================
+
+export interface NotificationMeta {
+  comment_id: string;
+  asset_id: number;
+  context_type: number | string;
+  context_module: string | null;
+  context_tab: string | null;
+  context_widget: string | null;
+  context_year?: number | null;
+  context_month?: number | null;
+  context_data_point?: string | null;
+}
+
+export interface NotificationData {
+  id: number;
+  notification_id: string;
+  owner: {
+    id: number;
+    name: string;
+  };
+  title: string;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  meta: NotificationMeta;
+}
+
+export interface SocketEvent {
+  type?: string;
+  [key: string]: any;
 }

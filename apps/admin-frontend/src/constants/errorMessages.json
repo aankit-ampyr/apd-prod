@@ -263,5 +263,10 @@
     "key": "digest_not_found",
     "message": "Digest not found.",
     "type": "not_found_error"
+  },
+  "E-10273": {
+    "key": "unauthorized_access",
+    "message": "You are not authorized to access this platform.",
+    "type": "data_error"
   }
 }

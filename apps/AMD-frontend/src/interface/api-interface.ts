@@ -8,6 +8,8 @@ import type {
   DigestFrequency,
   DigestScope,
   UserRole,
+  CommentContextType,
+  CommentModule,
 } from '@/constants';
 import type {
   APDAuditLog,
@@ -34,7 +36,12 @@ import type {
   InvoiceExtractionQualitySummary,
   Invoice,
   InvoiceSettlement,
-  AssetCapacityMarketAnalytics,
+  AssetCapacityMarketAnalytics2,
+  InvoiceStatementSummary,
+  Comment,
+  CreateCommentPayload,
+  AssetInvoiceRevenueReconciliation,
+  NotificationData,
 } from './common-interface';
 import type {SortType, APIResponse} from '@lazarus/react-common/interface';
 export type {APIResponse, LoginRequest, VerifyOtpRequest} from '@lazarus/react-common/interface/api-interface';
@@ -47,9 +54,11 @@ export interface ApiConfigInterface {
     demo: string;
     login: string;
     verifyOtp: string;
+    refresh: string;
   };
   authUrls: {
     logout: string;
+    websocketToken: string;
 
     users: string;
     user_id: (id: number) => string;
@@ -68,6 +77,7 @@ export interface ApiConfigInterface {
     asset_merge_dataset: (assetId: number) => string;
     asset_optimized_dataset: (assetId: number) => string;
     asset_multiple_users: string;
+    asset_taggable_users: (assetId: number) => string;
     asset_merged_dataset_download: (assetId: number) => string;
     asset_iar_report: (assetId: number) => string;
     asset_submit: (assetId: number) => string;
@@ -101,6 +111,7 @@ export interface ApiConfigInterface {
     asset_analysis_battery_health_summary: (assetId: number) => string;
     asset_analysis_battery_health_cycle_comparison: (assetId: number) => string;
     asset_analysis_battery_health_strategy_cycling_comparison: (assetId: number) => string;
+    asset_analysis_battery_health_strategy_energy_throughput_summary_export: (assetId: number) => string;
     asset_analysis_battery_health_annual_projection_report: (assetId: number) => string;
     asset_analysis_battery_health_daily_cycles: (assetId: number) => string;
     asset_analysis_battery_health_warranty_exceedance: (assetId: number) => string;
@@ -159,9 +170,28 @@ export interface ApiConfigInterface {
     asset_invoices_settlement: (assetId: number) => string;
     asset_invoices_settlement_id: (assetId: number, settlementId: number) => string;
     asset_invoices_settlement_id_export: (assetId: number, settlementId: number) => string;
+    asset_invoices_summary_statement: (assetId: number) => string;
+    asset_invoices_summary_statement_id: (assetId: number, statementId: number) => string;
+    asset_invoices_summary_statement_id_export: (assetId: number, statementId: number) => string;
 
-    asset_invoice_analysis_capacity_market: (assetId: number) => string;
+    asset_invoice_analysis_capacity_market_summary: (assetId: number) => string;
+    asset_invoice_analysis_capacity_market_payments: (assetId: number) => string;
+    asset_invoice_analysis_capacity_market_payment_trend: (assetId: number) => string;
     asset_invoice_analysis_capacity_market_export: (assetId: number) => string;
+
+    // comments related APIs
+    comments: (assetId: number) => string;
+    comment_id: (assetId: number, commentId: number | string) => string;
+    comment_reply: (assetId: number, commentId: number | string) => string;
+    comment_read: (assetId: number, commentId: number | string) => string;
+    comment_status: (assetId: number, commentId: number | string) => string;
+
+    // notifications related APIs
+    notifications_active: string;
+    notification_read: (notificationId: number | string) => string;
+    asset_invoice_analysis_revenue_reconciliation_summary: (assetId: number) => string;
+    asset_invoice_analysis_revenue_reconciliation_per_stream_comparison: (assetId: number) => string;
+    asset_invoice_analysis_revenue_reconciliation_export: (assetId: number) => string;
   };
 }
 
@@ -298,6 +328,7 @@ export interface ReassignAssetOwnershipRequest {
       name: string;
     };
   }>;
+  errorResponse: APIResponse<Record<string, any>>;
 }
 
 export interface OnboardAssetRequest {
@@ -360,6 +391,7 @@ export interface OptimizationParamsEditRequest {
 export interface GetAssetDetailsRequest {
   params: {
     id: number;
+    skip_audit?: boolean;
   };
   response: APIResponse<Asset>;
 }
@@ -425,29 +457,7 @@ export interface AssetOperationalAnalyticsRequest {
     month: number;
     year: number;
   };
-  response: APIResponse<{
-    month: number;
-    year: number;
-    trading_analysis: AssetOperationAnalytics['revenue'];
-    revenue_distribution: Array<{
-      name: string;
-      value: number;
-      percentage: number;
-    }>;
-  }>;
-}
-
-export interface AssetSocDistributionRequest {
-  params: {
-    assetId: number;
-    month: number;
-    year: number;
-  };
-  response: APIResponse<{
-    month: number;
-    year: number;
-    soc_distribution: AssetOperationAnalytics['soc_distribution'];
-  }>;
+  response: APIResponse<AssetOperationAnalytics['revenue']>;
 }
 
 export interface AssetMarketSummaryRequest {
@@ -456,13 +466,7 @@ export interface AssetMarketSummaryRequest {
     month: number;
     year: number;
   };
-  response: APIResponse<{
-    month: number;
-    year: number;
-    market_prices: AssetOperationAnalytics['market_price'];
-    ancillary_services: AssetOperationAnalytics['ancillary_services_revenue'];
-    trading_activity: AssetOperationAnalytics['trading_activity'];
-  }>;
+  response: APIResponse<AssetOperationAnalytics['market_summary']>;
 }
 
 export interface AssetMarketSummaryAnalysisRequest {
@@ -623,6 +627,16 @@ export interface AssetAnalysisBatteryHealthWarrantyExceedanceRequest {
     cycle_method: AssetBatteryCycleCalculationMethod;
   };
   response: APIResponse<AssetBatteryHealthAnalytics['warranty_limit_exceed']>;
+}
+
+export interface AssetAnalysisBatteryStrategyEnergyThroughputSummaryExportRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+    cycle_method: AssetBatteryCycleCalculationMethod;
+    fileName: string;
+  };
 }
 
 export interface AssetMarketStatisticsRequest {
@@ -1181,6 +1195,7 @@ export interface InvoiceSummaryRequest {
     assetId: number;
     year?: number[];
     month?: number[];
+    source: 'asset_management' | 'left_navigation';
   };
   response: APIResponse<{
     total_files: number;
@@ -1235,6 +1250,7 @@ export interface InvoiceDownloadRequest {
     invoiceId: number;
     fileName?: string;
     assetId: number;
+    source?: 'preview' | 'upload_history';
   };
 }
 
@@ -1345,18 +1361,120 @@ export interface ExportInvoiceSettlementRequest {
 
 /**
  *
- * @method GET
- * @description Get Capacity Market analytics
- * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market
+ * @method POST
+ * @description Upload summary statement file for a specific asset
+ * @endpoint /api/v1/assets/{asset_id}/invoice/summary-statement
  *
  */
-export interface AssetCapacityMarketRequest {
+export interface AssetInvoiceSummaryStatementUploadRequest {
+  payload: {
+    assetId: number;
+    formData: FormData;
+  };
+  response: APIResponse<InvoiceStatementSummary>;
+}
+
+/**
+ *
+ * @method DELETE
+ * @description Delete summary statement file for a specific asset
+ * @endpoint /api/v1/assets/{asset_id}/invoice/summary-statement/{statement_id}
+ *
+ */
+export interface DeleteAssetInvoiceSummaryStatementRequest {
+  payload: {
+    assetId: number;
+    statementId: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    statement_id: number;
+  }>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Export summary statement file for a specific asset
+ * @endpoint /api/v1/assets/{asset_id}/invoice/summary-statement/{statement_id}/export
+ *
+ */
+export interface ExportAssetInvoiceSummaryStatementRequest {
+  params: {
+    assetId: number;
+    statementId: number;
+    fileName?: string;
+  };
+}
+
+/**
+ *
+ * @method GET
+ * @description Get list of summary statement files for a particular asset
+ * @endpoint /api/v1/assets/{asset_id}/invoice/summary-statement/
+ *
+ */
+export interface AssetInvoiceSummaryStatementListRequest {
+  params: {
+    month: number[];
+    year: number[];
+    assetId: number;
+  };
+  response: APIResponse<{
+    total_files: number;
+    summary_statements: Array<InvoiceStatementSummary>;
+  }>;
+}
+
+// =============================== Invoice Analysis Request ===============================
+
+
+/**
+ *
+ * @method GET
+ * @description Get Capacity Market Summary
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market/summary
+ *
+ */
+export interface AssetCapacityMarketSummaryRequest {
   params: {
     assetId: number;
     year: number;
     month?: number;
   };
-  response: APIResponse<AssetCapacityMarketAnalytics>;
+  response: APIResponse<AssetCapacityMarketAnalytics2['summary']>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Get Capacity Market Payments
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market/payments
+ *
+ */
+export interface AssetCapacityMarketPaymentsRequest {
+  params: {
+    assetId: number;
+    year: number;
+    month?: number;
+  };
+  response: APIResponse<AssetCapacityMarketAnalytics2['payments']>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Get Capacity Market Payment Trend
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/capacity-market/payment-trend
+ *
+ */
+export interface AssetCapacityMarketPaymentTrendRequest {
+  params: {
+    assetId: number;
+    year: number;
+    month?: number;
+  };
+  response: APIResponse<AssetCapacityMarketAnalytics2['payment_trend']>;
 }
 
 /**
@@ -1373,4 +1491,197 @@ export interface AssetCapacityMarketExportRequest {
     month?: number;
     fileName: string;
   };
+}
+
+// =============================== Comment Management  ===============================
+
+/**
+ *
+ * @method GET
+ * @description Fetch all comments for a given asset with optional context filters
+ * @endpoint /api/v1/assets/{asset_id}/comments
+ *
+ */
+export interface FetchCommentsRequest {
+  params: {
+    assetId: number;
+    context_type?: CommentContextType;
+    context_module?: CommentModule;
+    context_tab?: string;
+    context_widget?: string;
+    context_data_point?: string;
+    context_year?: number;
+    context_month?: number;
+  };
+  response: APIResponse<{
+    current_page: number;
+    next_page: number | null;
+    total_pages: number;
+    total_comments: number;
+    comments: Comment[];
+  }>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Get Revenue Reconciliation Analysis Summary
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/revenue-reconciliation/summary
+ *
+ */
+export interface AssetInvoiceRevenueReconciliationSummaryRequest {
+  params: {
+    assetId: number;
+    year: number;
+    months: number[];
+  };
+  response: APIResponse<
+    | AssetInvoiceRevenueReconciliation['summary']
+    | {
+        asset_id: number;
+        asset_name: string;
+        year: number;
+        has_data: false;
+        message: string;
+      }
+  >;
+}
+
+/**
+ *
+ * @method GET
+ * @description Get Revenue Reconciliation Analysis Per Stream Comparison
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/revenue-reconciliation/per-stream-comparison
+ *
+ */
+export interface AssetInvoiceRevenueReconciliationPerStreamComparisonRequest {
+  params: {
+    assetId: number;
+    year: number;
+    months: number[];
+  };
+  response: APIResponse<AssetInvoiceRevenueReconciliation['per_stream_comparison']>;
+}
+
+/**
+ *
+ * @method POST
+ * @description Create a new top-level comment on an asset
+ * @endpoint /api/v1/assets/{asset_id}/comments
+ *
+ */
+export interface CreateCommentApiRequest {
+  params: { assetId: number };
+  payload: CreateCommentPayload;
+  response: APIResponse<Comment>;
+}
+
+/**
+ *
+ * @method PUT
+ * @description Update the title or content of an owned comment within the 15-minute edit window
+ * @endpoint /api/v1/assets/{asset_id}/comments/{comment_id}
+ *
+ */
+export interface UpdateCommentApiRequest {
+  params: { assetId: number; commentId: number };
+  payload: Partial<Pick<CreateCommentPayload, 'title' | 'content'>> & { is_read?: boolean };
+  noRefresh?: boolean;
+  response: APIResponse<Comment>;
+}
+
+/**
+ *
+ * @method DELETE
+ * @description Delete an owned comment within the 15-minute window (only if no replies exist)
+ * @endpoint /api/v1/assets/{asset_id}/comments/{comment_id}
+ *
+ */
+export interface DeleteCommentApiRequest {
+  payload: { assetId: number; commentId: number };
+  response: APIResponse<null>;
+}
+
+/**
+ *
+ * @method POST
+ * @description Post a reply to an existing comment
+ * @endpoint /api/v1/assets/{asset_id}/comments/{comment_id}/reply
+ *
+ */
+export interface ReplyCommentApiRequest {
+  params: { assetId: number; commentId: number };
+  payload: Pick<CreateCommentPayload, 'content'> & { title?: string };
+  response: APIResponse<Comment>;
+}
+
+/**
+ *
+ * @method PATCH
+ * @description Mark a comment as read
+ * @endpoint /api/v1/assets/{asset_id}/comments/{comment_id}/read
+ *
+ */
+export interface ReadCommentApiRequest {
+  params: { assetId: number; commentId: number };
+  response: APIResponse<{comment_id: number, read_by: number[]}>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Check whether a comment still exists and if deleted, whether it was a parent or reply
+ * @endpoint /api/v1/assets/{asset_id}/comments/{comment_id}/status
+ *
+ */
+export interface CheckCommentStatusApiRequest {
+  params: { assetId: number; commentId: number };
+  response: APIResponse<{
+    is_deleted: boolean;
+    type: 'parent' | 'reply' | null;
+    parent_id: number | null;
+    deleted_comment_id: number | null;
+    deleted_at: string | null;
+  }>;
+}
+
+/**
+ *
+ * @method GET
+ * @description Export Revenue Reconciliation analytics
+ * @endpoint /api/v1/assets/{asset_id}/invoice-analysis/revenue-reconciliation/export
+ *
+ */
+export interface AssetInvoiceRevenueReconciliationExportRequest {
+  params: {
+    assetId: number;
+    year: number;
+    months: number[];
+    fileName?: string;
+  };
+}
+
+// ===============================
+// Notifications
+// ===============================
+
+export interface ListActiveNotificationsRequest {
+  response: APIResponse<NotificationData[]>;
+}
+
+export interface MarkNotificationReadRequest {
+  params: {
+    notification_id: string | number;
+  };
+  response: APIResponse<{
+    notification_id: number;
+    is_read: boolean;
+  }>;
+}
+
+export interface GetWsTokenRequest {
+  response: APIResponse<{
+    user_id: number;
+    ephemeral_token: string;
+  }>;
 }

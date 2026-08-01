@@ -13,17 +13,130 @@ import {
   generatorData as generatorSavedData,
   initiateSimulationData,
   projectSimulationData,
+  simulationProjectLoading,
+  dispatchRuleDataLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData, projectLoading} from '@/services/redux/selectors';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
 import {dispatchRuleRequest, getDispatchRuleRequest} from '@/services/redux/slice/simulationWizardSlice';
-import {Alert, Button, Icon, Text} from '@/ui-kits';
+import {Alert, Button, Icon, Skeleton, Text} from '@/ui-kits';
 import {IOSSingleSlider, RadioCard} from '@lazarus/react-common/components';
 import {useEffect, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
 import {createPortal} from 'react-dom';
 import {useSimulationStatus} from '../SimulationStatusContext';
+
+function DispatchRulesGhostLoader() {
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center gap-3 mt-1">
+        <Skeleton className="h-7 w-7 rounded-md" />
+        <Skeleton className="h-7 w-64" />
+      </div>
+
+      {/* Summary Card */}
+      <div className="border border-border rounded-lg p-6 mt-4">
+        <Skeleton className="h-6 w-52 mb-5" />
+        <Skeleton className="h-20 w-full rounded-md" />
+        <Skeleton className="h-4 w-full mt-5" />
+        <Skeleton className="h-4 w-11/12 mt-2" />
+      </div>
+
+      <hr className="my-5 text-disabled!" />
+
+      {/* Card 1 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-48 mb-3" />
+        <Skeleton className="h-4 w-80 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Skeleton className="h-16 rounded-md" />
+          <Skeleton className="h-16 rounded-md" />
+        </div>
+      </div>
+
+      {/* Card 2 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-44 mb-3" />
+        <Skeleton className="h-4 w-72 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Skeleton className="h-16 rounded-md" />
+          <Skeleton className="h-16 rounded-md" />
+        </div>
+      </div>
+
+      {/* Card 3 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-52 mb-3" />
+        <Skeleton className="h-4 w-80 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </div>
+      </div>
+
+      {/* Card 4 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-52 mb-3" />
+        <Skeleton className="h-4 w-72 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-16 rounded-md" />
+          <Skeleton className="h-16 rounded-md" />
+        </div>
+      </div>
+
+      {/* Card 5 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-44 mb-3" />
+        <Skeleton className="h-4 w-80 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </div>
+      </div>
+
+      {/* Card 6 */}
+      <div className="border border-border rounded-lg p-4 mt-4">
+        <Skeleton className="h-6 w-52 mb-3" />
+        <Skeleton className="h-4 w-80 mb-5" />
+
+        <div className="grid grid-cols-2 gap-4">
+          <Skeleton className="h-14 rounded-md" />
+          <Skeleton className="h-14 rounded-md" />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 mt-4">
+          <Skeleton className="h-16 rounded-md" />
+          <Skeleton className="h-16 rounded-md" />
+        </div>
+      </div>
+
+      {/* Bottom Buttons */}
+      <div className="mt-6 flex justify-center gap-5">
+        <Skeleton className="h-11 w-40 rounded-md" />
+        <Skeleton className="h-11 w-52 rounded-md" />
+      </div>
+    </div>
+  );
+}
 
 interface DispatchRulesProps {
   onNextToSizing?: () => void;
@@ -32,11 +145,14 @@ interface DispatchRulesProps {
 export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
   const dispatch = useDispatch();
   const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
 
   const dgData = useSelector(generatorData);
   const success = useSelector(dispatchRuleDataSuccess);
   const failure = useSelector(dispatchRuleDataFailure);
+  const isProSimulLoading = useSelector(simulationProjectLoading);
+  const dispatchLoading = useSelector(dispatchRuleDataLoading);
+
   const saveLoading = useSelector((state: RootState) => state.simulationWizard.dispatchRuleLoading);
   const hasGenerator = dgData?.is_included;
   const isBinaryMode = dgData?.is_binary;
@@ -95,7 +211,7 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
   const [q2, setQ2] = useState<number | null>(DGDriggerType['Battery + Solar deficiency']);
   const [q3, setQ3] = useState<boolean | null>(false);
   const [q4, setQ4] = useState<number | null>(LoadServingPriority['BESS First (Solar → BESS → DG)']);
-  const [q5, setQ5] = useState<boolean | null>(true);
+  const [q5, setQ5] = useState<boolean | null>(false);
   const [q6, setQ6] = useState<boolean | null>(false);
   const [startTime, setStartTime] = useState(6);
   const [endTime, setEndTime] = useState(18);
@@ -625,16 +741,22 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
 
   const btnDisable = Boolean(hasValidationErrors || !isStep1Complete || (!hasSavedInCurrentSession && !dirty) || (hasSavedInCurrentSession && !isChanged()));
 
+  if (isProSimulLoading || dispatchLoading) {
+    return <DispatchRulesGhostLoader />;
+  }
+
   return (
     <div>
       {shouldBlock && (
-        <div className="mt-4 flex justify-center">
-          <div className="flex items-center gap-3 rounded-md border border-[#F7C9C4] bg-[#FFF6F4] px-4 py-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-            </Text>
-          </div>
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
         </div>
       )}
       <div className="flex items-center gap-3 mt-1">
@@ -906,13 +1028,13 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
             </div>
           </div>
 
-          <div className="bg-[#F7FDFC] border border-border p-4 mt-4 rounded-lg">
-            <Text variant="body1" className=" text-text-primary! font-InterSemiBold!">
+          <div className={`${q5 === true ? 'bg-[#F8F8F8]' : ''} bg-[#F7FDFC] border border-border p-4 mt-4 rounded-lg`}>
+            <Text variant="body1" className={`${q5 === true ? 'text-text-placeholder! font-InterSemiBold!' : 'text-text-primary! font-InterSemiBold!'} `}>
               4. Load serving priority?
             </Text>
             <Alert
-              iconClassName="text-primary!"
-              message="BESS First = more BESS cycles, less DG runtime. DG First = fewer cycles, more fuel."
+              iconClassName={q5 === true ? 'text-[#B6B6B6]!' : 'text-primary!'}
+              message="BESS First = more BESS cycles, less  G runtime. DG First = fewer cycles, more fuel."
               textClassName="text-text-secondary! font-InterRegular! text-[12px]! mt-0.5"
               className="border-none px-0! mb-2"
             />
@@ -922,8 +1044,8 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
                 subLabel="Solar → BESS → DG"
                 checked={q4 === LoadServingPriority['BESS First (Solar → BESS → DG)']}
                 onChange={() => updateDispatchField(setQ4, LoadServingPriority['BESS First (Solar → BESS → DG)'])}
-                className="w-full"
-                disabled={isAssignedUser}
+                className={q5 === true ? 'w-full bg-[#F1F1F1]! border-[#F1F1F1]! opacity-70' : 'w-full'}
+                disabled={isAssignedUser || q5 === true}
               />
 
               <RadioCard
@@ -931,10 +1053,29 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
                 subLabel="Solar → DG → BESS"
                 checked={q4 === LoadServingPriority['DG First (Solar → DG → BESS)']}
                 onChange={() => updateDispatchField(setQ4, LoadServingPriority['DG First (Solar → DG → BESS)'])}
-                className="w-full"
-                disabled={isAssignedUser}
+                className={q5 === true ? 'w-full bg-bg-card! border-[#F1F1F1]! opacity-70' : 'w-full'}
+                disabled={isAssignedUser || q5 === true}
               />
             </div>
+            {q5 === true && (
+              <Alert
+                iconName="octagon-alert"
+                iconClassName="text-[#ED9024]!"
+                message={
+                  <>
+                    <Text variant="14M" className="block text-text-primary! font-InterMedium!">
+                      Disabled — Takeover Mode overrides load priority
+                    </Text>
+                    <Text variant="14R" className="block mt-1 text-text-secondary!">
+                      On hours when Solar + BESS can't fully cover the load, DG serves as much as it can (up to its capacity) — priority order no longer applies
+                      that hour.
+                    </Text>
+                  </>
+                }
+                textClassName="font-InterRegular! text-[14px]!"
+                className="mt-4 border-[#ED9024]! bg-[#FFF8F0]!"
+              />
+            )}
           </div>
 
           <div className="bg-[#F7FDFC] border border-border p-4 mt-4 rounded-lg">

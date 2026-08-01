@@ -10,15 +10,30 @@ class AnalysisRouter:
         self.tags = ["Assets"]
 
         self.controller = AnalysisController()
-        # analysis 
+
+        # =======================================
+        # Benchmark Analysis                    #
+        # =======================================
+        # benchmark analysis first tab
         self.router.get("/{asset_id}/analysis/benchmark")(self.controller.get_benchmark_analysis)
         self.router.get("/{asset_id}/analysis/benchmark/export")(self.controller.download_benchmark_report)
 
+        # revenue IAR vs actual
+        self.router.get("/{asset_id}/benchmark/revenue-iar-vs-actual")(self.controller.get_revenue_iar_vs_actual)
+        self.router.get("/{asset_id}/benchmark/revenue-iar-vs-actual/export")(self.controller.export_revenue_iar_vs_actual)
+
+        # multi market optimized vs actual
+        self.router.get("/{asset_id}/benchmark/multi-market-optimized-vs-actual")(self.controller.get_multi_market_optimized_vs_actual)
+        self.router.get("/{asset_id}/benchmark/multi-market-optimized-vs-actual/export")(self.controller.export_multi_market_optimized_vs_actual)
+
+        # =======================================
+        # View Analysis                         #
+        # =======================================
         # operation
         self.router.get("/{asset_id}/analysis/operations/summary")(self.controller.get_operations_summary)
         self.router.get("/{asset_id}/analysis/operations/market-summary")(self.controller.get_market_summary)
         self.router.get("/{asset_id}/analysis/operations/energy-price")(self.controller.get_asset_energy_price_comparison)
-        self.router.get("/{asset_id}/analysis/operations/battery-power-over-time")(self.controller.get_batter_power)
+        self.router.get("/{asset_id}/analysis/operations/battery-power-over-time")(self.controller.get_battery_power)
         
         # multi market optmization
         self.router.get("/{asset_id}/analysis/market/summary")(self.controller.get_market_analysis_summary)
@@ -42,12 +57,6 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/ancillary/service-revenue-by-hour")(self.controller.get_service_revenue_by_hour)
         self.router.get("/{asset_id}/analysis/ancillary/opportunity-cost-analysis")(self.controller.get_opportunity_cost_analysis)
 
-        # benchmark analysis
-        self.router.get("/{asset_id}/benchmark/revenue-iar-vs-actual")(self.controller.get_revenue_iar_vs_actual)
-        self.router.get("/{asset_id}/benchmark/revenue-iar-vs-actual/export")(self.controller.export_revenue_iar_vs_actual)
-        self.router.get("/{asset_id}/benchmark/multi-market-optimized-vs-actual")(self.controller.get_multi_market_optimized_vs_actual)
-        self.router.get("/{asset_id}/benchmark/multi-market-optimized-vs-actual/export")(self.controller.export_multi_market_optimized_vs_actual)
-
         # imbalance analysis
         self.router.get("/{asset_id}/analysis/imbalance/summary")(self.controller.get_imbalance_summary)
         self.router.get("/{asset_id}/analysis/imbalance/hourly-charges")(self.controller.get_imbalance_hourly_charges)
@@ -59,6 +68,7 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/battery-health/summary")(self.controller.get_battery_health_analysis)
         self.router.get("/{asset_id}/analysis/battery-health/cycle-comparison")(self.controller.get_cycle_comparison)
         self.router.get("/{asset_id}/analysis/battery-health/strategy-cycling-comparison")(self.controller.get_strategy_cycling_comparison)
+        self.router.get("/{asset_id}/analysis/battery-health/strategy-energy-throughput-summary/export")(self.controller.export_strategy_energy_throughput_summary)
         self.router.get("/{asset_id}/analysis/battery-health/annual-projection-report")(self.controller.get_annual_projection_report)
         self.router.get("/{asset_id}/analysis/battery-health/daily-cycles")(self.controller.get_daily_cycles)
         self.router.get("/{asset_id}/analysis/battery-health/warranty-exceedance")(self.controller.get_warranty_limit_exceedance)
@@ -68,8 +78,10 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/tb-spread/details")(self.controller.get_tb_spread_details)
         self.router.get("/{asset_id}/analysis/tb-spread/details/export")(self.controller.export_tb_spread_details)
 
-        #Executive Analysis
-        self.router.get("/{asset_id}/analysis/executive-comparison/monthly-revenue-comparison")(self.controller.get_monthly_revenue_comparison)
+        # =======================================
+        # Executive Analysis                    #
+        # =======================================
+        self.router.get("/{asset_id}/analysis/executive-comparison/monthly-revenue-comparison")(self.controller.get_monthly_revenue_comparison) 
         self.router.get("/{asset_id}/analysis/executive-comparison/monthly-revenue-comparison/export")(self.controller.export_monthly_revenue_comparison)
         self.router.get("/{asset_id}/analysis/executive-comparison/revenue-by-stream")(self.controller.get_revenue_by_stream_analysis)
         self.router.get("/{asset_id}/analysis/executive-comparison/revenue-by-stream/export")(self.controller.export_revenue_by_stream_analysis)

@@ -58,4 +58,5 @@ dependencies = [
     "user-agents==2.2.0",
     "uuid==1.30",
     "uvicorn==0.41.0",
+    "websockets>=17.0",
 ]

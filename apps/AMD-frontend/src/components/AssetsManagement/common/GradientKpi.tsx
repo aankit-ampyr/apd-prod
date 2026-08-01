@@ -3,6 +3,8 @@ import {WithFallback} from '../../common';
 import {Icon, Skeleton, Text, Tooltip, type TooltipPosition} from '@/ui-kits';
 import {cn} from '@/utils';
 import React from 'react';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
 
 type KpiColorVariants = 'orange' | 'blue' | 'green' | 'yellow' | 'green' | 'purple';
 type KpiColorPallate = {
@@ -113,6 +115,9 @@ export function GradientKPI(props: MarketPriceKPIProps) {
 
   const pallete = getResolvedColorPallette();
 
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
+
   return (
     <WithFallback
       isLoading={isLoading}
@@ -129,7 +134,7 @@ export function GradientKPI(props: MarketPriceKPIProps) {
         style={{
           background: `linear-gradient(to bottom right, ${bgGradientStart}, ${pallete.bgGradientEnd})`,
         }}
-        className={cn('border-border border rounded-lg px-6 py-4 relative overflow-hidden', className)}>
+        className={cn('border-border border rounded-lg px-6 py-4 relative overflow-hidden', isTablet && 'px-4 py-3', className)}>
         
         {props.backgroundImage && (
           <img
@@ -150,27 +155,36 @@ export function GradientKPI(props: MarketPriceKPIProps) {
               <Icon name={icon} color={pallete.iconColor} />
             </div>
           )}
-          <Text variant="caption" className="text-text-secondary! font-InterMedium!">
+          <Text
+            variant="caption"
+            className={cn(
+              'text-text-secondary! font-InterMedium! break-words',
+              isTablet && 'text-[12px] leading-tight',
+            )}>
             {title}
           </Text>
           {showTooltip && (
             <div className="ml-auto relative group">
-              <Tooltip message={tooltipMessage ?? ''} position={tooltipPosition} />
+              <Tooltip portal message={tooltipMessage ?? ''} position={tooltipPosition} />
               <Icon name="circle-info-2" />
             </div>
           )}
         </div>
 
-        <div className="flex gap-2 items-center mt-2">
+        <div className={cn('flex gap-2 items-center mt-2', isTablet && 'flex-wrap gap-1')}>
           <Text
             variant="free"
             style={{color: valueColor ?? 'var(--color-text-primary)'}}
-            className={cn('font-InterSemiBold text-h2', valueClassName)}>
+            className={cn(
+              'font-InterSemiBold text-h2 break-all',
+              isTablet && 'text-[22px] leading-none',
+              valueClassName,
+            )}>
             {value}
           </Text>
           {subLabel &&
             (typeof subLabel === 'string' ? (
-              <Text variant="caption" className="text-text-secondary! mt-1">
+              <Text variant="caption" className={cn('text-text-secondary! mt-1', isTablet && 'text-[12px]')}>
                 {subLabel}
               </Text>
             ) : (

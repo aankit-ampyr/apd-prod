@@ -55,11 +55,6 @@ import {
   assetOperationalAnalyticsSuccess,
   assetOperationalAnalyticsFailure,
 
-  // asset soc distribution
-  assetSocDistributionRequest,
-  assetSocDistributionSuccess,
-  assetSocDistributionFailure,
-
   // asset market summary
   assetMarketSummaryAnalysisRequest,
   assetMarketSummaryAnalysisSuccess,
@@ -307,6 +302,20 @@ import {
   deleteInvoiceSettlementSuccess,
   deleteInvoiceSettlementFailure,
 
+  // upload invoices summary settlement
+  uploadInvoiceSummaryStatementRequest,
+  uploadInvoiceSummaryStatementSuccess,
+  uploadInvoiceSummaryStatementFailure,
+
+  // delete invoices summary settlement
+  deleteInvoiceSummaryStatementRequest,
+  deleteInvoiceSummaryStatementSuccess,
+  deleteInvoiceSummaryStatementFailure,
+
+  // filter invoices summary settlement files
+  filterInvoiceSummaryStatementFilesRequest,
+  filterInvoiceSummaryStatementFilesSuccess,
+  filterInvoiceSummaryStatementFilesFailure,
 } from '../slice/assetSlice';
 import {
   getAssets,
@@ -320,7 +329,6 @@ import {
   uploadScadaReport,
   mergeAssetDatasets,
   assetOperationalAnalytics,
-  assetSocDistribution,
   assetMarketSummary,
   assetMarketSummaryAnalysis,
   getAssetAncillaryServiceSummary,
@@ -367,6 +375,9 @@ import {
   uploadInvoiceSettlement,
   deleteInvoiceSettlement,
   getInvoicesSettlementList,
+  uploadAssetInvoiceStatementSummary,
+  deleteAssetInvoiceStatementSummary,
+  getAssetInvoiceStatementSummaryList,
 } from '@/services/api';
 import {SUCCESS_KEY} from '@/constants';
 
@@ -422,16 +433,19 @@ function* AssetMultipleUserSaga(action: ReturnType<typeof assetMultipleUserReque
   }
 }
 
-function* GetAllAssetsListSaga(): Generator {
+function* GetAllAssetsListSaga(action: ReturnType<typeof getAllAssetsListRequest>): Generator {
   try {
     const response: any = yield call(getAssets, {limit: -1});
     if (response.data.status === SUCCESS_KEY) {
       yield put(getAllAssetsListSuccess(response.data));
+      action.payload?.onSuccess?.(response.data);
     } else {
       yield put(getAllAssetsListFailure(response.data));
+      action.payload?.onFailure?.(response.data);
     }
   } catch (error: any) {
     yield put(getAllAssetsListFailure(error.response?.data || error.response));
+    action.payload?.onFailure?.(error.response?.data || error.response);
   }
 }
 
@@ -450,9 +464,12 @@ function* OnboardAssetSaga(action: ReturnType<typeof onboardAssetRequest>): Gene
 
 function* GetAssetDetailsSaga(action: ReturnType<typeof getAssetDetailsRequest>): Generator {
   try {
-    const response: any = yield call(getAssetDetails, {id: action.payload.id});
+    const response: any = yield call(getAssetDetails, {id: action.payload.id, skip_audit: action.payload.skip_audit});
     if (response.data.status === SUCCESS_KEY) {
       yield put(getAssetDetailsSuccess(response.data));
+    } else if (response.status === 403) {
+      // Org or asset access was revoked — pass a distinct code so screens can show the access-denied modal
+      yield put(getAssetDetailsFailure({status_code: 'E-ACCESS-DENIED', status: 'error', message: 'Access denied'}));
     } else {
       yield put(getAssetDetailsFailure(response.data));
     }
@@ -549,19 +566,6 @@ function* AssetOperationalAnalyticsSaga(action: ReturnType<typeof assetOperation
     }
   } catch (error: any) {
     yield put(assetOperationalAnalyticsFailure(error.response?.data || error.response));
-  }
-}
-
-function* AssetSocDistributionSaga(action: ReturnType<typeof assetSocDistributionRequest>): Generator {
-  try {
-    const response: any = yield call(assetSocDistribution, action.payload);
-    if (response.data.status === SUCCESS_KEY) {
-      yield put(assetSocDistributionSuccess(response.data));
-    } else {
-      yield put(assetSocDistributionFailure(response.data));
-    }
-  } catch (error: any) {
-    yield put(assetSocDistributionFailure(error.response?.data || error.response));
   }
 }
 
@@ -921,6 +925,22 @@ function* FilterInvoiceSettlementFilesSaga(action: ReturnType<typeof filterInvoi
   }
 }
 
+function* FilterInvoiceSummaryStatementFilesSaga(action: ReturnType<typeof filterInvoiceSummaryStatementFilesRequest>): Generator {
+  try {
+    // Call both APIs in parallel - update active period and filter files
+    const filesResponse: any = yield call(getAssetInvoiceStatementSummaryList, action.payload);
+
+    // Check if both calls succeeded
+    if (filesResponse.data.status === SUCCESS_KEY) {
+      yield put(filterInvoiceSummaryStatementFilesSuccess(filesResponse.data));
+    } else {
+      yield put(filterInvoiceSummaryStatementFilesFailure(filesResponse.data));
+    }
+  } catch (error: any) {
+    yield put(filterInvoiceSummaryStatementFilesFailure(error.response?.data || error.response));
+  }
+}
+
 function* UpdateAssetReportingPeriodSaga(action: ReturnType<typeof updateAssetReportingPeriodRequest>): Generator {
   try {
     const response: any = yield call(editAssetDetails, {
@@ -1273,6 +1293,51 @@ function* DeleteInvoiceSettlementSaga(action: ReturnType<typeof deleteInvoiceSet
   }
 }
 
+function* UploadInvoiceSummaryStatementSaga(action: ReturnType<typeof uploadInvoiceSummaryStatementRequest>): Generator {
+  const file = action.payload?.formData?.get('file') as File;
+  try {
+    const response: any = yield call(uploadAssetInvoiceStatementSummary, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(uploadInvoiceSummaryStatementSuccess(response.data));
+    } else {
+      yield put(
+        uploadInvoiceSummaryStatementFailure({
+          status: response?.data?.status,
+          message: response?.data?.message,
+          status_code: response?.data?.status_code,
+          data: {
+            file: file?.name || '',
+          },
+        }),
+      );
+    }
+  } catch (error: any) {
+    yield put(
+      uploadInvoiceSummaryStatementFailure({
+        status: error.response?.data?.status || error.response?.status,
+        message: error.response?.data?.message || error.response?.message || error.message,
+        status_code: error.response?.data?.status_code || error.response?.status,
+        data: {
+          file: file?.name || '',
+        },
+      }),
+    );
+  }
+}
+
+function* DeleteInvoiceSummaryStatementSaga(action: ReturnType<typeof deleteInvoiceSummaryStatementRequest>): Generator {
+  try {
+    const response: any = yield call(deleteAssetInvoiceStatementSummary, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(deleteInvoiceSummaryStatementSuccess(response.data));
+    } else {
+      yield put(deleteInvoiceSummaryStatementFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(deleteInvoiceSummaryStatementFailure(error.response?.data || error.response));
+  }
+}
+
 export default function* AssetSaga(): Generator {
   yield takeEvery(assetListRequest.type, AssetListSaga);
   yield takeLatest(reassignAssetOwnershipRequest.type, ReassignAssetOwnershipSaga);
@@ -1311,7 +1376,6 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(createAssetRequest.type, CreateAssetSaga);
 
   yield takeLeading(assetOperationalAnalyticsRequest.type, AssetOperationalAnalyticsSaga);
-  yield takeLatest(assetSocDistributionRequest.type, AssetSocDistributionSaga);
   yield takeLatest(getIndustryComparisonRequest.type, GetIndustryComparisonSaga);
   yield takeLatest(getAssetBenchmarkRevenueIARvsActualRequest.type, GetAssetBenchmarkRevenueIARvsActualSaga);
   yield takeLatest(
@@ -1354,6 +1418,9 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(deleteInvoiceRequest.type, DeleteInvoiceSaga);
   yield takeLatest(uploadInvoiceSettlementRequest.type, UploadInvoiceSettlementSaga);
   yield takeLatest(deleteInvoiceSettlementRequest.type, DeleteInvoiceSettlementSaga);
+  yield takeLatest(uploadInvoiceSummaryStatementRequest.type, UploadInvoiceSummaryStatementSaga);
+  yield takeLatest(deleteInvoiceSummaryStatementRequest.type, DeleteInvoiceSummaryStatementSaga);
+  yield takeLatest(filterInvoiceSummaryStatementFilesRequest.type, FilterInvoiceSummaryStatementFilesSaga);
 
   // refresh cached all-assets list after onboard/edit success
   yield takeLatest(onboardAssetSuccess.type, function* () {

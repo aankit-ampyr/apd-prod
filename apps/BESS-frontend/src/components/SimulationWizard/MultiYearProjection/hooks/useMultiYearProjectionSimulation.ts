@@ -18,7 +18,7 @@ const MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY = `${SIMULATION_JOB_STORAGE_KEY}_mul
 export const useMultiYearProjectionSimulation = ({simulationId, onSimulationCompleted, onSimulationStopped}: UseMultiYearProjectionSimulationParams) => {
   const dispatch = useDispatch();
   const {subscribe} = useContext(WebSocketContext);
-  const {isAnySimulationRunning, setIsMultiYearRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, setIsMultiYearRunning, runningSimulationId} = useSimulationStatus() ?? {};
 
   const runMultiYearProjectionData = useSelector((state: RootState) => state.simulationWizard.runMultiYearProjectionData);
 
@@ -34,6 +34,7 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
   const [processedYears, setProcessedYears] = useState(0);
   const [isStopSimulationOpen, setIsStopSimulationOpen] = useState(false);
   const [runSimulationDisabled, setRunSimulationDisabled] = useState(false);
+  const [stopSimulationStatus, setStopSimulationStatus] = useState<'confirm' | 'stopping' | 'stopped'>('confirm');
 
   const progressContainerRef = useRef<HTMLDivElement>(null);
   const pendingRunRequestRef = useRef(false);
@@ -119,6 +120,8 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
           setActiveResourceId(null);
           localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
           resetProjectionProgressDetails();
+          setIsStopSimulationOpen(false);
+          setStopSimulationStatus('confirm');
           onSimulationCompleted(yearsProcessed);
           return;
         }
@@ -140,13 +143,19 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
         activeResourceIdRef.current = null;
         setActiveResourceId(null);
         localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
-
+        setIsStopSimulationOpen(false);
+        setStopSimulationStatus('confirm');
         onSimulationCompleted(yearsProcessed);
 
         setTimeout(() => {
           setShowCompletionProgress(false);
           setShowCompletionSummary(true);
         }, 5000);
+        return;
+      }
+
+      if (event.action_id === 8) {
+        setStopSimulationStatus('stopped');
         return;
       }
 
@@ -189,20 +198,33 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
 
     dispatch(stopMultiYearProjectionRequest({simulation_id: simulationId}));
 
+    setStopSimulationStatus('stopping');
+  }, [dispatch, simulationId]);
+
+  const handleCloseStoppedPopup = useCallback(() => {
     setIsSimulationRunning(false);
     setIsMultiYearRunning(false);
     setIsSimulationLocked(false);
+
     pendingRunRequestRef.current = false;
+
     setShowCompletionProgress(false);
     setShowCompletionSummary(false);
-    setIsStopSimulationOpen(false);
-    setRunSimulationDisabled(false);
+
     activeResourceIdRef.current = null;
     setActiveResourceId(null);
+
     localStorage.removeItem(MULTI_YEAR_PROJECTION_JOB_STORAGE_KEY);
+
     resetProjectionProgressDetails();
+
+    setRunSimulationDisabled(false);
+
+    setIsStopSimulationOpen(false);
+    setStopSimulationStatus('confirm');
+
     onSimulationStopped();
-  }, [dispatch, onSimulationStopped, resetProjectionProgressDetails, simulationId]);
+  }, [onSimulationStopped, resetProjectionProgressDetails, setIsMultiYearRunning]);
 
   useEffect(() => {
     const jobId = runMultiYearProjectionData?.simulation_job_id;
@@ -255,7 +277,10 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
   return {
     currentConfig,
     currentYear,
-    handleCancelStopSimulation: () => setIsStopSimulationOpen(false),
+    handleCancelStopSimulation: () => {
+      setIsStopSimulationOpen(false);
+      setStopSimulationStatus('confirm');
+    },
     handleOpenStopSimulation: () => setIsStopSimulationOpen(true),
     handleRunProjection,
     handleStopProjection,
@@ -266,9 +291,12 @@ export const useMultiYearProjectionSimulation = ({simulationId, onSimulationComp
     progressContainerRef,
     runSimulationDisabled,
     setRunSimulationDisabled,
+    setIsSimulationRunning,
     showCompletionProgress,
     showCompletionSummary,
     simulationProgress,
     totalConfig,
+    stopSimulationStatus,
+    handleCloseStoppedPopup,
   };
 };

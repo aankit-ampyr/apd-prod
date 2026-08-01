@@ -142,7 +142,9 @@ export const SelectInput: React.FC<SelectInputProps> = (props) => {
     () => options?.find((option) => option.id === value) ?? null,
     [options, value],
   );
-  const displayLabel = selectedOption ? valueLabelFormatter(selectedOption) : selectedDisplayLabel;
+  const displayLabel = selectedOption
+    ? valueLabelFormatter(selectedOption)
+    : selectedDisplayLabel;
   const hasSelectedValue = Boolean(selectedOption || selectedDisplayLabel);
 
   const handleToggle = () => {
@@ -254,7 +256,9 @@ export const SelectInput: React.FC<SelectInputProps> = (props) => {
             variant="caption"
             className={cn(
               "grow text-start mt-1 truncate",
-              hasSelectedValue ? "text-text-primary!" : "text-text-placeholder!",
+              hasSelectedValue
+                ? "text-text-primary!"
+                : "text-text-placeholder!",
               disabled && "text-disabled",
               textClassName,
             )}
@@ -557,8 +561,12 @@ export const MultiSelectInput: React.FC<MultiSelectInputProps> = (props) => {
                 message={infoMessage ?? ""}
                 textClassName="font-InterRegular!"
                 position="top"
+                portal
               />{" "}
-              <Icon name="circle-info-2" className="text-text-secondary! size-4" />
+              <Icon
+                name="circle-info-2"
+                className="text-text-secondary! size-4"
+              />
             </span>
           )}
         </Text>
@@ -1050,6 +1058,7 @@ export const SearchableMultiSelectInput: React.FC<
             disabled={disabled}
             onClick={handleToggle}
             onFocus={handleFocus}
+            spellCheck={false}
             onBlur={handleBlur}
             placeholder={resolvedPlaceholder}
             className={cn(
@@ -1232,36 +1241,59 @@ export const SearchableSelectInput: React.FC<SearchableSelectInputProps> = ({
   const displayValue = isOpen ? search : selectedOption?.label || "";
 
   const inlineDropdown =
-    isOpen && !disabled && !usePortal && filteredOptions.length > 0 ? (
-      <Dropdown
-        itemRenderer={dropdownItemRenderer}
-        className={cn(
-          "absolute left-0 right-0 top-[calc(100%)] z-999",
-          dropdownClassName,
-        )}
-        options={filteredOptions}
-        value={selectedOption}
-        onSelect={handleSelect}
-      />
+    isOpen && !disabled && !usePortal ? (
+      filteredOptions.length > 0 ? (
+        <Dropdown
+          itemRenderer={dropdownItemRenderer}
+          className={cn(
+            "absolute left-0 right-0 top-[calc(100%)] z-999",
+            dropdownClassName,
+          )}
+          options={filteredOptions}
+          value={selectedOption}
+          onSelect={handleSelect}
+        />
+      ) : (
+        <div
+          className={cn(
+            "absolute left-0 right-0 top-[calc(100%)] z-999 mt-1 rounded-md border border-border bg-white p-3 text-center shadow-lg",
+            dropdownClassName,
+          )}
+        >
+          <Text variant="caption" className="text-text-secondary!">
+            No results found
+          </Text>
+        </div>
+      )
     ) : null;
 
   const portalDropdown =
-    isOpen &&
-    !disabled &&
-    usePortal &&
-    filteredOptions.length > 0 &&
-    rect &&
-    document?.body
+    isOpen && !disabled && usePortal && rect && document?.body
       ? createPortal(
-          <Dropdown
-            ref={portalDropdownRef}
-            itemRenderer={dropdownItemRenderer}
-            className={cn("z-9999", dropdownClassName)}
-            style={style}
-            options={filteredOptions}
-            value={selectedOption}
-            onSelect={handleSelect}
-          />,
+          filteredOptions.length > 0 ? (
+            <Dropdown
+              ref={portalDropdownRef}
+              itemRenderer={dropdownItemRenderer}
+              className={cn("z-9999", dropdownClassName)}
+              style={style}
+              options={filteredOptions}
+              value={selectedOption}
+              onSelect={handleSelect}
+            />
+          ) : (
+            <div
+              ref={portalDropdownRef}
+              style={style}
+              className={cn(
+                "z-9999 rounded-md border border-border bg-white p-3 text-center shadow-lg",
+                dropdownClassName,
+              )}
+            >
+              <Text variant="caption" className="text-text-secondary!">
+                No results found
+              </Text>
+            </div>
+          ),
           document.body,
         )
       : null;
@@ -1297,6 +1329,7 @@ export const SearchableSelectInput: React.FC<SearchableSelectInputProps> = ({
           onBlur={(e) => {
             onBlur?.(e as any);
           }}
+          spellCheck={false}
           disabled={disabled}
           onClick={handleToggle}
           onFocus={() => setIsFocused(true)}

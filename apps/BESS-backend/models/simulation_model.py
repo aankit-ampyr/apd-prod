@@ -567,6 +567,10 @@ class CustomSimulationJob(BessBase):
     hourly_results: Mapped[list["SimulationHourlyResult"]] = relationship(
         back_populates="custom_job", cascade="all, delete-orphan"
     )
+    monthly_results: Mapped[list["SimulationMonthlyResult"]] = relationship(
+        back_populates="custom_job", cascade="all, delete-orphan"
+    )
+
     results: Mapped[list["SingularConfSimulationResult"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -625,6 +629,27 @@ class AbstractSimulationHourlyResult(BessBase):
     green_energy_to_load_mwh: Mapped[float] = mapped_column(Float, nullable=False)
 
 
+class AbstractSimulationMonthlyResult(BessBase):
+    __abstract__ = True
+
+    month: Mapped[str] = mapped_column(String(50), nullable=False)
+    load_met_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    green_energy_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    wastage_energy_pct: Mapped[float] = mapped_column(Float, nullable=False)
+    hours_fully_served: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_load_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    generator_hours: Mapped[int] = mapped_column(Integer, nullable=False)
+    green_energy_to_load_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    dg_to_load_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    curtailed_mwh: Mapped[float] = mapped_column(Float, nullable=False)
+    month_int: Mapped[int] = mapped_column(Integer, nullable=False)
+    year_int: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class SimulationHourlyResult(AbstractSimulationHourlyResult):
     __tablename__ = "simulation_hourly_results"
 
@@ -645,6 +670,27 @@ class SimulationHourlyResult(AbstractSimulationHourlyResult):
         back_populates="hourly_results"
     )
     simulation: Mapped["Simulation"] = relationship()
+
+
+class SimulationMonthlyResult(AbstractSimulationMonthlyResult):
+    __tablename__ = "simulation_monthly_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    job_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("custom_simulation_job.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+
+    custom_job: Mapped["CustomSimulationJob"] = relationship(
+        back_populates="monthly_results"
+    )
 
 
 class MultiYearProjection(BessBase):
@@ -761,6 +807,9 @@ class MultiYearSimulationResult(BessBase):
     delivery_met_mwh: Mapped[float] = mapped_column(Float, nullable=False)
     charging_loss: Mapped[float] = mapped_column(Float, nullable=False)
     discharging_loss: Mapped[float] = mapped_column(Float, nullable=False)
+    degradation_loss: Mapped[float] = mapped_column(
+        Float, nullable=False, server_default=text("0")
+    )
     final_soc_pct: Mapped[float] = mapped_column(
         Float,
         nullable=False,
@@ -969,6 +1018,11 @@ class DetailGreenSimulationJob(BessBase):
     hourly_results: Mapped[list["GreenSimulationHourlyResult"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
+
+    monthly_results: Mapped[list["GreenSimulationMonthlyResult"]] = relationship(
+        back_populates="custom_job", cascade="all, delete-orphan"
+    )
+
     results: Mapped[list["DetailedGreenSimulationResult"]] = relationship(
         back_populates="job", cascade="all, delete-orphan"
     )
@@ -1022,4 +1076,23 @@ class GreenSimulationHourlyResult(AbstractSimulationHourlyResult):
     # Relationships
     job: Mapped["DetailGreenSimulationJob"] = relationship(
         back_populates="hourly_results"
+    )
+
+
+class GreenSimulationMonthlyResult(AbstractSimulationMonthlyResult):
+    __tablename__ = "green_simulation_monthly_results"
+
+    id: Mapped[int] = mapped_column(primary_key=True, index=True)
+    simulation_id: Mapped[int] = mapped_column(
+        ForeignKey("simulations.id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    job_id: Mapped[int] = mapped_column(
+        ForeignKey("detail_green_simulation_job.job_id", ondelete="CASCADE"),
+        index=True,
+        nullable=False,
+    )
+    custom_job: Mapped["DetailGreenSimulationJob"] = relationship(
+        back_populates="monthly_results"
     )

@@ -1,3 +1,5 @@
+from typing import Optional
+from redis.asyncio import Redis
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import status
@@ -33,6 +35,7 @@ class GreenEnergyConfigService:
         payload: GreenEnergyConfig,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
 
         if (
@@ -108,6 +111,7 @@ class GreenEnergyConfigService:
             after=after_config,
             remove_id=True,
             sim_module_type=SimulationLogStep.GREEN_ENERGY_CONFIGURATION,
+            redis=redis,
         )
 
         await bess_db.commit()

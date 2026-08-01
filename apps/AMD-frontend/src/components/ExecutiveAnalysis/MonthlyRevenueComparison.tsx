@@ -19,6 +19,7 @@ interface MonthlyRevenueComparisonProps {
   selectedMonths?: SelectInputItem['id'][] | null;
   data: ExecutiveMonthlyRevenueComparisonEntries[];
   year: number;
+  customActions?: React.ReactNode;
 }
 export function MonthlyRevenueComparison(props: MonthlyRevenueComparisonProps) {
   const {
@@ -31,6 +32,7 @@ export function MonthlyRevenueComparison(props: MonthlyRevenueComparisonProps) {
     loading,
     selectedMonths: selectedMonthsFromProps = null,
     year,
+    customActions,
   } = props;
 
   /**
@@ -40,7 +42,9 @@ export function MonthlyRevenueComparison(props: MonthlyRevenueComparisonProps) {
    */
   const {chartRef, onMaximize, onMinimize} = useChartsActionV2({
     downloadFileName,
-    renderFullScreen: () => <MonthlyRevenueComparison {...props} isFullScreenOverride selectedMonths={selectedMonths}/>,
+    renderFullScreen: () => (
+      <MonthlyRevenueComparison {...props} isFullScreenOverride selectedMonths={selectedMonths} />
+    ),
   });
 
   /**
@@ -217,13 +221,14 @@ export function MonthlyRevenueComparison(props: MonthlyRevenueComparisonProps) {
         />
         {!loading && (
           <div className={cn('flex shrink-0 items-center gap-3 chart-actions', actionWrapperClassName)}>
+            {customActions}
             <IconButton
               name="download"
               size={20}
               className="cursor-pointer hover:bg-primary-tint-2! charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={() => {
-                const months = selectedMonths?.map(Number) ?? [] as number[];
+                const months = selectedMonths?.map(Number) ?? ([] as number[]);
                 onDownload?.(months);
               }}
             />

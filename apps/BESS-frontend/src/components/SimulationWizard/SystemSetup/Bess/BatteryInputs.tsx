@@ -1,5 +1,5 @@
-import {Checkbox, Icon, Text, Tooltip} from '@/ui-kits';
-import {IOSDoubleSlider, IOSSingleSlider, Accordion} from '@/components';
+import {Icon, Text, Tooltip} from '@/ui-kits';
+import {IOSSingleSlider, Accordion} from '@/components';
 import {cn} from '@/utils';
 import React from 'react';
 

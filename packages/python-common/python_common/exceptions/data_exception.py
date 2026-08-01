@@ -49,3 +49,15 @@ class ProjectDeleted(Exception):
     def __init__(self, message: str = "Project not found"):
         self.message = message
         super().__init__(self.message)
+
+class ExceptionWithErrorCode(Exception):
+    def __init__(self, error_code: str, message: str=""):
+        self.message = message
+        self.error_code = error_code
+        super().__init__(self.message)
+
+class DependencyNotAvailableError(ExceptionWithErrorCode):
+    def __init__(self, error_code: str, message: str=""):
+        self.message = message
+        self.error_code = error_code
+        super().__init__(self.message, self.error_code)

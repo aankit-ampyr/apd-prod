@@ -46,7 +46,7 @@ export function IARReportSection() {
       <IARReportUpload
         disabled={isStepLocked || isAssetInactive || isAssetPendingApproval}
         variant={'inline'}
-        className="mt-0!"
+        className="mt-0! z-10"
       />
       {currentAsset?.iar_report_file && (
         <button

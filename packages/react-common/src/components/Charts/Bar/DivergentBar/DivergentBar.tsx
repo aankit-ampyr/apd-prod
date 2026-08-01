@@ -75,6 +75,7 @@ interface DivergentBarProps {
     offset?: number;
     angle?: number;
   };
+  customActions?: React.ReactNode;
   positiveBarColor?: string;
   negativeBarColor?: string;
   hoverColor?: string;
@@ -214,6 +215,7 @@ export function DivergentBarChart(props: DivergentBarProps) {
     yAxisLabel = "Revenue (£)",
     xAxisLabelProps,
     yAxisLabelProps,
+    customActions,
     positiveBarColor = DEFAULT_POSITIVE_COLOR,
     negativeBarColor = DEFAULT_NEGATIVE_COLOR,
     hoverColor = DEFAULT_HOVER_COLOR,
@@ -379,13 +381,14 @@ export function DivergentBarChart(props: DivergentBarProps) {
         {!isLoading && (
           <div
             className={cn(
-              "flex items-center gap-4 chart-actions",
+              "flex shrink-0 items-center gap-3 chart-actions flex-nowrap",
               actionWrapperClassName,
             )}
           >
+            {customActions}
             <IconButton
               name="download"
-              size={20}
+              size={16}
               className="hover:bg-primary-tint-2! cursor-pointer charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
               onClick={handleDownLoad}
@@ -393,7 +396,7 @@ export function DivergentBarChart(props: DivergentBarProps) {
             {!isFullScreen ? (
               <IconButton
                 name="maximize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMaximize}
@@ -401,7 +404,7 @@ export function DivergentBarChart(props: DivergentBarProps) {
             ) : (
               <IconButton
                 name="minimize"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={onMinimize}

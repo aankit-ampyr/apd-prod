@@ -1,7 +1,7 @@
 from fastapi import Request, Depends, Path
 import redis.asyncio as redis
 from sqlalchemy import select
-from constants.enums import UserRole
+from constants.enums import SimulationSetupProgress, UserRole
 from sqlalchemy.orm import joinedload
 from models.simulation_model import Simulation
 from db.dependencies import get_bess_db
@@ -27,9 +27,13 @@ async def validate_simulation_access(
 
     # Store in request.state for accessibility across the router/controller
     request.state.sim_id = simulation.sim_id
+    request.state.last_edited = simulation.edit_step
     request.state.project_id = simulation.project.proj_id
 
     if request.method == "GET":
+        return simulation.project.proj_id
+
+    if "compute" == [segment for segment in request.url.path.split("/") if segment][-1]:
         return simulation.project.proj_id
 
     user = getattr(request.state, "user", None)
@@ -57,3 +61,12 @@ async def get_resource_id(request: Request):
     proj_id = getattr(request.state, "project_id", None)
 
     return f"{proj_id} ≫ {sim_id}"
+
+
+async def get_edited_step(request: Request) -> SimulationSetupProgress:
+    """Dependency to retrieve the project_id stored in request.state."""
+    last_edited = getattr(
+        request.state, "last_edited", SimulationSetupProgress.INITIALIZED.value
+    )
+
+    return SimulationSetupProgress(last_edited)

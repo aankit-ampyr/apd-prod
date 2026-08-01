@@ -10,11 +10,10 @@ import {
   Bar,
   BarShapeProps,
   Rectangle,
-  Tooltip,
   getNiceTickValues,
 } from "recharts";
 import { useChartsActionV2 } from "../../../../hooks";
-import { IconButton, Skeleton, Text } from "../../../../ui-kit";
+import { IconButton, Skeleton, Text, Icon } from "../../../../ui-kit";
 import { cn } from "../../../../utils";
 import { WithFallback } from "../../../SkelatonWrapper";
 import { useEffect, useRef, useState } from "react";
@@ -23,6 +22,7 @@ export type DivergentBarData = {
   value: number;
   label: string;
   color?: string;
+  commentCount?: number;
 };
 
 export type DivergentBarChartTooltipProps = {
@@ -71,10 +71,12 @@ interface DivergantBarChartsV2Props {
   yDomainPadding?: number;
   headerClassName?: string;
   yAxisTickFormtter?: (tick: string) => string;
+  customActions?: React.ReactNode;
 
   customTooltipRenderer?: (
     props: DivergentBarChartTooltipProps,
   ) => React.ReactNode;
+  onBadgeClick?: (label: string) => void;
 }
 
 export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
@@ -106,9 +108,11 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     barValueLabelProps,
     barValueLabelFomatter = (v) => v.toString(),
     customTooltipRenderer,
+    onBadgeClick,
     yDomainPadding = 0,
     headerClassName,
     yAxisTickFormtter = (v) => v.toString(),
+    customActions,
   } = props;
 
   /**
@@ -132,6 +136,40 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
   const [hoveredLabel, setHoveredLabel] = useState<string | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
   const chartHostRef = useRef<HTMLDivElement | null>(null);
+  const innerChartRef = useRef<HTMLDivElement | null>(null);
+  const [hoverTooltip, setHoverTooltip] = useState<{
+    left: number;
+    top: number;
+    data: DivergentBarData;
+  } | null>(null);
+  const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showBarTooltip = (
+    event: React.MouseEvent<SVGRectElement>,
+    barData: DivergentBarData,
+  ) => {
+    if (!customTooltipRenderer && !showTooltip) return;
+    if (tooltipTimeout.current) {
+      clearTimeout(tooltipTimeout.current);
+      tooltipTimeout.current = null;
+    }
+    // Use the inner relative div — stays correct even when chart is scrolled horizontally
+    const containerRect = innerChartRef.current?.getBoundingClientRect();
+    const targetRect = event.currentTarget.getBoundingClientRect();
+    if (!containerRect || !targetRect) return;
+    setHoverTooltip({
+      left: targetRect.left - containerRect.left + targetRect.width / 2,
+      top: targetRect.top - containerRect.top - 8,
+      data: barData,
+    });
+  };
+
+  const hideBarTooltip = () => {
+    if (!customTooltipRenderer && !showTooltip) return;
+    tooltipTimeout.current = setTimeout(() => {
+      setHoverTooltip(null);
+    }, 300);
+  };
 
   /**
    * =================================
@@ -196,6 +234,8 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
       ? normalizedY + normalizedHeight + 16 // below negative bar
       : normalizedY - 8; // above positive bar
 
+    const commentCount = payload?.commentCount;
+
     return (
       <g>
         <Rectangle
@@ -208,12 +248,43 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
             cursor: "pointer",
           }}
           fill={resolvedBarColor}
-          onMouseEnter={() => setHoveredLabel(payload.label)}
-          onMouseLeave={() => setHoveredLabel(null)}
+          onMouseEnter={(e) => {
+            setHoveredLabel(payload.label);
+            const barData: DivergentBarData = {
+              ...payload,
+              color:
+                payload.color ??
+                (rawValue > 0
+                  ? (positiveBarHoverColor ?? positiveBarColor)
+                  : (negativeBarHoverColor ?? negativeBarColor)),
+            };
+            showBarTooltip(
+              e as unknown as React.MouseEvent<SVGRectElement>,
+              barData,
+            );
+          }}
+          onMouseMove={(e) => {
+            const barData: DivergentBarData = {
+              ...payload,
+              color:
+                payload.color ??
+                (rawValue > 0
+                  ? (positiveBarHoverColor ?? positiveBarColor)
+                  : (negativeBarHoverColor ?? negativeBarColor)),
+            };
+            showBarTooltip(
+              e as unknown as React.MouseEvent<SVGRectElement>,
+              barData,
+            );
+          }}
+          onMouseLeave={() => {
+            setHoveredLabel(null);
+            hideBarTooltip();
+          }}
         />
         {showValues && (
           <text
-            x={x + width / 2}
+            x={Number(x) + Number(width) / 2}
             y={labelY}
             textAnchor="middle"
             fontSize={12}
@@ -221,9 +292,42 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
             fontFamily="Inter-Medium"
             {...barValueLabelProps}
           >
-            {barValueLabelFomatter(props.value as number)}
+            {barValueLabelFomatter?.(rawValue) ?? rawValue}
           </text>
         )}
+
+        {commentCount && commentCount > 0 ? (
+          <g
+            transform={`translate(${Number(x) + Number(width) / 2}, ${normalizedY - 20})`}
+            className={cn("pointer-events-none", {
+              "cursor-pointer pointer-events-auto": !!onBadgeClick,
+            })}
+            onClick={(e) => {
+              if (onBadgeClick) {
+                e.stopPropagation();
+                onBadgeClick(payload.label);
+              }
+            }}
+          >
+            <foreignObject
+              x={-15}
+              y={-15}
+              width="30"
+              height="30"
+              className="overflow-visible"
+            >
+              <div className="relative flex items-center justify-center w-full h-full rounded-full border-[0.8px] border-[#E5F2F0] bg-white shadow-sm group hover:opacity-80 transition-opacity">
+                <Icon
+                  name="message"
+                  className="w-[14px] h-[14px] text-[#088477]"
+                />
+                <span className="absolute -top-1.5 -right-1.5 bg-[#2F9C8F] text-white text-[9px] font-bold w-4 h-4 flex items-center justify-center rounded-full shadow-sm z-10 leading-none">
+                  {commentCount > 99 ? "99+" : commentCount}
+                </span>
+              </div>
+            </foreignObject>
+          </g>
+        ) : null}
       </g>
     );
   };
@@ -273,10 +377,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     </ResponsiveContainer>
   );
 
-  const TooltipContent = ({ active, payload }: any) => {
-    if (!active || !payload?.length) return null;
-
-    const data = payload[0]?.payload as DivergentBarData;
+  const TooltipContent = ({ data }: { data: DivergentBarData }) => {
     const toolTipData = {
       ...data,
       color:
@@ -302,68 +403,81 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
   };
 
   const chartContent = (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart
-        data={data}
-        margin={{ top: 20, right: 0, bottom: 20, left: 0, ...chartMargins }}
-      >
-        <CartesianGrid
-          yAxisId={'yaxis'}
-          vertical={false}
-          stroke="var(--color-border)"
-          strokeDasharray="4 4"
-        />
-        <ReferenceLine y={0} stroke={"var(--color-border)"} strokeWidth={1} />
-        {!enableHorizontalScroll && YAxisComponent}
-
-        <XAxis
-          dataKey={"label"}
-          tickLine={false}
-          interval={0}
-          axisLine={{ stroke: "var(--color-border)" }}
-          tick={{
-            fill: "var(--color-text-secondary)",
-            fontSize: 12,
-            fontFamily: "Inter-Regular",
-          }}
+    <div ref={innerChartRef} className="relative w-full h-full">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart
+          data={data}
+          margin={{ top: 20, right: 0, bottom: 20, left: 0, ...chartMargins }}
         >
-          {!enableHorizontalScroll && (
-            <Label
-              value={xAxisLabel}
-              position="insideBottom"
-              offset={-10}
-              style={{
-                fill: "var(--color-text-primary)",
-                fontSize: 14,
-                fontWeight: 500,
-                textAnchor: "middle",
-                fontFamily: "Inter-Medium",
-              }}
-              {...xAxisLabelProps}
-            />
-          )}
-        </XAxis>
-
-        {showTooltip && (
-          <Tooltip
-            shared={false}
-            cursor={{ fill: "transparent" }}
-            isAnimationActive={false}
-            animationDuration={0}
-            content={<TooltipContent />}
+          <CartesianGrid
+            yAxisId={"yaxis"}
+            vertical={false}
+            stroke="var(--color-border)"
+            strokeDasharray="4 4"
           />
-        )}
+          <ReferenceLine y={0} stroke={"var(--color-border)"} strokeWidth={1} />
+          {!enableHorizontalScroll && YAxisComponent}
 
-        <Bar
-          yAxisId={'yaxis'}
-          barSize={barWidth}
-          dataKey="value"
-          radius={[4, 4, 0, 0]}
-          isAnimationActive={false}
-          shape={barShape}
-        />
-      </BarChart>
-    </ResponsiveContainer>
+          <XAxis
+            dataKey={"label"}
+            tickLine={false}
+            interval={0}
+            axisLine={{ stroke: "var(--color-border)" }}
+            tick={{
+              fill: "var(--color-text-secondary)",
+              fontSize: 12,
+              fontFamily: "Inter-Regular",
+            }}
+          >
+            {!enableHorizontalScroll && (
+              <Label
+                value={xAxisLabel}
+                position="insideBottom"
+                offset={-10}
+                style={{
+                  fill: "var(--color-text-primary)",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  textAnchor: "middle",
+                  fontFamily: "Inter-Medium",
+                }}
+                {...xAxisLabelProps}
+              />
+            )}
+          </XAxis>
+
+          <Bar
+            yAxisId={"yaxis"}
+            barSize={barWidth}
+            dataKey="value"
+            radius={[4, 4, 0, 0]}
+            isAnimationActive={false}
+            shape={barShape}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+
+      {showTooltip && hoverTooltip && (
+        <div
+          className="absolute z-50"
+          style={{
+            left: hoverTooltip.left,
+            top: hoverTooltip.top,
+            transform: "translate(-50%, -100%)",
+            pointerEvents: "auto",
+          }}
+          onMouseEnter={() => {
+            if (tooltipTimeout.current) {
+              clearTimeout(tooltipTimeout.current);
+              tooltipTimeout.current = null;
+            }
+          }}
+          onMouseLeave={() => setHoverTooltip(null)}
+        >
+          <TooltipContent data={hoverTooltip.data} />
+        </div>
+      )}
+    </div>
   );
 
   /**
@@ -409,10 +523,11 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
             ) : (
               title
             )}
-            <div className="flex items-center gap-3 chart-actions">
+            <div className="flex items-center gap-3 chart-actions flex-nowrap">
+              {customActions}
               <IconButton
                 name="download"
-                size={20}
+                size={16}
                 className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                 iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                 onClick={handleDownLoad}
@@ -420,7 +535,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
               {!isFullScreen ? (
                 <IconButton
                   name="maximize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMaximize}
@@ -428,7 +543,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
               ) : (
                 <IconButton
                   name="minimize"
-                  size={20}
+                  size={16}
                   className="hover:bg-primary-tint-2! cursor-pointer charts-action"
                   iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
                   onClick={onMinimize}

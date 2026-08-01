@@ -1,5 +1,6 @@
 import math
 from typing import Optional
+from redis.asyncio import Redis
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,12 +30,11 @@ from models.simulation_model import (
     DieselGeneratorConfiguration,
     SolarProfileSource,
 )
-from python_common.constants.enums import AuditLogModules, AuditLogScenario
 from services.service_support import (
     depreciate_simulation_job,
     progress_simulation_setup,
 )
-from utils.log_utils import audit_logs, compare_and_log
+from utils.log_utils import compare_and_log
 from utils.response_utils import Res
 
 
@@ -120,7 +120,18 @@ class MultiYearSimService:
         simulation_id: int,
         config: MultiYearCalculation,
         current_user: dict,
+        last_edited: Optional[SimulationSetupProgress] = None,
+        redis: Optional[Redis] = None,
     ):
+        if (
+            last_edited is not None
+            and last_edited < SimulationSetupProgress.RUN_CUSTOM_CONFIG_SIMULATION
+        ):
+            return Res.error(
+                status_code="E-20062",
+                message="Incomplete Simulation configuration.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         response = await bess_db.execute(
             select(CustomSimulationConfig).where(
@@ -159,8 +170,16 @@ class MultiYearSimService:
         config: MultiYearCalculation,
         current_user: dict,
         resource_id: str,
+        last_edited: SimulationSetupProgress,
+        redis: Redis,
     ):
         try:
+            if last_edited < SimulationSetupProgress.RUN_CUSTOM_CONFIG_SIMULATION:
+                return Res.error(
+                    status_code="E-20062",
+                    message="Incomplete Simulation configuration.",
+                    http_status_code=status.HTTP_400_BAD_REQUEST,
+                )
             multi_y_projection_res = await bess_db.execute(
                 select(MultiYearProjection).where(
                     MultiYearProjection.simulation_id == simulation_id
@@ -195,6 +214,7 @@ class MultiYearSimService:
                 after=after_config,
                 remove_id=True,
                 sim_module_type=SimulationLogStep.MULTI_YEAR_PROJECTION,
+                redis=redis,
             )
 
             await bess_db.flush()

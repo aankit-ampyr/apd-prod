@@ -2,7 +2,8 @@ from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import Organization
 from utils.response_utils import Res
-from utils import audit_logs
+from utils import audit_logs, build_sectioned_audit_payload
+from redis.asyncio import Redis
 from python_common.dto.common_dto import LogParams
 from dtos import OrganizationCreate, OrganizationUpdate
 from constants.enums import Platform, APDAuditLogScenario as AuditLogScenario, APDAuditLogModules as AuditLogModules
@@ -12,6 +13,8 @@ from typing import Union, List
 from datetime import datetime, timezone
 
 class OrganizationService:
+    ORGANIZATION_DETAILS_AUDIT_SECTION = "ORGANIZATION DETAILS"
+
     async def get_organization_users(
         self, 
         db: AsyncSession, 
@@ -75,8 +78,8 @@ class OrganizationService:
         
         if total_results == 0:
             if filter_applied:
-                return Res.error('E-10015', message="No records match applied filters")
-            return Res.error('E-10014', message="No records match filter")
+                return Res.error('E-10015', message="No records match applied filters", http_status_code=404)
+            return Res.error('E-10014', message="No records match filter", http_status_code=404)
         
         if limit == -1:
             result = await user_db.execute(query)
@@ -111,13 +114,13 @@ class OrganizationService:
             "total_results": total_results
         })
 
-    async def create_organization(self, db: AsyncSession, org: OrganizationCreate, current_user: dict):
+    async def create_organization(self, db: AsyncSession, redis: Redis, org: OrganizationCreate, current_user: dict):
         try:
             if Platform.AMD.value not in current_user['platform']:
-                return Res.error('E-10013', message="Only AMD admin can access this API")
+                return Res.error('E-10013', message="Only AMD admin can access this API", http_status_code=403)
             
             if not org.name or not org.name.strip():
-                return Res.error('E-10002', message="Organization name cannot be blank", http_status_code=400)
+                return Res.error('E-10002', message="Organization name cannot be blank", http_status_code=422)
 
             result = await db.execute(
                 select(Organization).where(
@@ -127,7 +130,7 @@ class OrganizationService:
             existing = result.scalar_one_or_none()
 
             if existing:
-                return Res.error('E-10019', message="Organization already exists", http_status_code=400)
+                return Res.error('E-10019', message="Organization already exists", http_status_code=409)
             
             result = await db.execute(select(func.count(Organization.id)))
             count = result.scalar() or 0
@@ -150,6 +153,7 @@ class OrganizationService:
                 before=None,
                 after=f"Org: {new_org.name}",
                 db=db,
+                redis=redis,
                 resource_id=new_org.org_id
             )
 
@@ -173,9 +177,9 @@ class OrganizationService:
             return Res.error('E-10001', message=str(e))
         
     
-    async def update_organization(self, db: AsyncSession, current_user: dict, org_id: int, org_data: OrganizationUpdate):
+    async def update_organization(self, db: AsyncSession, redis: Redis, current_user: dict, org_id: int, org_data: OrganizationUpdate):
         if Platform.AMD.value not in current_user['platform']:
-            return Res.error('E-10013', message="Only AMD admin can access this API")
+            return Res.error('E-10013', message="Only AMD admin can access this API", http_status_code=403)
         
         result = await db.execute(
             select(Organization).where(Organization.id == org_id)
@@ -184,7 +188,7 @@ class OrganizationService:
         org = result.scalar_one_or_none()
 
         if not org:
-            return Res.error('E-10014', message="Organization not found")
+            return Res.error('E-10014', message="Organization not found", http_status_code=404)
 
         # check duplicate name if updating
         if org_data.name:
@@ -197,7 +201,7 @@ class OrganizationService:
             existing = result.scalars().first()
 
             if existing:
-                return Res.error('E-10019', message="Organization already exists")
+                return Res.error('E-10019', message="Organization already exists", http_status_code=409)
 
         # Capture old name before updating for audit log
         old_name = org.name
@@ -213,8 +217,14 @@ class OrganizationService:
             action=AuditLogScenario.ORG_UPDATED,
             user_id=current_user['user_id'],
             user_role=current_user['role'],
-            before=("name: " + old_name) if org_data.name else None,
-            after=("name: " + org.name) if org_data.name else None,
+            before=build_sectioned_audit_payload(
+                self.ORGANIZATION_DETAILS_AUDIT_SECTION,
+                {"Name": old_name},
+            ) if org_data.name else None,
+            after=build_sectioned_audit_payload(
+                self.ORGANIZATION_DETAILS_AUDIT_SECTION,
+                {"Name": org.name},
+            ) if org_data.name else None,
             resource_id=org.org_id,
             db=db,
         )
@@ -244,7 +254,7 @@ class OrganizationService:
                     db=db,
                 )
 
-        await audit_logs(**log_params.model_dump())
+        await audit_logs(**log_params.model_dump(), redis=redis)
 
         await db.commit()
         await db.refresh(org)
@@ -279,7 +289,7 @@ class OrganizationService:
         sort=None,
     ):
         if Platform.AMD.value not in current_user['platform']:
-            return Res.error('E-10013', message="Only AMD admin can access this API")
+            return Res.error('E-10013', message="Only AMD admin can access this API", http_status_code=403)
 
         query = select(Organization)
         filter_applied = False
@@ -308,8 +318,8 @@ class OrganizationService:
 
         if total_results == 0:
             if not filter_applied:
-                return Res.error('E-10014', message="No organizations found")
-            return Res.error('E-10015', message="No organizations found")
+                return Res.error('E-10014', message="No organizations found", http_status_code=404)
+            return Res.error('E-10015', message="No organizations found", http_status_code=404)
 
         # pagination
         if limit != -1:

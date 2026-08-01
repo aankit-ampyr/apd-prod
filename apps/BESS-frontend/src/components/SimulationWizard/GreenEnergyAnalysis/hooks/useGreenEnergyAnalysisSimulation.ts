@@ -19,7 +19,7 @@ const GREEN_ANALYSIS_RESOURCE_TYPE = 12;
 export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationCompleted, onSimulationStopped}: UseGreenEnergyAnalysisSimulationParams) => {
   const dispatch = useDispatch();
   const {subscribe} = useContext(WebSocketContext);
-  const {isAnySimulationRunning, setIsGreenAnalysisRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, setIsGreenAnalysisRunning, runningSimulationId} = useSimulationStatus() ?? {};
 
   const runGreenAnalysisData = useSelector((state: RootState) => state.simulationWizard.runGreenAnalysisData);
 
@@ -37,7 +37,8 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
   const [showCompletionSummary, setShowCompletionSummary] = useState(false);
   const [isStopSimulationOpen, setIsStopSimulationOpen] = useState(false);
   const [runSimulationDisabled, setRunSimulationDisabled] = useState(false);
-
+  const [stopSimulationStatus, setStopSimulationStatus] = useState<'confirm' | 'stopping' | 'stopped'>('confirm');
+  const [isOwnerRunning, setIsOwnerRunning] = useState(false);
   const progressContainerRef = useRef<HTMLDivElement>(null);
   const pendingRunRequestRef = useRef(false);
   const activeResourceIdRef = useRef<number | null>(null);
@@ -47,7 +48,9 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
     return Number.isFinite(savedJobId) && savedJobId > 0 ? savedJobId : null;
   }, []);
 
-  const isCurrentUserOwner = activeResourceId !== null && getSavedJobId() === activeResourceId;
+  const savedJobId = getSavedJobId();
+
+  const isCurrentUserOwner = pendingRunRequestRef.current || (savedJobId !== null && savedJobId === activeResourceId);
   const isBlocked = isSimulationLocked && !isCurrentUserOwner && !isSimulationRunning;
 
   const shouldBlock = isAnySimulationRunning && runningSimulationId === simulationId;
@@ -80,8 +83,9 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
 
       const eventSimulationId = Number(event.data?.simulation_id ?? 0);
       const eventResourceId = Number(event.resource_id);
-      const isCurrentSimulationEvent = (simulationId && eventSimulationId === simulationId) || event.resource_id === activeResourceIdRef.current;
-      const isOwnerEvent = getSavedJobId() === eventResourceId;
+      const isActiveResourceEvent = eventResourceId === activeResourceIdRef.current;
+      const isCurrentSimulationEvent = (simulationId && eventSimulationId === simulationId) || isActiveResourceEvent;
+      const isOwnerEvent = getSavedJobId() === eventResourceId || (isSimulationRunning && isActiveResourceEvent);
 
       if (!isCurrentSimulationEvent) return;
 
@@ -102,7 +106,7 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
         return;
       }
 
-      if ((action === 'Updated' || action === ActionType.Updated || action === Number(ActionType.Started)) && isOwnerEvent) {
+      if ((action === 'Updated' || action === ActionType.Updated) && isOwnerEvent) {
         const configDetails = event.data?.current_config_details;
 
         setSimulationProgress(Number(event.data?.progress_percentage ?? 0));
@@ -119,6 +123,7 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
         if (!isOwnerEvent) {
           setIsSimulationRunning(false);
           setIsSimulationLocked(false);
+          setIsGreenAnalysisRunning(false);
           setRunSimulationDisabled(false);
           pendingRunRequestRef.current = false;
           setShowCompletionProgress(false);
@@ -127,6 +132,8 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
           setActiveResourceId(null);
           localStorage.removeItem(GREEN_ANALYSIS_JOB_STORAGE_KEY);
           resetProgressDetails();
+          setIsStopSimulationOpen(false);
+          setStopSimulationStatus('confirm');
           onSimulationCompleted();
           return;
         }
@@ -139,13 +146,15 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
         setIsSimulationRunning(false);
         setIsSimulationLocked(false);
         setRunSimulationDisabled(false);
+        setIsOwnerRunning(false);
         pendingRunRequestRef.current = false;
         setShowCompletionProgress(true);
         setShowCompletionSummary(false);
         activeResourceIdRef.current = null;
         setActiveResourceId(null);
         localStorage.removeItem(GREEN_ANALYSIS_JOB_STORAGE_KEY);
-
+        setIsStopSimulationOpen(false);
+        setStopSimulationStatus('confirm');
         onSimulationCompleted();
 
         setTimeout(() => {
@@ -155,9 +164,18 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
         return;
       }
 
+      if (event.action_id === 8) {
+        if (isOwnerEvent) {
+          setStopSimulationStatus('stopped');
+          return;
+        }
+      }
+
       if (isTerminalAction) {
+        setIsOwnerRunning(false);
         setIsSimulationRunning(false);
         setIsSimulationLocked(false);
+        setIsGreenAnalysisRunning(false);
         pendingRunRequestRef.current = false;
         setShowCompletionProgress(false);
         setShowCompletionSummary(false);
@@ -178,6 +196,7 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
 
     localStorage.removeItem(GREEN_ANALYSIS_JOB_STORAGE_KEY);
     resetProgressDetails();
+    setIsOwnerRunning(true);
     setIsSimulationRunning(true);
     setShowCompletionProgress(false);
     setShowCompletionSummary(false);
@@ -192,20 +211,34 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
 
     dispatch(stopGreenAnalysisRequest({simulation_id: simulationId}));
 
+    setStopSimulationStatus('stopping');
+  }, [dispatch, simulationId]);
+
+  const handleCloseStoppedPopup = useCallback(() => {
     setIsSimulationRunning(false);
+    setIsOwnerRunning(false);
     setIsGreenAnalysisRunning(false);
     setIsSimulationLocked(false);
+
     pendingRunRequestRef.current = false;
+
     setShowCompletionProgress(false);
     setShowCompletionSummary(false);
-    setIsStopSimulationOpen(false);
-    setRunSimulationDisabled(false);
+
     activeResourceIdRef.current = null;
     setActiveResourceId(null);
+
     localStorage.removeItem(GREEN_ANALYSIS_JOB_STORAGE_KEY);
+
     resetProgressDetails();
+
+    setRunSimulationDisabled(false);
+
+    setIsStopSimulationOpen(false);
+    setStopSimulationStatus('confirm');
+
     onSimulationStopped();
-  }, [dispatch, onSimulationStopped, resetProgressDetails, simulationId]);
+  }, [onSimulationStopped, resetProgressDetails, setIsGreenAnalysisRunning]);
 
   useEffect(() => {
     const jobId = runGreenAnalysisData?.simulation_job_id;
@@ -226,14 +259,9 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
       setRunSimulationDisabled(true);
       setActiveResourceId(normalizedSavedJobId);
       activeResourceIdRef.current = normalizedSavedJobId;
+      setIsOwnerRunning(true);
     }
   }, [getSavedJobId]);
-
-  useEffect(() => {
-    if (!simulationId) {
-      localStorage.removeItem(GREEN_ANALYSIS_JOB_STORAGE_KEY);
-    }
-  }, [simulationId]);
 
   useEffect(() => {
     if (!isSimulationRunning && !isBlocked && !shouldBlock) return;
@@ -261,7 +289,10 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
     currentDg,
     currentDuration,
     currentSolar,
-    handleCancelStopSimulation: () => setIsStopSimulationOpen(false),
+    handleCancelStopSimulation: () => {
+      setIsStopSimulationOpen(false);
+      setStopSimulationStatus('confirm');
+    },
     handleOpenStopSimulation: () => setIsStopSimulationOpen(true),
     handleRunGreenAnalysis,
     handleStopGreenAnalysis,
@@ -275,5 +306,10 @@ export const useGreenEnergyAnalysisSimulation = ({simulationId, onSimulationComp
     showCompletionSummary,
     simulationProgress,
     totalConfig,
+    stopSimulationStatus,
+    handleCloseStoppedPopup,
+    isCurrentUserOwner,
+    setShowCompletionSummary,
+    isOwnerRunning,
   };
 };

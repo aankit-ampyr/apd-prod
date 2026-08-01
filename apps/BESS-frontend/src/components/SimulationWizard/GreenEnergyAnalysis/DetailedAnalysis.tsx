@@ -3,6 +3,9 @@ import {
   detailedGreenAnalysisProgressData,
   detailedGreenAnalysisResultData,
   detailedGreenAnalysisSuccess,
+  detailedGreenError,
+  detailedGreenRunError,
+  detailedLoading,
   detailedResultLoading,
   detailedResultSuccess,
   generatorData,
@@ -10,14 +13,17 @@ import {
   projectSimulationData,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {
+  clearDetailedGreenErrors,
   detailedGreenAnalysisDataRequest,
   detailedGreenAnalysisProgressRequest,
   detailedGreenAnalysisRequest,
   detailedGreenAnalysisResultRequest,
+  getGreenAnalysisProgressSilentRequest,
   refreshProjectSimulationRequest,
   setShowDetailedGreenAnalysis,
+  setShowGreenAnalysisResults,
 } from '@/services/redux/slice/simulationWizardSlice';
-import {Button, Icon, Text} from '@/ui-kits';
+import {Alert, Button, Icon, Text} from '@/ui-kits';
 import {useEffect, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {useDetailedGreenEnergySimulation} from './hooks/useDetailedGreenEnergySimulation';
@@ -27,10 +33,108 @@ import {getGreenAnalysisHourlyExport, getGreenAnalysisMonthlyExport} from '@/ser
 import {useChangeConfigurationConfirmation} from '../ChangeConfigurationContext';
 import {Images} from '@lazarus/react-common';
 import {allProjectsData, authDataSelector} from '@/services/redux/selectors';
+import {ConfigurationOutOfSync} from '../OutOfSyncPopup';
+
+function DetailedAnalysisGhostLoader() {
+  return (
+    <div className="animate-pulse">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div className="h-8 w-72 rounded bg-gray-200" />
+        <div className="h-12 w-64 rounded-md bg-gray-200" />
+      </div>
+
+      {/* Configuration Card */}
+      <div className="mt-5 rounded-md border border-border p-5">
+        <div className="flex items-start gap-3">
+          <div className="h-6 w-6 rounded bg-gray-200" />
+          <div className="space-y-2">
+            <div className="h-6 w-56 rounded bg-gray-200" />
+            <div className="h-4 w-96 rounded bg-gray-200" />
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-md border border-border p-5">
+          <div className="grid grid-cols-4 gap-8">
+            {Array.from({length: 4}).map((_, i) => (
+              <div key={i}>
+                <div className="h-4 w-32 rounded bg-gray-200 mb-4" />
+                <div className="h-14 w-full rounded-md bg-gray-200" />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="mt-6 grid grid-cols-4 gap-5">
+          {Array.from({length: 4}).map((_, i) => (
+            <div key={i} className="rounded-lg border border-border p-5">
+              <div className="flex items-center gap-2">
+                <div className="h-7 w-7 rounded bg-gray-200" />
+                <div className="h-4 w-20 rounded bg-gray-200" />
+              </div>
+
+              <div className="mt-4 h-7 w-32 rounded bg-gray-200" />
+            </div>
+          ))}
+        </div>
+
+        {/* Buttons */}
+        <div className="mt-8 flex justify-center gap-4">
+          <div className="h-10 w-32 rounded-md bg-gray-200" />
+          <div className="h-10 w-48 rounded-md bg-gray-200" />
+        </div>
+      </div>
+
+      {/* Results Skeleton */}
+      <div className="mt-8 rounded-2xl border border-border p-6">
+        <div className="h-7 w-56 rounded bg-gray-200 mb-8" />
+
+        <div className="grid grid-cols-4 gap-6">
+          {Array.from({length: 12}).map((_, i) => (
+            <div key={i}>
+              <div className="h-4 w-24 rounded bg-gray-200" />
+              <div className="mt-3 h-6 w-16 rounded bg-gray-200" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Analysis Files */}
+      <div className="mt-6 rounded-lg border border-border p-6">
+        <div className="h-7 w-48 rounded bg-gray-200 mb-8" />
+
+        {Array.from({length: 2}).map((_, i) => (
+          <div key={i} className={i ? 'mt-6' : ''}>
+            <div className="h-5 w-44 rounded bg-gray-200 mb-3" />
+
+            <div className="rounded-lg border border-border p-4">
+              <div className="flex justify-between">
+                <div>
+                  <div className="h-5 w-64 rounded bg-gray-200" />
+                  <div className="mt-2 h-4 w-20 rounded bg-gray-200" />
+                </div>
+
+                <div className="h-5 w-5 rounded bg-gray-200" />
+              </div>
+
+              <div className="mt-5 h-12 w-full rounded bg-gray-200" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type ProjectOption = {
+  id?: number | string;
+  name?: string;
+};
 
 export const DetailedAnalysis = () => {
   const dispatch = useDispatch();
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
   const {requestChangeConfigurationConfirmation} = useChangeConfigurationConfirmation();
 
   const dgData = useSelector(generatorData);
@@ -40,6 +144,9 @@ export const DetailedAnalysis = () => {
   const resultSuccess = useSelector(detailedResultSuccess);
   const progressData = useSelector(detailedGreenAnalysisProgressData);
   const isLoading = useSelector(detailedResultLoading);
+  const saveError = useSelector(detailedGreenError);
+  const runError = useSelector(detailedGreenRunError);
+  const isDataLoading = useSelector(detailedLoading);
 
   const simulData = useSelector(initiateSimulationData);
   const proSimulData = useSelector(projectSimulationData);
@@ -54,7 +161,10 @@ export const DetailedAnalysis = () => {
   const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some((user: any) => user.id === authData.id));
   const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
   const isReadOnly = isAssignedUser || isProjectAssignmentPending;
+  const allProjects = useSelector(allProjectsData);
+  const project_id = proSimulData?.project_id;
 
+  const projectName = currentProject?.name || (allProjects as ProjectOption[] | undefined)?.find(project => project.id === project_id)?.name || '';
   const [solarPeak, setSolarPeak] = useState(50);
   const [bessCapacity, setBessCapacity] = useState(5);
   const [dgCapacity, setDgCapacity] = useState(200);
@@ -71,11 +181,11 @@ export const DetailedAnalysis = () => {
     dgCapacity: 200,
   });
 
-  const durationClass = selectedDuration === '2-hour' ? 2 : 4;
+  const durationClass = selectedDuration === '2-hour' ? 1 : 2;
 
   const hasGenerator = dgData?.is_included;
 
-  const {handleRunSimulation, isBlocked, isSimulationRunning}: any = useDetailedGreenEnergySimulation({
+  const {handleRunSimulation, isBlocked, isSimulationRunning, setIsSimulationRunning}: any = useDetailedGreenEnergySimulation({
     simulationId: simulation_id,
     onSimulationCompleted: () => {
       if (simulation_id) {
@@ -131,13 +241,13 @@ export const DetailedAnalysis = () => {
 
   useEffect(() => {
     if (detailedData) {
-      setSelectedDuration(detailedData?.duration_class === 2 ? '2-hour' : '4-hour');
+      setSelectedDuration(detailedData?.duration_class === 2 ? '4-hour' : '2-hour');
       setSolarPeak(Number(detailedData?.solar_peak));
       setBessCapacity(Number(detailedData?.bess_capacity));
       setDgCapacity(Number(detailedData?.dg_capacity));
 
       setInitialValues({
-        duration: detailedData.duration_class === 2 ? '2-hour' : '4-hour',
+        duration: detailedData.duration_class === 2 ? '4-hour' : '2-hour',
         solarPeak: Number(detailedData.solar_peak),
         bessCapacity: Number(detailedData.bess_capacity),
         dgCapacity: Number(detailedData.dg_capacity),
@@ -150,6 +260,13 @@ export const DetailedAnalysis = () => {
       setRunClicked(false);
     }
   }, [resultSuccess, progressData]);
+
+  useEffect(() => {
+    if (saveError === 'E-20059' || runError === 'E-20059') {
+      setRunClicked(false);
+      setIsSimulationRunning(false);
+    }
+  }, [saveError, runError]);
 
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
@@ -321,8 +438,20 @@ export const DetailedAnalysis = () => {
   };
 
   const showResults = (resultSuccess === 'S-20055' || progressData?.status === 2) && !hasChanges;
+  const isOutOfSync = saveError === 'E-20059' || runError === 'E-20059';
 
-  const showLoader = (runClicked || isLoading || isSimulationRunning) && !showResults;
+  const dismissOutOfSync = () => {
+    dispatch(clearDetailedGreenErrors());
+  };
+
+  const handleOutOfSyncAction = () => {
+    dispatch(setShowDetailedGreenAnalysis(false));
+    dispatch(setShowGreenAnalysisResults(false));
+    dispatch(getGreenAnalysisProgressSilentRequest({simulation_id: Number(simulation_id)}));
+    dismissOutOfSync();
+  };
+
+  const showLoader = (runClicked || isLoading || isSimulationRunning) && !showResults && !isOutOfSync;
 
   const QuantitySelector = ({
     label,
@@ -379,7 +508,7 @@ export const DetailedAnalysis = () => {
               disabled={isReadOnly}
               className={`
 flex h-full w-10 items-center justify-center border-r border-border text-lg
-${value <= min ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+${value <= min || isReadOnly ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
 `}>
               <Icon name="minus" size={18} className="text-text-placeholder" />
             </button>
@@ -391,7 +520,7 @@ ${value <= min ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
               onClick={increase}
               className={`
 flex h-full w-10 items-center justify-center border-l border-border text-lg
-${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
+${value >= max || isReadOnly ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
 `}>
               <Icon name="plus" size={18} className="text-text-placeholder" />
             </button>
@@ -454,16 +583,22 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
     setDgCapacity(value);
   };
 
+  if (isDataLoading) {
+    return <DetailedAnalysisGhostLoader />;
+  }
+
   return (
     <div className="main">
-      <div className="flex items-center gap-2">
-        <button onClick={() => dispatch(setShowDetailedGreenAnalysis(false))} className="flex items-center gap-1 text-text-primary! mr-5 cursor-pointer">
-          <Icon name="arrow-left" size={20} />
-        </button>
-
+      <div className="flex justify-between gap-2">
         <Text variant="h2" className="font-InterBold! text-h3! xl:text-h2">
           Calculate Detailed Analysis{' '}
         </Text>
+
+        <div className="bg-primary-tint-2 p-3.5 rounded-md">
+          <Text variant="14M" className="text-text-secondary!">
+            Project: <span className="text-text-primary!">{projectName}</span>
+          </Text>
+        </div>
       </div>
       <div className="border border-border rounded-md mt-5 p-5">
         <div className="flex items-start gap-3">
@@ -494,7 +629,8 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
                       key={item.label}
                       disabled={isReadOnly}
                       onClick={() => updateDuration(item.label)}
-                      className={`flex h-14 w-18 cursor-pointer flex-col items-center justify-center rounded-md border transition-colors
+                      className={`${isReadOnly ? 'cursor-not-allowed!' : 'cursor-pointer'} 
+                      flex h-14 w-18 cursor-pointer flex-col items-center justify-center rounded-md border transition-colors
           ${isSelected ? 'border-primary-tint-1 bg-primary/5 text-primary!' : 'border-border bg-white text-text-primary hover:border-primary'}`}>
                       <Text variant="14M" className={`${isSelected ? 'text-primary!' : 'text-text-primary'}`}>
                         {item.label}
@@ -541,29 +677,32 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
         </div>
 
         <div className="mt-6 grid grid-cols-4 gap-5">
-          {summaryCards.map((card: any) => (
-            <div
-              key={card.title}
-              className="rounded-lg border p-5"
-              style={{
-                background: card.background,
-                borderColor: card.border,
-              }}>
-              <div className="flex items-center gap-2 w-full">
-                <div className="flex h-7 w-7 items-center justify-center rounded-md" style={{background: card.iconBackground}}>
-                  <Icon name={card.icon} size={16} style={{color: card.iconColor}} />
+          {summaryCards.map((card: any) => {
+            const showNa = !hasGenerator && card.title === 'DG';
+            return (
+              <div
+                key={card.title}
+                className="rounded-lg border p-5"
+                style={{
+                  background: card.background,
+                  borderColor: card.border,
+                }}>
+                <div className="flex items-center gap-2 w-full">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md" style={{background: card.iconBackground}}>
+                    <Icon name={card.icon} size={16} style={{color: card.iconColor}} />
+                  </div>
+
+                  <Text variant="14M" className="text-sm! xl:text-[14px]!" style={{color: card.iconColor}}>
+                    {card.title}
+                  </Text>
                 </div>
 
-                <Text variant="14M" className="text-sm! xl:text-[14px]!" style={{color: card.iconColor}}>
-                  {card.title}
+                <Text variant="largeBody" className={`text-[#333B45]! text-left mt-3 font-InterSemiBold! text-[16px]! xl:text-[18px]! whitespace-nowrap`}>
+                  {showNa ? 'N/A' : card.value}
                 </Text>
               </div>
-
-              <Text variant="largeBody" className={`text-[#333B45]! text-left mt-3 font-InterSemiBold! text-[16px]! xl:text-[18px]! whitespace-nowrap`}>
-                {card.value}
-              </Text>
-            </div>
-          ))}
+            );
+          })}
         </div>
         {showLoader ? (
           <div className="flex justify-center gap-3 mt-6">
@@ -572,9 +711,11 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
         ) : (
           !showResults && (
             <div className="mt-6 flex items-center justify-center gap-4">
-              <Button variant="secondary" size="md" className="w-30 justify-center" disabled={!saveEnabled || isReadOnly} onClick={handleSave}>
-                Save
-              </Button>
+              {!isReadOnly && (
+                <Button variant="secondary" size="md" className="w-30 justify-center" disabled={!saveEnabled || isReadOnly} onClick={handleSave}>
+                  Save
+                </Button>
+              )}
 
               <Button
                 size="md"
@@ -590,6 +731,15 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
           )
         )}
       </div>
+      {isOutOfSync && (
+        <ConfigurationOutOfSync
+          open={isOutOfSync}
+          onClose={dismissOutOfSync}
+          onAction={handleOutOfSyncAction}
+          actionText="Green Energy Analysis"
+          recommendationText="Rerun the simulation, then open Green Energy Analysis to view the updated results."
+        />
+      )}
 
       {showResults && !hasChanges && (
         <>
@@ -683,15 +833,18 @@ ${value >= max ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}
         </>
       )}
       {(isSimulationRunning || isBlocked || shouldBlock) &&
+        !isOutOfSync &&
         createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
       {shouldShowExternalSimulationMessage && (
-        <div className="flex justify-center mt-3">
-          <div className="flex items-center gap-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes.
-            </Text>
-          </div>
+        <div className="flex justify-center">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
         </div>
       )}
     </div>

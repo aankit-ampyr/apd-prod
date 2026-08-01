@@ -1,17 +1,18 @@
-import {ToastProvider, ScreenOverrideProvider, ConfirmProvider} from '@/context';
+import {ToastProvider, ScreenOverrideProvider, ConfirmProvider, WebSocketProvider} from '@/context';
 import '@/stylesheet/index.css';
 import {RootNavigator} from '@/navigation/RootNavigation';
 import {Provider, useDispatch, useSelector} from 'react-redux';
 import {PersistGate} from 'redux-persist/integration/react';
 import {store, persistor} from '@/services/redux/store';
 import {PropsWithChildren, useEffect} from 'react';
-import {useInactivityTimer} from '@/hooks';
 import {
   cancelAuthRequest,
   resetAuthWithReason,
 } from './services/redux/slice';
 import {authStatus} from './services/redux/selectors';
 import {UserSessionEndReason} from './constants';
+import {useInactivityTimer, useNotificationListener} from '@/hooks';
+
 export default function App() {
   return (
     <Provider store={store}>
@@ -19,9 +20,11 @@ export default function App() {
         <ToastProvider>
           <ScreenOverrideProvider>
             <ConfirmProvider>
-              <AppRoot>
-                <RootNavigator />
-              </AppRoot>
+              <WebSocketProvider>
+                <AppRoot>
+                  <RootNavigator />
+                </AppRoot>
+              </WebSocketProvider>
             </ConfirmProvider>
           </ScreenOverrideProvider>
         </ToastProvider>
@@ -32,8 +35,9 @@ export default function App() {
 
 function AppRoot({children}: PropsWithChildren) {
   const dispatch = useDispatch();
-
   const isAuthenticated = useSelector(authStatus);
+
+  useNotificationListener();
 
   useInactivityTimer({
     onInactivity: () => dispatch(resetAuthWithReason({reason: UserSessionEndReason.IdleTimeout})),
@@ -44,5 +48,6 @@ function AppRoot({children}: PropsWithChildren) {
     // since only auth slice is persisted
     dispatch(cancelAuthRequest());
   }, []);
+
   return children;
 }

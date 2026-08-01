@@ -53,6 +53,7 @@ import {
   runDetailedGreenAnalysis,
   getDetailedGreenAnalysisProgress,
   getDetailedGreenAnalysisResult,
+  getEditedStepSimulation,
 } from '@/services/api';
 
 import {
@@ -236,6 +237,18 @@ import {
   detailedGreenAnalysisResultRequest,
   detailedGreenAnalysisResultSuccess,
   detailedGreenAnalysisResultFailure,
+  editedStepSimulationDataRequest,
+  editedStepSimulationDataSuccess,
+  editedStepSimulationDataFailure,
+  getGeneratorDgSilentRequest,
+  getGeneratorDgSilentSuccess,
+  getGeneratorDgSilentFailure,
+  getProjectSimulationSilentRequest,
+  getProjectSimulationSilentSuccess,
+  getProjectSimulationSilentFailure,
+  simulationProgressSilentRequest,
+  simulationProgressSilentSuccess,
+  simulationProgressSilentFailure,
 } from '../slice/simulationWizardSlice';
 
 import {deleteProjectSuccess} from '../slice/projectsSlice';
@@ -553,7 +566,7 @@ function* DGSizingSaga(action: ReturnType<typeof dgSizingRequest>): Generator {
     if (response.data.status === SUCCESS_KEY) {
       yield put(dgSizingSuccess(response.data));
       yield put(refreshProjectSimulationRequest({simulation_id}));
-      yield put(simulationProgressRequest({simulation_id}));
+      // yield put(simulationProgressRequest({simulation_id}));
     } else {
       yield put(dgSizingFailure(response.data));
     }
@@ -670,6 +683,21 @@ function* getProjectSimulationSaga(action: ReturnType<typeof getProjectSimulatio
   }
 }
 
+function* getProjectSimulationSilentSaga(action: ReturnType<typeof getProjectSimulationSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getProjectSimulation, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getProjectSimulationSilentSuccess(response.data));
+    } else {
+      yield put(getProjectSimulationSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getProjectSimulationSilentFailure(error.response?.data || error.response));
+  }
+}
+
 // ======================================
 // Refresh Project Simulation Saga (without clearing wizard data)
 // ======================================
@@ -733,6 +761,21 @@ function* simulationProgressSaga(action: ReturnType<typeof simulationProgressReq
   }
 }
 
+function* simulationProgressSilentSaga(action: ReturnType<typeof simulationProgressSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getSimulationProgress, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(simulationProgressSilentSuccess(response.data));
+    } else {
+      yield put(simulationProgressSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(simulationProgressSilentFailure(error.response?.data || error.response));
+  }
+}
+
 function* simulationResultsSaga(action: ReturnType<typeof simulationResultsRequest>): Generator {
   try {
     const {simulation_id, ...params} = action.payload;
@@ -759,6 +802,7 @@ function* customConfigSaga(action: ReturnType<typeof customConfigRequest>): Gene
       yield put(refreshProjectSimulationRequest({simulation_id}));
     } else {
       yield put(customConfigFailure(response.data));
+      yield put(editedStepSimulationDataRequest({simulation_id}));
     }
   } catch (error: any) {
     yield put(customConfigFailure(error.response?.data || error.response));
@@ -806,6 +850,7 @@ function* runCustomSimulationSaga(action: ReturnType<typeof runCustomSimulationR
       yield put(runCustomSimulationSuccess(response.data));
     } else {
       yield put(runCustomSimulationFailure(response.data));
+      yield put(editedStepSimulationDataRequest({simulation_id}));
     }
   } catch (error: any) {
     yield put(runCustomSimulationFailure(error.response?.data || error.response));
@@ -874,12 +919,14 @@ function* customHourlyChartSaga(action: ReturnType<typeof customHourlyChartReque
 
 function* multiYearProjectionSaga(action: ReturnType<typeof multiYearProjectionRequest>): Generator {
   try {
+    const {simulation_id} = action.payload;
     const response: any = yield call(multiYearProjection, action.payload);
 
     if (response.data.status === SUCCESS_KEY) {
       yield put(multiYearProjectionSuccess(response.data));
     } else {
       yield put(multiYearProjectionFailure(response.data));
+      yield put(editedStepSimulationDataRequest({simulation_id}));
     }
   } catch (error: any) {
     yield put(multiYearProjectionFailure(error.response?.data || error.response));
@@ -939,6 +986,7 @@ function* runMultiYearProjectionSaga(action: ReturnType<typeof runMultiYearProje
       yield put(runMultiYearProjectionSuccess(response.data));
     } else {
       yield put(runMultiYearProjectionFailure(response.data));
+      yield put(editedStepSimulationDataRequest({simulation_id}));
     }
   } catch (error: any) {
     yield put(runMultiYearProjectionFailure(error.response?.data || error.response));
@@ -1002,6 +1050,21 @@ function* getMultiYearProgressSilentSaga(action: ReturnType<typeof getMultiYearP
     }
   } catch (error: any) {
     yield put(getMultiYearProgressSilentFailure(error.response?.data || error.response));
+  }
+}
+
+function* getGeneratorDgSilentSaga(action: ReturnType<typeof getGeneratorDgSilentRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getGeneratorDgData, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getGeneratorDgSilentSuccess(response.data));
+    } else {
+      yield put(getGeneratorDgSilentFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getGeneratorDgSilentFailure(error.response?.data || error.response));
   }
 }
 
@@ -1162,6 +1225,7 @@ function* runDetailedGreenAnalysisSaga(action: ReturnType<typeof runDetailedGree
       yield put(runDetailedGreenAnalysisSuccess(response.data));
     } else {
       yield put(runDetailedGreenAnalysisFailure(response.data));
+      yield put(editedStepSimulationDataRequest({simulation_id}));
     }
   } catch (error: any) {
     yield put(runDetailedGreenAnalysisFailure(error.response?.data || error.response));
@@ -1195,6 +1259,21 @@ function* detailedGreenAnalysisResultSaga(action: ReturnType<typeof detailedGree
     }
   } catch (error: any) {
     yield put(detailedGreenAnalysisResultFailure(error.response?.data || error.response));
+  }
+}
+
+function* getEditedStepSimulationSaga(action: ReturnType<typeof editedStepSimulationDataRequest>): Generator {
+  try {
+    const {simulation_id} = action.payload;
+    const response: any = yield call(getEditedStepSimulation, simulation_id);
+
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(editedStepSimulationDataSuccess(response.data));
+    } else {
+      yield put(editedStepSimulationDataFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(editedStepSimulationDataFailure(error.response?.data || error.response));
   }
 }
 
@@ -1232,6 +1311,7 @@ export default function* simulationWizardSaga(): Generator {
   yield takeLatest(runSimulationRequest.type, runSimulationSaga);
   yield takeLatest(stopSimulationRequest.type, stopSimulationSaga);
   yield takeLatest(simulationProgressRequest.type, simulationProgressSaga);
+  yield takeLatest(simulationProgressSilentRequest.type, simulationProgressSilentSaga);
   yield takeLatest(simulationResultsRequest.type, simulationResultsSaga);
   yield takeLatest(customConfigRequest.type, customConfigSaga);
   yield takeLatest(getCustomConfigRequest.type, getCustomConfigSaga);
@@ -1258,9 +1338,12 @@ export default function* simulationWizardSaga(): Generator {
   yield takeLatest(greenAnalysisResultsRequest.type, greenAnalysisResultsSaga);
   yield takeLatest(greenAnalysisProgressRequest.type, greenAnalysisProgressSaga);
   yield takeLatest(getGreenAnalysisProgressSilentRequest.type, getGreenAnalysisProgressSilentSaga);
+  yield takeLatest(getGeneratorDgSilentRequest.type, getGeneratorDgSilentSaga);
   yield takeLatest(detailedGreenAnalysisRequest.type, detailedGreenAnalysisSaga);
   yield takeLatest(detailedGreenAnalysisDataRequest.type, getDetailedGreenAnalysisSaga);
   yield takeLatest(runDetailedGreenAnalysisRequest.type, runDetailedGreenAnalysisSaga);
   yield takeLatest(detailedGreenAnalysisProgressRequest.type, detailedGreenAnalysisProgressSaga);
   yield takeLatest(detailedGreenAnalysisResultRequest.type, detailedGreenAnalysisResultSaga);
+  yield takeLatest(editedStepSimulationDataRequest.type, getEditedStepSimulationSaga);
+  yield takeLatest(getProjectSimulationSilentRequest.type, getProjectSimulationSilentSaga);
 }

@@ -1,5 +1,6 @@
 from datetime import date
 from typing import Optional
+from redis.asyncio import Redis
 
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -185,6 +186,7 @@ class LoadSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(LoadProfile).where(LoadProfile.simulation_id == simulation_id)
@@ -285,7 +287,10 @@ class LoadSimulationService:
         )
 
         await depreciate_simulation_job(
-            simulation_id=simulation_id, db=bess_db, include_green_job=True
+            simulation_id=simulation_id,
+            db=bess_db,
+            include_green_job=True,
+            include_detailed_green_job=True,
         )
         await compare_and_log(
             db=bess_db,
@@ -297,6 +302,7 @@ class LoadSimulationService:
             before=before_config,
             after=after_config,
             sim_module_type=SimulationLogStep.SYSTEM_SETUP,
+            redis=redis,
         )
 
         await bess_db.commit()

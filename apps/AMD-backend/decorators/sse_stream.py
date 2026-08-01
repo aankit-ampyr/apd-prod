@@ -41,9 +41,9 @@ def sse_stream(gen_func):
         except Exception as e:
             # Handle errors during generator creation
             traceback.print_exc()
-            def error_wrapper():
+            def error_wrapper(e):
                 yield Res.streaming_error("E-10001", str(e))
-            return error_wrapper()
+            return error_wrapper(e)
 
     return wrapper
 

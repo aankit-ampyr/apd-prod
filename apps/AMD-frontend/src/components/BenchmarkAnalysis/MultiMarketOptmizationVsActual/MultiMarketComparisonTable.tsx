@@ -26,6 +26,7 @@ interface MultiMarketComparisonTableProps {
 
   // states
   selectedMonths?: SelectInputItem['id'][] | null;
+  customActions?: React.ReactNode;
 }
 
 function formatMonthLabel(month: number, year: number) {
@@ -59,6 +60,7 @@ export function MultiMarketComparisonTable(props: MultiMarketComparisonTableProp
     className,
     onDownload,
     selectedMonths: selectedMonthsFromProps = null,
+    customActions,
   } = props;
 
   /**
@@ -122,6 +124,7 @@ export function MultiMarketComparisonTable(props: MultiMarketComparisonTableProp
         <div className="flex items-start justify-between gap-4">
           <SectionHeader title={title} subtitle={subtitle} icon={icon} />
           <div className={cn('flex shrink-0 items-center gap-3 chart-actions', actionWrapperClassName)}>
+            {customActions}
             <IconButton
               name="download"
               size={20}

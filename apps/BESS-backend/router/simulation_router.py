@@ -55,6 +55,7 @@ class SimulationRouter:
         self.router.patch("/{simulation_id}")(self.controller.update_simulation)
         self.router.delete("/{simulation_id}")(self.controller.delete_simulation)
         self.router.get("/{simulation_id}")(self.controller.get_simulation_details)
+        self.router.get("/{simulation_id}/step")(self.controller.fetch_simulation_step)
 
         # Run sizing Simulation
         self.router.post("/{simulation_id}/sizing/run")(

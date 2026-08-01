@@ -79,7 +79,7 @@ export function SectionFrame(props: EditableSectionProps) {
   } = props;
 
   return (
-    <div className="w-full rounded-lg  border border-border shadow-md shadow-border/40">
+    <div className="w-full rounded-lg border border-border shadow-md shadow-border/40 transform-gpu">
       <div className="rounded-t-lg bg-linear-to-r py-4 pl-6 pr-4 flex justify-between from-primary-tint-2 to-[#C6ECE8]">
         <Text variant="free" className="font-SpaceGroteskBold! text-[22px]">
           {title}

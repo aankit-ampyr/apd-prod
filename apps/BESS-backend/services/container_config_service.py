@@ -1,4 +1,5 @@
 from typing import Optional
+from redis.asyncio import Redis
 
 from sqlalchemy import select
 from models.simulation_model import (
@@ -83,6 +84,7 @@ class ContainerConfigService:
         payload: BessConfigPayload,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         """
         Creates or updates a BESSContainerConfiguration for a given simulation_id.
@@ -138,7 +140,10 @@ class ContainerConfigService:
             db=bess_db,
         )
         await depreciate_simulation_job(
-            simulation_id=simulation_id, db=bess_db, include_green_job=True
+            simulation_id=simulation_id,
+            db=bess_db,
+            include_green_job=True,
+            include_detailed_green_job=True,
         )
         await compare_and_log(
             db=bess_db,
@@ -151,6 +156,7 @@ class ContainerConfigService:
             after=after_config,
             remove_id=True,
             sim_module_type=SimulationLogStep.SYSTEM_SETUP,
+            redis=redis,
         )
 
         await bess_db.commit()

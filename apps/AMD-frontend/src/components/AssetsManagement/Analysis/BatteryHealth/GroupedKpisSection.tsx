@@ -1,6 +1,9 @@
 import {IconTypes} from '@/interface';
 import {Icon, Skeleton, Text} from '@/ui-kits';
 import {useRef} from 'react';
+import {useWindowDimensions} from '@/hooks';
+import {TABLET_SCREEN_BREAKPOINT} from '@lazarus/react-common';
+import {cn} from '@/utils';
 
 export interface GroupedKpiObj {
   icon: IconTypes;
@@ -45,6 +48,8 @@ export function GroupedKpisSection(props: GroupKpisSectionProps) {
   } = props;
 
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const {width: windowWidth} = useWindowDimensions();
+  const isTablet = windowWidth <= TABLET_SCREEN_BREAKPOINT;
 
   if (isLoading) {
     return (
@@ -120,10 +125,15 @@ export function GroupedKpisSection(props: GroupKpisSectionProps) {
                 <Text variant="14M" className="text-text-secondary!">
                   {label}
                 </Text>
-                <span className="gap-1 @[390px]:gap-2 -translate-x-4 @[395px]:-translate-x-2 @[445px]:translate-x-0 @[435px]:gap-3 items-center flex mt-auto">
+                <span className="gap-1 @[390px]:gap-2 -translate-x-4 @[395px]:-translate-x-2 @[445px]:translate-x-0 @[435px]:gap-3 items-baseline flex mt-auto">
                   <Text
                     variant="free"
-                    className="font-InterBold! text-[22px] @[385px]:text-h3 @[400px]:text-h2 @[435px]:text-h1"
+                    className={cn(
+                      'font-InterBold!',
+                      isTablet
+                        ? 'text-[14px] @[385px]:text-[20px] @[400px]:text-[24px] @[435px]:text-[28px]'
+                        : 'text-[22px] @[385px]:text-h3 @[400px]:text-h2 @[435px]:text-h1',
+                    )}
                     style={{
                       color: accentColor,
                     }}>

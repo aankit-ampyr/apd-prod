@@ -1,6 +1,7 @@
-import {DGDriggerType, DGRunScheduleMode, LoadProfilePattern, LoadServingPriority, SimulationProgressStatus, SimulationStatus} from '@/constants';
+import {DGDriggerType, DGRunScheduleMode, LoadProfilePattern, LoadServingPriority} from '@/constants';
 import {
   bessContainerConfigData,
+  editedStepData,
   generatorData,
   greenAnalysisData,
   greenAnalysisProgressData,
@@ -8,9 +9,11 @@ import {
   initiateSimulationData,
   projectSimulationData,
   showGreenAnalysisResults,
+  simulationProjectLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {
   clearGreenAnalysisProgressData,
+  editedStepSimulationDataRequest,
   getGreenAnalysisProgressSilentRequest,
   getGreenAnalysisSilentRequest,
   greenAnalysisDataRequest,
@@ -18,7 +21,7 @@ import {
   greenAnalysisRequest,
   setShowGreenAnalysisResults,
 } from '@/services/redux/slice/simulationWizardSlice';
-import {Button, Checkbox, Icon, IconTypes, SelectInput, Skeleton, Text, TextInput, Tooltip} from '@/ui-kits';
+import {Alert, Button, Checkbox, Icon, IconTypes, SelectInput, Skeleton, Text, TextInput, Tooltip} from '@/ui-kits';
 import {RootState} from '@/services/redux/rootReducer';
 import {Images} from '@lazarus/react-common';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -103,23 +106,22 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
   const isGreenAnalysisDataLoading = useSelector((state: RootState) => state.simulationWizard.greenAnalysisDataLoading);
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
+  const isProSimulLoading = useSelector(simulationProjectLoading);
+
   const projectId = simulData?.project_id ?? proSimulData?.project_id;
   const currentProject = allProjData?.find((project: any) => Number(project?.id) === projectId);
   const isAssignedUser = Boolean(authData?.id && currentProject?.assigned_users?.some((user: any) => user.id === authData.id));
   const isProjectAssignmentPending = Boolean(authData?.id && projectId && !currentProject);
   const isReadOnly = isAssignedUser || isProjectAssignmentPending;
-  const {isAnySimulationRunning, runningSimulationId} = useSimulationStatus();
+  const {isAnySimulationRunning, runningSimulationId, userName} = useSimulationStatus() ?? {};
+  const stepData = useSelector(editedStepData);
 
   const simulationProgress = simulData?.progress ?? proSimulData?.progress;
   const hasGenerator = dgData?.is_included;
 
   const simulation_id = simulData?.id ?? proSimulData?.id;
-  // Persisted completion state from backend. Fall back to the simulation record so a fresh session
-  // can still show the completed state even before the progress payload is rehydrated.
-  const greenAnalysisCompleted =
-    progressData?.status === SimulationProgressStatus.Completed ||
-    simulData?.status === SimulationStatus.Completed ||
-    proSimulData?.status === SimulationStatus.Completed;
+
+  const greenAnalysisCompleted = progressData?.status === 2;
   const shouldBlock = isAnySimulationRunning && runningSimulationId === simulation_id;
 
   const handleGreenAnalysisCompleted = useCallback(() => {
@@ -155,13 +157,20 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
     runSimulationDisabled,
     showCompletionProgress,
     showCompletionSummary,
+    isCurrentUserOwner,
     simulationProgress: greenAnalysisProgress,
     totalConfig,
+    stopSimulationStatus,
+    handleCloseStoppedPopup,
+    setShowCompletionSummary,
+    isOwnerRunning,
   } = useGreenEnergyAnalysisSimulation({
     simulationId: simulation_id,
     onSimulationCompleted: handleGreenAnalysisCompleted,
     onSimulationStopped: handleGreenAnalysisStopped,
   });
+
+  const hideSimulationCTAs = isOwnerRunning;
 
   const shouldShowResults = showResults && (greenAnalysisCompleted || showCompletionSummary);
 
@@ -306,6 +315,12 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
   );
 
   useEffect(() => {
+    if (showResults) {
+      setHasUserEditedAfterCompletion(false);
+    }
+  }, [showResults]);
+
+  useEffect(() => {
     if (simulation_id) {
       dispatch(
         greenAnalysisDataRequest({
@@ -316,9 +331,27 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
   }, [simulation_id]);
 
   useEffect(() => {
+    if (simulation_id) {
+      dispatch(editedStepSimulationDataRequest({simulation_id}));
+    }
+  }, [simulation_id]);
+
+  useEffect(() => {
+    if (!greenAnalysisCompleted) {
+      setShowCompletionSummary(false);
+    }
+  }, [greenAnalysisCompleted]);
+
+  useEffect(() => {
     if (!simulation_id) return;
     dispatch(greenAnalysisProgressRequest({simulation_id: Number(simulation_id)}));
   }, [simulation_id]);
+
+  useEffect(() => {
+    if (stepData?.last_edited === 12) {
+      setIsDirty(false);
+    }
+  }, [stepData?.last_edited]);
 
   useEffect(() => {
     if (!greenAnalysis) return;
@@ -400,7 +433,7 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
   const hasConfigurationError = hasSolarError || hasBessError || hasDgError || hasStepError;
 
   const shouldShowCompletionSummary =
-    !isSimulationRunning && !showCompletionProgress && (showCompletionSummary || greenAnalysisCompleted) && !isBlocked && !hasUserEditedAfterCompletion;
+    !isSimulationRunning && !showCompletionProgress && (showCompletionSummary || greenAnalysisCompleted) && !hasUserEditedAfterCompletion;
 
   const completedConfig = greenAnalysisCompleted && greenAnalysis && !hasUserEditedAfterCompletion ? greenAnalysis : null;
   const displaySolarMin = Number(completedConfig?.solar_min ?? solarMin);
@@ -538,7 +571,7 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
     setIsDirty(false);
   };
 
-  const shouldShowInitialLoader = isGreenAnalysisDataLoading;
+  const shouldShowInitialLoader = isGreenAnalysisDataLoading || isProSimulLoading || !proSimulData?.project_id || !currentProject;
   if (shouldShowInitialLoader) {
     return <GreenAnalysisGhostLoader />;
   }
@@ -548,12 +581,14 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
       <>
         {shouldShowExternalSimulationMessage && (
           <div className="flex justify-center">
-            <div className="flex items-center gap-3">
-              <Icon name="infoCircle" className="size-4.5! text-warning!" />
-              <Text variant="14M" className="text-warning!">
-                Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-              </Text>
-            </div>
+            <Alert
+              textClassName="text-error-text! text-[14px]!"
+              iconClassName="mt-0! size-4.5!"
+              iconName="warning-triangle-sharp"
+              message={`${userName} is currently running this simulation. You can run it again once it completes`}
+              variant="error"
+              className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+            />
           </div>
         )}
 
@@ -578,6 +613,18 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
       <Text variant="14R" className="text-text-secondary! w-[65%]! xl:w-full">
         Find optimal Solar + BESS + DG configurations to meet green energy targets with acceptable wastage levels.
       </Text>
+      {shouldShowExternalSimulationMessage && (
+        <div className="flex justify-center mt-3">
+          <Alert
+            textClassName="text-error-text! text-[14px]!"
+            iconClassName="mt-0! size-4.5!"
+            iconName="warning-triangle-sharp"
+            message={`${userName} is currently running this simulation. You can run it again once it completes`}
+            variant="error"
+            className={`w-fit! justify-center items-center! p-3! border-0.5 border-error/20`}
+          />
+        </div>
+      )}
       <div className="rounded-md border border-l-3 border-blue bg-[#F8FCFF] p-3 mt-8 mb-8">
         <div className="flex items-start gap-3.5">
           <Icon name="circle-info" size={20} className="text-blue mt-1" />
@@ -1063,7 +1110,7 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
       )}
 
       <div className="flex justify-center gap-3 mt-3">
-        {!isSimulationRunning && !showCompletionProgress && !isBlocked && (!greenAnalysisCompleted || hasUserEditedAfterCompletion) && !isReadOnly && (
+        {!hideSimulationCTAs && !showCompletionProgress && (!greenAnalysisCompleted || hasUserEditedAfterCompletion) && !isReadOnly && (
           <Button
             variant="secondary"
             size="md"
@@ -1073,7 +1120,7 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
             Save
           </Button>
         )}
-        {!isSimulationRunning && !showCompletionProgress && !isBlocked && (!greenAnalysisCompleted || hasUserEditedAfterCompletion) && (
+        {!hideSimulationCTAs && !showCompletionProgress && (!greenAnalysisCompleted || hasUserEditedAfterCompletion) && (
           <Button
             variant="primary"
             size="md"
@@ -1094,16 +1141,6 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
       {/*
         Next → View Results
       */}
-      {shouldShowExternalSimulationMessage && (
-        <div className="flex justify-center">
-          <div className="flex items-center gap-3">
-            <Icon name="infoCircle" className="size-4.5! text-warning!" />
-            <Text variant="14M" className="text-warning!">
-              Another simulation is currently running. You'll be able to start a new one once it finishes. Please check back later.
-            </Text>
-          </div>
-        </div>
-      )}
 
       {(isSimulationRunning || isBlocked || shouldBlock) &&
         createPortal(<div className="fixed inset-0 bg-white opacity-30 pointer-events-none" />, document.body)}
@@ -1155,6 +1192,8 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
                       open={isStopSimulationOpen}
                       onCancel={handleCancelStopSimulation}
                       onStop={handleStopGreenAnalysis}
+                      status={stopSimulationStatus}
+                      onCloseSuccess={handleCloseStoppedPopup}
                     />
                   )}
                 </>
@@ -1173,15 +1212,15 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
       )}
       {shouldShowCompletionSummary && (
         <>
-              <div className="mt-4 flex justify-center">
-                <div className="bg-primary-tint-2 p-3 flex items-center gap-3 w-fit rounded-sm">
-                  <Icon name="circle-check-big" className="text-success! mt-0.5!" size={18} />
-                  <Text variant="16M" className="font-InterMedium!">
-                    Green analysis completed <div className="bg-[#44AA6F] inline-block mx-2.5 rounded-full h-2 w-2" /> {completedConfigurationCount}{' '}
-                    Configurations processed
-                  </Text>
-                </div>
-              </div>
+          <div className="mt-4 flex justify-center">
+            <div className="bg-primary-tint-2 p-3 flex items-center gap-3 w-fit rounded-sm">
+              <Icon name="circle-check-big" className="text-success! mt-0.5!" size={18} />
+              <Text variant="16M" className="font-InterMedium!">
+                Green analysis completed <div className="bg-[#44AA6F] inline-block mx-2.5 rounded-full h-2 w-2" /> {completedConfigurationCount} Configurations
+                processed
+              </Text>
+            </div>
+          </div>
           <div className="mt-6 flex justify-center">
             <Button variant="primary" size="md" onClick={() => dispatch(setShowGreenAnalysisResults(true))}>
               Next → View Results
@@ -1371,6 +1410,7 @@ function SimulationConfigurationSummary() {
     },
     () => {
       const dg = proSimulData?.config?.dg;
+      const isTakeoverFullLoad = proSimulData?.config?.dispatch?.is_dg_takeover_full_load;
 
       // If DG is not included
       if (!dg?.is_included) {
@@ -1407,10 +1447,16 @@ function SimulationConfigurationSummary() {
           label: 'DG Charges BESS',
           value: proSimulData?.config?.dispatch?.is_dg_charging_bess ? 'YES - Excess DG power' : 'NO - Solar only',
         },
-        {
-          label: 'Load Priority',
-          value: proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
-        },
+        // Show only when Takeover Mode is NO
+        ...(!isTakeoverFullLoad
+          ? [
+              {
+                label: 'Load Priority',
+                value:
+                  proSimulData?.config?.dispatch?.load_serving_priority === LoadServingPriority['BESS First (Solar → BESS → DG)'] ? 'BESS First' : 'DG First',
+              },
+            ]
+          : []),
         {
           label: 'Takeover Mode',
           value: proSimulData?.config?.dispatch?.is_dg_takeover_full_load ? 'Yes - DG serves full load' : 'No - DG fills gap',
@@ -1422,8 +1468,6 @@ function SimulationConfigurationSummary() {
       ];
     },
   );
-
-  const configSummaryData: ConfigSummaryDataType[] = [loadConfig, solarConfig, generatorConfig, batteryConfig, dispatchStrategyConfig];
 
   function summaryPointFactory(
     args: {
@@ -1522,12 +1566,24 @@ function ConfigurationSummaryCard(props: Readonly<ConfigSummaryCardProps>) {
           const showTooltip = title === 'SOLAR' && point.label === 'Profile';
           return (
             <li key={`${point.label ?? point.value}-${index}`}>
-              <div className="flex items-center gap-1 min-w-0">
-                <Text variant="small" className="text-text-secondary! shrink-0">
-                  {point.label} :
+              {point.label ? (
+                <div className="flex items-center gap-1 min-w-0">
+                  <Text variant="small" className="text-text-secondary! shrink-0">
+                    {point.label}:
+                  </Text>
+                  {showTooltip ? (
+                    <TruncatedTextWithTooltip text={point.value} />
+                  ) : (
+                    <Text variant="12SB" className="leading-none!">
+                      {point.value}
+                    </Text>
+                  )}
+                </div>
+              ) : (
+                <Text variant="12SB" className="leading-none!">
+                  {point.value}
                 </Text>
-                {showTooltip ? <TruncatedTextWithTooltip text={point.value} /> : <Text variant="12SB">{point.value}</Text>}
-              </div>
+              )}
             </li>
           );
         })}

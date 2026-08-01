@@ -1,11 +1,11 @@
 import type {Asset} from '@/interface';
 import {Modal, Button, Text, SearchableSelectInput} from '@/ui-kits';
-import React from 'react';
-import {useDispatch} from 'react-redux';
+import React, {useEffect} from 'react';
+import {useDispatch, useSelector} from 'react-redux';
 import {useDropdownValues} from '@/hooks';
-import {getErrorMessage} from '@/utils';
+import {ErrorCodes, getErrorMessage} from '@/utils';
 import {reassignAssetOwnershipRequest, getAllOrganizationsListRequest} from '@/services/redux/slice';
-import {allOrganizationsList} from '@/services/redux/selectors';
+import {allOrganizationsList, assetError, assetErrorMessageVars} from '@/services/redux/selectors';
 import {useFormik} from 'formik';
 import * as Yup from 'yup';
 
@@ -30,15 +30,18 @@ const ReassignSchema = Yup.object().shape({
 export const ReassignAssetOwnership: React.FC<ReassignAssetOwnershipProps> = props => {
   const {onClose, open, asset} = props;
 
-  // hooks
+  /**
+   * =====================
+   * Hooks
+   * =====================
+   */
   const dispatch = useDispatch();
   const allOrgs = useDropdownValues({
     fetchAction: getAllOrganizationsListRequest,
     selector: allOrganizationsList,
   });
 
-  // Formik
-  const {dirty, isValid, errors, values, handleBlur, setFieldValue, handleSubmit, touched} = useFormik({
+  const {dirty, isValid, errors, values, handleBlur, setFieldValue, handleSubmit, touched, setFieldError} = useFormik({
     initialValues,
     validationSchema: ReassignSchema,
     onSubmit: handleReassign,
@@ -46,9 +49,26 @@ export const ReassignAssetOwnership: React.FC<ReassignAssetOwnershipProps> = pro
     validateOnMount: true,
   });
 
-  // Filter out current organization from the list
+  /**
+   * =====================
+   * Selectors
+   * =====================
+   */
+  const failureMessageVars = useSelector(assetErrorMessageVars);
+  const failure = useSelector(assetError) as ErrorCodes;
+
+  /**
+   * =====================
+   * Derived State
+   * =====================
+   */
   const filteredOrgs = allOrgs.filter(item => item.id !== asset?.organization?.id);
 
+  /**
+   * =====================
+   * Functions
+   * =====================
+   */
   function handleReassign(values: FormType) {
     if (!values.organization) return;
     dispatch(
@@ -59,9 +79,22 @@ export const ReassignAssetOwnership: React.FC<ReassignAssetOwnershipProps> = pro
     );
   }
 
+  /**
+   * =====================
+   * Side Effects
+   * =====================
+   */
+  useEffect(() => {
+    if (failure) {
+      if (failure === 'E-10239') {
+        setFieldError('organization', getErrorMessage(failure, failureMessageVars));
+      }
+    }
+  }, [failure]);
+
   return (
     <Modal open={open} maxWidth={500} className="flex! flex-col gap-6!">
-        <Text variant="h3">Reassign Asset Ownership?</Text>
+      <Text variant="h3">Reassign Asset Ownership?</Text>
 
       <div className="bg-primary-tint-2 flex flex-col gap-2 p-4  border-primary rounded-sm">
         <span className="flex gap-2 items-center">

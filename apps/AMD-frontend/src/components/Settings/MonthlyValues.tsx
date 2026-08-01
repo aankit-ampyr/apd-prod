@@ -1,6 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import {AnalyticsTable, Divider, SectionHeader} from '../common';
-import {Button, Icon, Modal, MonthYearSelector, MultiMonthYearSelector, Text, Tooltip} from '@/ui-kits';
+import {Alert, Button, Icon, Modal, MonthYearSelector, MultiMonthYearSelector, Text, Tooltip} from '@/ui-kits';
 import {
   AddMonthlyValuesRequest,
   DataTableColumn,
@@ -296,11 +296,11 @@ export function MonthlyValues() {
     const payload: AddMonthlyValuesRequest['payload'] = Object.entries(columnData)
       .map(([metric_id, value]) => [metric_id, normalizeMonthlyValue(value)] as const)
       .map(([metric_id, value]) => ({
-      metric_id: Number(metric_id),
-      month: activeColumn.month,
-      year: activeColumn.year,
-      value: value ? Number(value) : null,
-    }));
+        metric_id: Number(metric_id),
+        month: activeColumn.month,
+        year: activeColumn.year,
+        value: value ? Number(value) : null,
+      }));
 
     dispatch(addMonthlyValuesRequest(payload));
   }
@@ -429,7 +429,9 @@ export function MonthlyValues() {
       name: 'metric',
       align: 'left',
       title: <Text variant="14R">Metric Name</Text>,
-      width: {minWidth: '330px', maxWidth: '390px'},
+      width: (!hasMonthlyValues && !selectedAddMonthYear && !fetchLoading) 
+        ? {minWidth: '260px', maxWidth: '290px'} 
+        : {minWidth: '330px', maxWidth: '390px'},
       render: row => {
         // for modo benchmark metric it will be fetched from API so it will render some extra text "Auto (API)"
         if (row.id === AssetMetrics.ModoBenchmark) {
@@ -653,7 +655,7 @@ export function MonthlyValues() {
 
   return (
     <React.Fragment>
-      <div className="flex my-5 gap-4 items-center">
+      <div className="flex mt-5 mb-2 gap-4 items-center">
         <SectionHeader
           title="Monthly Configured Values"
           subtitle="Add monthly columns and enter hardcoded metric values"
@@ -678,6 +680,12 @@ export function MonthlyValues() {
         />
       </div>
 
+      <Alert
+        variant="info"
+        className="mb-1"
+        message="Months shown in “Add months” are based on the reporting periods for which Aggregator, SCADA, and IAR files have been uploaded in the View Details screen. Upload the required files there to make a month available for configuration."
+      />
+
       {isAddMonthPickerOpen && (
         <AddMonthlyColumnModal
           open={isAddMonthPickerOpen}
@@ -685,12 +693,16 @@ export function MonthlyValues() {
           onClose={() => setIsAddMonthPickerOpen(false)}
           onChange={handleAddMonthColum}
           disabledMonths={existingMonthYears}
+          maxDate={{
+            month: new Date().getMonth() + 1,
+            year: new Date().getFullYear(),
+          }}
         />
       )}
 
       <AnalyticsTable
         loading={fetchLoading}
-        className="-mt-4 shadow-lg shadow-border/40 rounded-md"
+        className="shadow-lg shadow-border/40 rounded-md"
         tableClassName="table-auto"
         headerColor="var(--color-primary-tint-2)"
         data={groupedMonthlyData}
@@ -718,10 +730,11 @@ interface AddMonthlyColumnModalProps {
   onClose: () => void;
   onChange: (value: {month: number; year: number}) => void;
   disabledMonths?: {month: number; year: number}[];
+  maxDate?: {month: number; year: number};
 }
 
 function AddMonthlyColumnModal(props: AddMonthlyColumnModalProps) {
-  const {open, value, onClose, onChange, disabledMonths} = props;
+  const {open, value, onClose, onChange, disabledMonths, maxDate} = props;
 
   const handleChange = (nextValue: {month: number; year: number}) => {
     onChange(nextValue);
@@ -746,6 +759,7 @@ function AddMonthlyColumnModal(props: AddMonthlyColumnModalProps) {
           doneText="Add Column"
           className="shadow-none"
           disabledMonths={disabledMonths}
+          maxDate={maxDate}
         />
       </div>
     </Modal>
@@ -793,7 +807,7 @@ function MonthFilter({value = [], onChange, className, disabled}: MonthFilterPro
           onClick={handleClear}
           className="border-primary disabled:opacity-65 disabled:cursor-not-allowed cursor-pointer hover:border-primary-hover active:border-primary-active border h-8 rounded-sm px-4 py-1 flex items-center gap-2">
           <Icon name="cross" className="text-text-secondary size-3" />
-          <Text variant="caption" className="text-text-secondary!">
+          <Text variant="caption" className="text-text-secondary! whitespace-nowrap">
             Clear filters
           </Text>
         </button>
@@ -812,6 +826,10 @@ function MonthFilter({value = [], onChange, className, disabled}: MonthFilterPro
             cancelText="Clear"
             doneText="Apply"
             className="shadow-none"
+            maxDate={{
+              month: new Date().getMonth() + 1,
+              year: new Date().getFullYear(),
+            }}
           />
         </div>
       )}

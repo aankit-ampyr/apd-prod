@@ -7,6 +7,9 @@ import digestReducer from './slice/digestSlice';
 import settingsReducer from './slice/settingsSlice';
 import auditLogReducer from './slice/auditLogSlice';
 import invoiceReducer from './slice/invoiceSlice';
+import commentReducer from './slice/commentSlice';
+import notificationReducer from './slice/notificationSlice';
+import analyticsFilterReducer from './slice/analyticsFilterSlice';
 
 const appReducer = combineReducers({
   auth: authReducer,
@@ -17,6 +20,9 @@ const appReducer = combineReducers({
   settings: settingsReducer,
   auditLog: auditLogReducer,
   invoice: invoiceReducer,
+  comment: commentReducer,
+  notification: notificationReducer,
+  analyticsFilter: analyticsFilterReducer,
 });
 
 /**
@@ -26,6 +32,7 @@ const appReducer = combineReducers({
 const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: any) => {
   if (action.type === logoutSuccess.type || action.type === resetAuthWithReason.type) {
     const sessionEndReason = action.payload?.reason || null;
+    const errorCode = action.payload?.errorCode || null;
     state = undefined;
 
     localStorage.clear();
@@ -38,10 +45,12 @@ const rootReducer = (state: ReturnType<typeof appReducer> | undefined, action: a
         auth: {
           ...initialState.auth,
           sessionEndReason,
+          ...(errorCode && { authFailure: errorCode }),
         },
       };
     }
   }
+
   return appReducer(state, action);
 };
 

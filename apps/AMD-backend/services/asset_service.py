@@ -2,27 +2,38 @@ from typing import List
 from sqlalchemy import delete, update, extract, select, or_, func, case, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload, with_loader_criteria
+from broker import broker
 from models import (
     AssetOptimizationParameter,
     Asset,
     AssetFile,
-    AuditLog,
     Organization,
     User,
     UserOrganization,
     PdfInvoice,
     Settlement,
+    SummaryStatement,
 )
-from utils import Res, audit_logs, FileStorageManager, paginate
+from utils import (
+    Res,
+    audit_logs,
+    compare_and_build_sectioned_audit_payload,
+    build_sectioned_audit_payload,
+    FileStorageManager,
+    paginate,
+)
+from redis.asyncio import Redis
 from python_common.constants.country_list import countries_list
 from python_common.constants.enums import Country
 from services.organization_service import OrganizationService
+import re
 from dtos.asset_dto import (
     AssetCreate,
     AssetEdit,
     AssetOptimizationUpdate,
     GenerateMergeFile,
     GenerateOptmizedFile,
+    AssetGenerateAnalytics,
 )
 from constants.enums import (
     AssetStatus,
@@ -33,6 +44,13 @@ from constants.enums import (
     Platform,
     APDAuditLogScenario as AuditLogScenario,
     APDAuditLogModules as AuditLogModules,
+)
+from constants.dependency_class import (
+    OptimizedDataFrame,
+    YearlyOptimizedDataFrame,
+    MergedDataFrame,
+    YearlyMergedDataFrame,
+    IARDataFrame,
 )
 from constants.defaults import UPLOAD_PATHS
 import pandas as pd
@@ -52,6 +70,7 @@ from utils.mail_utils import MailUtils
 from config import WEB_APP_URL
 import numpy as np
 import calendar
+from worker.tasks import asset_computation_task, asset_analytics_deletion_task
 import time
 
 t1 = time.time()
@@ -60,6 +79,76 @@ logger = logging.getLogger(__name__)
 
 
 class AssetService:
+    BASIC_INFORMATION_AUDIT_SECTION = "BASIC INFORMATION"
+    BASIC_INFORMATION_AUDIT_FIELD_MAP = {
+        "name": "Asset Name",
+        "type": "Asset Type",
+        "capacity": "Capacity",
+        "location": "Location",
+        "country": "Country",
+        "organization": "Organization Name",
+        "status": "Asset Status",
+    }
+
+    def _format_asset_audit_value(self, key: str, value):
+        if value is None:
+            return None
+
+        if key == "type":
+            try:
+                return AssetType(value).name
+            except Exception:
+                return value
+
+        if key == "capacity":
+            return f"{value} MW"
+
+        if key == "country":
+            return countries_list.get(value, {}).get("label", value)
+
+        if key == "organization":
+            return value.name if hasattr(value, "name") else value
+
+        if key == "status":
+            try:
+                return AssetStatus(value).name
+            except Exception:
+                return value
+
+        return value
+
+    def _build_basic_information_audit_snapshot(
+        self,
+        *,
+        name=None,
+        asset_type=None,
+        capacity=None,
+        location=None,
+        country=None,
+        organization=None,
+        status=None,
+    ) -> dict:
+        return {
+            "name": self._format_asset_audit_value("name", name),
+            "type": self._format_asset_audit_value("type", asset_type),
+            "capacity": self._format_asset_audit_value("capacity", capacity),
+            "location": self._format_asset_audit_value("location", location),
+            "country": self._format_asset_audit_value("country", country),
+            "organization": self._format_asset_audit_value("organization", organization),
+            "status": self._format_asset_audit_value("status", status),
+        }
+
+    async def _generate_view_analysis(self, asset_id: int, month: int, year: int):
+        await asset_computation_task.kiq(
+            asset_id=asset_id,
+            month=month,
+            year=year,
+            dependencies=[
+                OptimizedDataFrame.__name__,
+                YearlyOptimizedDataFrame.__name__,
+            ],
+        )
+
     async def _get_asset_alert_seen_before(
         self,
         user_db: AsyncSession,
@@ -145,6 +234,25 @@ class AssetService:
 
         return start, end
 
+    async def start_analysis_computation(
+        self,
+        db: AsyncSession,
+        data: AssetGenerateAnalytics,
+        current_user: dict,
+        background_tasks: BackgroundTasks,
+    ):
+        background_tasks.add_task(
+            asset_computation_task.kiq,
+            asset_id=data.asset_id,
+            month=data.month,
+            year=data.year,
+            dependencies=data.dependencies,
+            db=db,
+        )
+
+        return Res.success('S-10000')
+
+
     async def get_assets(
         self,
         db: AsyncSession,
@@ -172,7 +280,7 @@ class AssetService:
             )
         )
 
-        if current_user.get("role") == UserRole.ANALYST.value:
+        if current_user.get("role") in [UserRole.ANALYST.value, UserRole.MANAGER.value]:
             organization_map_query = await db.execute(
                 select(UserOrganization).where(
                     UserOrganization.user_id == current_user.get("id")
@@ -180,15 +288,8 @@ class AssetService:
             )
             analyst_organization_map = organization_map_query.scalars().first()
             if not analyst_organization_map:
-                return Res.success(
-                    "S-10026",
-                    data={
-                        "assets": [],
-                        "total_assets": 0,
-                        "current_page": page,
-                        "total_pages": 0,
-                    },
-                )
+                # return this error code when user is not assigned to any orgnization
+                return Res.error("E-10272", http_status_code=403)
             query = query.where(
                 Asset.organization_id == analyst_organization_map.organization_id
             )
@@ -214,7 +315,6 @@ class AssetService:
         if status is not None:
             query = query.where(Asset.status == status)
 
-
         result = await paginate(
             db=db,
             base_query=query,
@@ -227,6 +327,20 @@ class AssetService:
         # Extracting total_assets and records from the pagination result
         total_assets = result.total_results
         if total_assets == 0:
+            org_name = "your organization"
+
+            if current_user.get("role") in [UserRole.ANALYST.value, UserRole.MANAGER.value]:
+                if analyst_organization_map:
+                    org_obj_result = await db.execute(select(Organization).where(Organization.id == analyst_organization_map.organization_id))
+                    org_obj = org_obj_result.scalars().first()
+                    if org_obj:
+                        org_name = org_obj.name
+            elif organization:
+                org_obj_result = await db.execute(select(Organization).where(Organization.id == organization))
+                org_obj = org_obj_result.scalars().first()
+                if org_obj:
+                    org_name = org_obj.name
+
             return Res.success(
                 "S-10026",
                 data={
@@ -234,6 +348,7 @@ class AssetService:
                     "total_assets": 0,
                     "current_page": page,
                     "total_pages": 0,
+                    "organization_name": org_name
                 },
             )
 
@@ -241,15 +356,23 @@ class AssetService:
 
         assets_list = []
         for asset, org in rows:
+            asset_files = asset.files
+
             # get only merged files
             merged_files = [
                 f
-                for f in asset.files
+                for f in asset_files
                 if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value
             ]
 
             # get file count
             file_count = len(merged_files)
+
+            # only treat an IAR as available when the active upload exists
+            has_iar = any(
+                f.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value and f.is_active
+                for f in asset_files
+            )
 
             # invoices
             invoices = asset.invoices
@@ -306,6 +429,7 @@ class AssetService:
                     },
                     "location": asset.state,
                     "analysis_available": file_count > 0,
+                    "has_iar": has_iar,
                     "available_periods": available_periods,
                     "available_invoice_periods": available_invoice_periods,
                     "current_step": asset.current_step,
@@ -337,7 +461,7 @@ class AssetService:
         )
 
     async def reassign_asset(
-        self, db: AsyncSession, asset_id: int, organization_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, organization_id: int, current_user: dict
     ):
 
         # CHECK ASSET
@@ -349,11 +473,12 @@ class AssetService:
         asset, old_organization = asset_query.first()
 
         if not asset:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
         if asset.status == AssetStatus.PENDING_APPROVAL.value:
             return Res.error(
-                "E-10139", message="Pending approval asset cannot be reassigned"
+                "E-10139", message="Pending approval asset cannot be reassigned",
+                http_status_code=409
             )
 
         # CHECK ORGANIZATION
@@ -363,10 +488,10 @@ class AssetService:
         organization = org_query.scalar_one_or_none()
 
         if not organization:
-            return Res.error("E-10035", message="Organization not found")
+            return Res.error("E-10035", message="Organization not found", http_status_code=404)
 
         if not organization.status:
-            return Res.error("E-10021", message="Organization inactive")
+            return Res.error("E-10021", message="Organization inactive", http_status_code=409)
 
         name_check = await db.execute(
             select(Asset).where(
@@ -377,8 +502,10 @@ class AssetService:
         )
         if name_check.scalar_one_or_none():
             return Res.error(
-                "E-10125",
-                message=f"This organization already has an asset named {asset.name}",
+                "E-10239",
+                message=f'This organization already has an asset named "{asset.name}"',
+                data={"asset_name": asset.name},
+                http_status_code=409,
             )
 
         # UPDATE
@@ -387,11 +514,12 @@ class AssetService:
 
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get(
                 "user_id"
             ),  # Replace with actual user ID from auth context
             user_role=current_user.get("role"),
-            module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+            module=self._get_audit_module(asset),
             action=AuditLogScenario.ASSET_REASSIGNED,
             before={"Organization": old_org_name},
             after=f"Organization: {organization.name}",
@@ -430,13 +558,13 @@ class AssetService:
         assets = asset_query.scalars().all()
 
         if not assets:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
         org_ids = list({a.organization_id for a in assets if a.organization_id})
 
         if not org_ids:
             return Res.error(
-                "E-10035", message="Asset not assigned to any organization"
+                "E-10035", message="Asset not assigned to any organization", http_status_code=409
             )
 
         org_service = OrganizationService()
@@ -464,13 +592,13 @@ class AssetService:
         assets = asset_query.scalars().all()
 
         if not assets:
-            return Res.error("E-10014", message="Asset not found")
+            return Res.error("E-10014", message="Asset not found", http_status_code=404)
 
         org_ids = list({a.organization_id for a in assets if a.organization_id})
 
         if not org_ids:
             return Res.error(
-                "E-10014", message="Asset not assigned to any organization"
+                "E-10014", message="Asset not assigned to any organization", http_status_code=409
             )
 
         org_service = OrganizationService()
@@ -483,12 +611,12 @@ class AssetService:
         )
 
     async def get_asset_details(
-        self, db: AsyncSession, user_db: AsyncSession, asset_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, user_db: AsyncSession, asset_id: int, current_user: dict, skip_audit: bool = False
     ):
         # PLATFORM CHECK
         if Platform.AMD.value not in current_user["platform"]:
             return Res.error(
-                "E-10013", message="You are not authorized to perform this action"
+                "E-10013", message="You are not authorized to perform this action", http_status_code=403
             )
 
         # Asset Query
@@ -506,11 +634,11 @@ class AssetService:
         row = result.first()
 
         if not row:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
         asset, org, opt = row
 
-        if current_user.get("role") == UserRole.ANALYST.value:
+        if current_user.get("role") in [UserRole.ANALYST.value, UserRole.MANAGER.value]:
             organization_map_query = await db.execute(
                 select(UserOrganization).where(
                     UserOrganization.user_id == current_user.get("id")
@@ -519,13 +647,14 @@ class AssetService:
             analyst_organization_map = organization_map_query.scalars().first()
             if asset.organization_id != analyst_organization_map.organization_id:
                 return Res.error(
-                    "E-10013", message="You are not authorized to access this asset"
+                    "E-10013", message="You are not authorized to access this asset", http_status_code=403
                 )
 
         # Audit Logs for Asset View
-        if asset.status in [AssetStatus.DRAFT.value, AssetStatus.ANALYSIS_READY.value]:
+        if not skip_audit and asset.status in [AssetStatus.DRAFT.value, AssetStatus.ANALYSIS_READY.value]:
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=AuditLogModules.ASSET_ONBOARDING,
@@ -539,12 +668,13 @@ class AssetService:
                 },
                 resource_id=asset.asset_id,
             )
-        elif asset.status == AssetStatus.PENDING_APPROVAL.value:
+        elif not skip_audit and asset.status == AssetStatus.PENDING_APPROVAL.value:
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
-                module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                module=self._get_audit_module(asset),
                 action=AuditLogScenario.VIEWED_PENDING_APPROVAL_ASSET,
                 before=None,
                 after={
@@ -554,12 +684,13 @@ class AssetService:
                 },
                 resource_id=asset.asset_id,
             )
-        elif asset.status in [AssetStatus.ACTIVE.value, AssetStatus.INACTIVE.value]:
+        elif not skip_audit and asset.status in [AssetStatus.ACTIVE.value, AssetStatus.INACTIVE.value]:
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
-                module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                module=self._get_audit_module(asset),
                 action=AuditLogScenario.VIEWED_ACTIVE_ASSET,
                 before=None,
                 after={
@@ -658,6 +789,7 @@ class AssetService:
             .where(
                 AssetFile.asset_id == asset_id,
                 AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
+                AssetFile.is_active.is_(True),
             )
             .order_by(AssetFile.uploaded_at.desc())
             .limit(1)
@@ -671,13 +803,17 @@ class AssetService:
             PdfInvoice.asset_id == asset_id,
             PdfInvoice.is_deleted.is_(False),
         )
-        
+
         if asset.active_invoice_month:
-            invoice_query = invoice_query.where(PdfInvoice.month == asset.active_invoice_month)
+            invoice_query = invoice_query.where(
+                PdfInvoice.month == asset.active_invoice_month
+            )
 
         if asset.active_invoice_year:
-            invoice_query = invoice_query.where(PdfInvoice.year == asset.active_invoice_year)
-        
+            invoice_query = invoice_query.where(
+                PdfInvoice.year == asset.active_invoice_year
+            )
+
         invoice_query = invoice_query.order_by(PdfInvoice.uploaded_on.desc()).limit(1)
         invoice_result = await db.execute(invoice_query)
         invoice = invoice_result.scalar_one_or_none()
@@ -687,16 +823,47 @@ class AssetService:
             Settlement.asset_id == asset_id,
             Settlement.is_deleted.is_(False),
         )
-        
+
         if asset.active_invoice_month:
-            invoice_settlement_query = invoice_settlement_query.where(Settlement.month == asset.active_invoice_month)
+            invoice_settlement_query = invoice_settlement_query.where(
+                Settlement.month == asset.active_invoice_month
+            )
 
         if asset.active_invoice_year:
-            invoice_settlement_query = invoice_settlement_query.where(Settlement.year == asset.active_invoice_year)
-        
-        invoice_settlement_query = invoice_settlement_query.order_by(Settlement.uploaded_on.desc()).limit(1)
+            invoice_settlement_query = invoice_settlement_query.where(
+                Settlement.year == asset.active_invoice_year
+            )
+
+        invoice_settlement_query = invoice_settlement_query.order_by(
+            Settlement.uploaded_on.desc()
+        ).limit(1)
         invoice_settlement_result = await db.execute(invoice_settlement_query)
         invoice_settlement = invoice_settlement_result.scalar_one_or_none()
+
+        # =========== Invoice Summary Statement File Query ===========
+        invoice_summary_statement_query = select(SummaryStatement).where(
+            SummaryStatement.asset_id == asset_id,
+            SummaryStatement.is_deleted.is_(False),
+        )
+        if asset.active_invoice_month:
+            invoice_summary_statement_query = invoice_summary_statement_query.where(
+                SummaryStatement.month == asset.active_invoice_month
+            )
+
+        if asset.active_invoice_year:
+            invoice_summary_statement_query = invoice_summary_statement_query.where(
+                SummaryStatement.year == asset.active_invoice_year
+            )
+
+        invoice_summary_statement_query = invoice_summary_statement_query.order_by(
+            SummaryStatement.uploaded_on.desc()
+        ).limit(1)
+        invoice_summary_statement_result = await db.execute(
+            invoice_summary_statement_query
+        )
+        invoice_summary_statement = (
+            invoice_summary_statement_result.scalar_one_or_none()
+        )
 
         # Fetch Available Periods
         periods_query = (
@@ -706,7 +873,8 @@ class AssetService:
             )
             .where(
                 AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value,  # ✅ key change
+                AssetFile.type
+                == AssetFileType.MERGED_SCADA_AGGREGATOR.value,  # ✅ key change
                 AssetFile.month.isnot(None),
                 AssetFile.year.isnot(None),
             )
@@ -728,6 +896,7 @@ class AssetService:
             )
             .where(
                 PdfInvoice.asset_id == asset_id,
+                PdfInvoice.is_deleted.is_(False),
                 PdfInvoice.month.isnot(None),
                 PdfInvoice.year.isnot(None),
             )
@@ -738,8 +907,34 @@ class AssetService:
             )
         )
 
+        # summary statement available periods query
+        summary_statement_periods_query = (
+            select(
+                SummaryStatement.year.label("year"),
+                SummaryStatement.month.label("month"),
+            )
+            .where(
+                SummaryStatement.asset_id == asset_id,
+                SummaryStatement.is_deleted.is_(False),
+                SummaryStatement.month.isnot(None),
+                SummaryStatement.year.isnot(None),
+            )
+            .distinct()
+            .order_by(
+                desc(SummaryStatement.year),
+                desc(SummaryStatement.month),
+            )
+        )
+
         invoice_periods_query_result = await db.execute(invoice_periods_query)
         available_invoice_periods = invoice_periods_query_result.fetchall()
+
+        summary_statement_periods_query_result = await db.execute(
+            summary_statement_periods_query
+        )
+        available_summary_statement_periods = (
+            summary_statement_periods_query_result.fetchall()
+        )
 
         def format_report_file(f):
             if not f:
@@ -793,6 +988,7 @@ class AssetService:
                 if asset.type != AssetType.SOLAR.value
                 else AssetSteps.BASIC_INFORMATION.value
             ),
+            "has_iar": bool(iar_file),
             "submitted_by": submited_by,
             "activated_by": approved_by,
             "created_by": created_by,
@@ -832,32 +1028,84 @@ class AssetService:
             data["optimized_dataset_file"] = format_generated_file(
                 files_map.get(AssetFileType.OPTIMIZED_DATASET.value)
             )
-            data['invoice_file'] = {
-                "id": invoice.id,
-                "invoice_file_name": invoice.invoice_file_name,
-                "invoice_file_size": invoice.size,
-                "type": invoice.type,
-                "invoice_number": invoice.invoice_number,
-                "invoice_date": invoice.invoice_date.strftime("%d %b %Y") if invoice.invoice_date else None,
-                "invoice_amount": invoice.invoice_amount,
-                "capacity_payment_month": invoice.capacity_payment_month,
-                "capacity_payment_year": invoice.capacity_payment_year,
-                "uploaded_on": invoice.uploaded_on.isoformat() if invoice.uploaded_on else None,
-                "month": invoice.month,
-                "year": invoice.year,
-            } if invoice else None
+            data["invoice_file"] = (
+                {
+                    "id": invoice.id,
+                    "invoice_file_name": invoice.invoice_file_name,
+                    "invoice_file_size": invoice.size,
+                    "type": invoice.type,
+                    "invoice_number": invoice.invoice_number,
+                    "invoice_date": (
+                        invoice.invoice_date.strftime("%d %b %Y")
+                        if invoice.invoice_date
+                        else None
+                    ),
+                    "invoice_amount": invoice.invoice_amount,
+                    "capacity_payment_month": invoice.capacity_payment_month,
+                    "capacity_payment_year": invoice.capacity_payment_year,
+                    "uploaded_on": (
+                        invoice.uploaded_on.isoformat() if invoice.uploaded_on else None
+                    ),
+                    "month": invoice.month,
+                    "year": invoice.year,
+                }
+                if invoice
+                else None
+            )
 
-            data["invoice_settlement_file"] = {
-                "id": invoice_settlement.id,
-                "settlement_file_name": invoice_settlement.file_name,
-                "settlement_file_size": invoice_settlement.file_size,
-                "extracted_invoice_number": invoice_settlement.extracted_invoice_number,
-                "extracted_invoice_date": invoice_settlement.extracted_invoice_date.strftime("%d %b %Y") if invoice_settlement.extracted_invoice_date else None,
-                "invoice_payment_date": invoice_settlement.invoice_payment_date.strftime("%d %b %Y") if invoice_settlement.invoice_payment_date else None,
-                "uploaded_on": invoice_settlement.uploaded_on.isoformat() if invoice_settlement.uploaded_on else None,
-                "month": invoice_settlement.month,
-                "year": invoice_settlement.year,
-            } if invoice_settlement else None
+            data["invoice_settlement_file"] = (
+                {
+                    "id": invoice_settlement.id,
+                    "settlement_file_name": invoice_settlement.file_name,
+                    "settlement_file_size": invoice_settlement.file_size,
+                    "extracted_invoice_number": invoice_settlement.extracted_invoice_number,
+                    "extracted_invoice_date": (
+                        invoice_settlement.extracted_invoice_date.strftime("%d %b %Y")
+                        if invoice_settlement.extracted_invoice_date
+                        else None
+                    ),
+                    "invoice_payment_date": (
+                        invoice_settlement.invoice_payment_date.strftime("%d %b %Y")
+                        if invoice_settlement.invoice_payment_date
+                        else None
+                    ),
+                    "uploaded_on": (
+                        invoice_settlement.uploaded_on.isoformat()
+                        if invoice_settlement.uploaded_on
+                        else None
+                    ),
+                    "month": invoice_settlement.month,
+                    "year": invoice_settlement.year,
+                }
+                if invoice_settlement
+                else None
+            )
+
+            data["invoice_summary_statement"] = (
+                {
+                    "id": invoice_summary_statement.id,
+                    "summary_id": invoice_summary_statement.statement_id,
+                    "file_name": invoice_summary_statement.file_name,
+                    "file_size": invoice_summary_statement.file_size,
+                    "revenue_values": {
+                        "total_energy_revenue": invoice_summary_statement.total_energy_revenue
+                        or 0,
+                        "total_ancillary_revenue": invoice_summary_statement.total_ancillary_revenue
+                        or 0,
+                        "reported_net_revenue": invoice_summary_statement.reported_net_revenue
+                        or 0,
+                    },
+                    "uploaded_on": (
+                        invoice_summary_statement.uploaded_on.isoformat()
+                        if invoice_summary_statement.uploaded_on
+                        else None
+                    ),
+                    "month": invoice_summary_statement.month,
+                    "year": invoice_summary_statement.year,
+                }
+                if invoice_summary_statement
+                else None
+            )
 
             # Time-Periods
             data["active_period"] = (
@@ -869,12 +1117,13 @@ class AssetService:
                 else None
             )
 
-            data['invoice_active_period'] = (
+            data["invoice_active_period"] = (
                 {
                     "month": int(asset.active_invoice_month),
                     "year": int(asset.active_invoice_year),
                 }
-                if asset.active_invoice_month is not None and asset.active_invoice_year is not None
+                if asset.active_invoice_month is not None
+                and asset.active_invoice_year is not None
                 else None
             )
 
@@ -890,7 +1139,7 @@ class AssetService:
                 else []
             )
 
-            data['available_invoice_periods'] = (
+            data["available_invoice_periods"] = (
                 [
                     {
                         "month": int(p.month),
@@ -902,13 +1151,25 @@ class AssetService:
                 else []
             )
 
+            data["available_summary_statement_periods"] = (
+                [
+                    {
+                        "month": int(p.month),
+                        "year": int(p.year),
+                    }
+                    for p in available_summary_statement_periods
+                ]
+                if available_summary_statement_periods is not None
+                else []
+            )
+
         return Res.success("S-10026", data=data)
 
     async def onboard_new_asset(
-        self, db: AsyncSession, payload: AssetCreate, current_user: dict
+        self, db: AsyncSession, redis: Redis, payload: AssetCreate, current_user: dict
     ):
         if payload.country_id not in countries_list:
-            return Res.error("E-10055", message="Invalid country selected")
+            return Res.error("E-10055", message="Invalid country selected", http_status_code=400)
 
         org_query = await db.execute(
             select(Organization).where(Organization.id == payload.organization_id)
@@ -916,9 +1177,9 @@ class AssetService:
         organization = org_query.scalar_one_or_none()
 
         if not organization:
-            return Res.error("E-10035", message="Organization not found")
+            return Res.error("E-10035", message="Organization not found", http_status_code=404)
         if not organization.status:
-            return Res.error("E-10021", message="Organization inactive")
+            return Res.error("E-10021", message="Organization inactive", http_status_code=409)
 
         name_check = await db.execute(
             select(Asset).where(
@@ -927,7 +1188,7 @@ class AssetService:
             )
         )
         if name_check.scalars().first():
-            return Res.error("E-10060", message="Asset name already exists")
+            return Res.error("E-10060", message="Asset name already exists", http_status_code=409)
 
         new_asset = Asset(
             name=payload.name,
@@ -951,6 +1212,7 @@ class AssetService:
 
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=AuditLogModules.ASSET_ONBOARDING,
@@ -1006,29 +1268,30 @@ class AssetService:
         self,
         asset_id: int,
         db: AsyncSession,
+        redis: Redis,
         payload: AssetEdit,
         current_user: dict,
     ):
         # PLATFORM CHECK
         if Platform.AMD not in current_user["platform"]:
             return Res.error(
-                "E-10013", message="You are not authorized to perform this action"
+                "E-10013", message="You are not authorized to perform this action", http_status_code=403
             )
 
         payload_fields = payload.model_fields_set
         allowed_fields = {
-            "current_step", 
-            "active_month", 
-            "active_year", 
+            "current_step",
+            "active_month",
+            "active_year",
             "active_invoice_month",
-            "active_invoice_year"
+            "active_invoice_year",
         }
 
         if (
             current_user.get("role") == UserRole.ANALYST.value
             and not payload_fields < allowed_fields
         ):
-            return Res.error("E-10013")
+            return Res.error("E-10013", http_status_code=403)
 
         # FETCH ASSET
         query = select(Asset).where(Asset.id == asset_id)
@@ -1039,16 +1302,17 @@ class AssetService:
         asset_id = asset.asset_id if asset else None
 
         if not asset:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
+        old_organization = await db.get(Organization, asset.organization_id)
         if payload.type is not None:
             new_type_val = (
                 payload.type.value if hasattr(payload.type, "value") else payload.type
             )
             old_type_val = asset.type
+            old_status_val = asset.status
 
             if new_type_val != old_type_val:
-
                 # HARD DELETE FROM DB
                 await db.execute(
                     delete(AssetOptimizationParameter).where(
@@ -1067,12 +1331,34 @@ class AssetService:
                 # LOG THE PURGE
                 await audit_logs(
                     db=db,
+                    redis=redis,
                     user_id=current_user.get("user_id"),
                     user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                    module=self._get_audit_module(asset),
                     action=AuditLogScenario.ASSET_UPDATED,
-                    before=f"Type: {old_type_val}",
-                    after=audit_after,
+                    before=build_sectioned_audit_payload(
+                        self.BASIC_INFORMATION_AUDIT_SECTION,
+                        {
+                            "Asset Type": self._format_asset_audit_value(
+                                "type", old_type_val
+                            ),
+                            "Asset Status": self._format_asset_audit_value(
+                                "status", old_status_val
+                            ),
+                        },
+                    ),
+                    after=build_sectioned_audit_payload(
+                        self.BASIC_INFORMATION_AUDIT_SECTION,
+                        {
+                            "Asset Type": self._format_asset_audit_value(
+                                "type", new_type_val
+                            ),
+                            "Asset Status": self._format_asset_audit_value(
+                                "status", asset.status
+                            ),
+                            "Reset Reason": audit_after,
+                        },
+                    ),
                     resource_id=asset_id,
                 )
 
@@ -1085,11 +1371,12 @@ class AssetService:
                 )
                 organization = org_query.scalar_one_or_none()
                 if not organization:
-                    return Res.error("E-10035", message="Organization not found")
+                    return Res.error("E-10035", message="Organization not found", http_status_code=404)
                 if not organization.status:
                     return Res.error(
                         "E-10021",
                         message="This Organization is not active, Please select a diff organization",
+                        http_status_code=409,
                     )
 
             # UNIQUENESS CHECK (NAME + ORGANIZATION REASSIGNMENT) ---
@@ -1113,10 +1400,17 @@ class AssetService:
                         "E-10125",
                         message=f"This organization already has an asset named {check_name}.",
                         data={"asset_name": check_name},
+                        http_status_code=409,
                     )
-        # AUDIT LOG DATA
-        before_data = []
-        after_data = []
+        asset_before_snapshot = self._build_basic_information_audit_snapshot(
+            name=asset.name,
+            asset_type=asset.type,
+            capacity=asset.capacity,
+            location=asset.state,
+            country=asset.country_id,
+            organization=old_organization,
+            status=asset.status,
+        )
 
         # UPDATE FIELDS
         fields_map = {
@@ -1138,7 +1432,7 @@ class AssetService:
             new_val = getattr(payload, payload_field)
             if new_val is not None:
                 if payload_field == "country_id" and new_val not in countries_list:
-                    return Res.error("E-10055", message="Invalid country selected")
+                    return Res.error("E-10055", message="Invalid country selected", http_status_code=400)
 
                 if payload_field == "status" and asset.status in [
                     AssetStatus.ACTIVE.value,
@@ -1155,20 +1449,36 @@ class AssetService:
                 final_val = new_val.value if hasattr(new_val, "value") else new_val
 
                 if final_val != old_val:
-                    if payload_field != "current_step":
-                        before_data.append(f"{label}: {old_val}")
-                        after_data.append(f"{label}: {final_val}")
                     setattr(asset, model_attr, final_val)
 
-        if before_data:
+        asset_after_snapshot = self._build_basic_information_audit_snapshot(
+            name=asset.name,
+            asset_type=asset.type,
+            capacity=asset.capacity,
+            location=asset.state,
+            country=asset.country_id,
+            organization=organization if "organization" in locals() and organization else asset.organization_id,
+            status=asset.status,
+        )
+        before_audit_payload, after_audit_payload = (
+            compare_and_build_sectioned_audit_payload(
+                self.BASIC_INFORMATION_AUDIT_SECTION,
+                asset_before_snapshot,
+                asset_after_snapshot,
+                field_map=self.BASIC_INFORMATION_AUDIT_FIELD_MAP,
+            )
+        )
+
+        if before_audit_payload:
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
-                module=AuditLogModules.ASSET_MANAGEMENT_AMD,
+                module=self._get_audit_module(asset),
                 action=AuditLogScenario.ASSET_UPDATED,
-                before=", ".join(before_data),
-                after=", ".join(after_data),
+                before=before_audit_payload,
+                after=after_audit_payload,
                 resource_id=asset_id,
             )
 
@@ -1227,6 +1537,7 @@ class AssetService:
     async def save_optimization_parameters(
         self,
         db: AsyncSession,
+        redis: Redis,
         asset_id: int,
         payload: AssetOptimizationUpdate,
         current_user: dict,
@@ -1235,12 +1546,13 @@ class AssetService:
         asset = asset_query.scalar_one_or_none()
 
         if not asset:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
         if asset.type == AssetType.SOLAR.value:
             return Res.error(
                 "E-10079",
                 message="Optimization parameters are only applicable for BESS or Solar+BESS assets.",
+                http_status_code=422,
             )
 
         # Calculate Power Asymmetry Ratio
@@ -1304,13 +1616,17 @@ class AssetService:
             "max_daily_cycles": payload.max_daily_cycles,
         }
 
+        optimization_section = "OPTIMIZATION PARAMETERS"
+
         if old_values is None:
             action = AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED
             before = {
-                label: f"{new_values[key]} {unit}".strip()
-                for label, key, unit in fields
+                optimization_section: {
+                    label: f"{new_values[key]} {unit}".strip()
+                    for label, key, unit in fields
+                }
             }
-            after = "No changes made"
+            after = {optimization_section: "No changes made"}
         else:
             changed_before = {}
             changed_after = {}
@@ -1325,18 +1641,21 @@ class AssetService:
 
             if changed_before:
                 action = AuditLogScenario.ASSET_OPTIMIZATION_UPDATED
-                before = changed_before
-                after = changed_after
+                before = {optimization_section: changed_before}
+                after = {optimization_section: changed_after}
             else:
                 action = AuditLogScenario.OPTIMIZATION_PARAMETERS_CONFIRMED
                 before = {
-                    label: f"{old_values[key]} {unit}".strip()
-                    for label, key, unit in fields
+                    optimization_section: {
+                        label: f"{old_values[key]} {unit}".strip()
+                        for label, key, unit in fields
+                    }
                 }
-                after = "No changes made"
+                after = {optimization_section: "No changes made"}
 
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=self._get_audit_module(asset),
@@ -1381,6 +1700,7 @@ class AssetService:
     async def upload_aggregator_report(
         self,
         db: AsyncSession,
+        redis: Redis,
         asset_id: int,
         file: UploadFile,
         current_user: dict,
@@ -1395,18 +1715,20 @@ class AssetService:
             # Basic Asset & Type Validations
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034")
+                return Res.error("E-10034", http_status_code=404)
             if asset.type == AssetType.SOLAR.value:
                 return Res.error("E-10079")
 
             # File Size & Type
             if not (1024 <= size_bytes <= 100 * 1024 * 1024):
                 return Res.error(
-                    "E-10085", data={"file": {"name": "File size limit mismatch"}}
+                    "E-10085", data={"file": {"name": "File size limit mismatch"}},
+                    http_status_code=413
                 )
             if not original_name.lower().endswith((".xlsx", ".xls")):
                 return Res.error(
-                    "E-10084", data={"file": {"name": "Invalid file type"}}
+                    "E-10084", data={"file": {"name": "Invalid file type"}},
+                    http_status_code=415
                 )
 
             # Name Validation
@@ -1420,6 +1742,7 @@ class AssetService:
                             "name": 'Invalid file name format. Expected "Backing Data" or "Northwold_" prefix'
                         }
                     },
+                    http_status_code=422,
                 )
 
             # Read and Parse Excel
@@ -1429,13 +1752,14 @@ class AssetService:
                     return Res.error(
                         "E-10087",
                         message="Aggregator file must contain only one sheet.",
+                        http_status_code=422
                     )
 
                 df = pd.read_excel(xl, sheet_name=xl.sheet_names[0])
                 df.columns = [str(c).strip() for c in df.columns]
 
                 if df.empty:
-                    return Res.error("E-10087", message="Uploaded file is empty.")
+                    return Res.error("E-10087", message="Uploaded file is empty.", http_status_code=422)
 
                 # Full Validation Call
                 validation_errors = self._validate_aggregator_excel(
@@ -1452,12 +1776,13 @@ class AssetService:
                             "file": {"name": original_name},
                             "validation_errors": formatted_errors,
                         },
+                        http_status_code=422,
                     )
 
             except Exception:
                 traceback.print_exc()
                 return Res.error(
-                    "E-10087", message="Failed to parse excel file content."
+                    "E-10087", message="Failed to parse excel file content.", http_status_code=422
                 )
 
             # Ensure valid timestamps for DB query
@@ -1474,13 +1799,15 @@ class AssetService:
                 end_date = end_date.tz_localize("UTC")
             if pd.isna(start_date) or pd.isna(end_date):
                 return Res.error(
-                    "E-10087", message="Could not extract valid date range from file."
+                    "E-10087", message="Could not extract valid date range from file.", http_status_code=422
                 )
 
             file_month = start_date.month
             file_year = start_date.year
 
-            if (validation_month and file_month != validation_month) or (validation_year and file_year != validation_year):
+            if (validation_month and file_month != validation_month) or (
+                validation_year and file_year != validation_year
+            ):
                 return Res.error(
                     "E-10087",
                     data={
@@ -1488,7 +1815,7 @@ class AssetService:
                             f"File content month/year ({file_month}/{file_year}) does not match the expected month/year ({validation_month}/{validation_year})."
                         ]
                     },
-                    http_status_code=400
+                    http_status_code=422,
                 )
 
             # Check for existing record
@@ -1553,6 +1880,7 @@ class AssetService:
             # Audit Logs
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -1610,8 +1938,8 @@ class AssetService:
                 df[col] = df[col].astype(str).str.strip()
 
         # Normalize Column Names
-        norm = (
-            lambda c: re.sub(r"\s+", " ", str(c).replace("\xa0", " ")).strip().lower()
+        norm = lambda c: (
+            re.sub(r"\s+", " ", str(c).replace("\xa0", " ")).strip().lower()
         )
         mapping = {norm(c): c for c in df.columns}
 
@@ -1842,14 +2170,18 @@ class AssetService:
         add_errors(
             ~is_blank(df["Battery SoC"]),
             "Battery SoC",
-            lambda idx: f"Invalid numeric value in 'Battery SoC' at row {idx + 2}. Column must be blank.",
+            lambda idx: (
+                f"Invalid numeric value in 'Battery SoC' at row {idx + 2}. Column must be blank."
+            ),
         )
 
         # ── Credited Energy Volume ────────────────────────────────────────────────
         add_errors(
             is_blank(df["Credited Energy Volume Battery MWh Output"]),
             "Credited Energy Volume Battery MWh Output",
-            lambda idx: f"Blank value found in 'Credited Energy Volume Battery MWh Output' at row {idx + 2}.",
+            lambda idx: (
+                f"Blank value found in 'Credited Energy Volume Battery MWh Output' at row {idx + 2}."
+            ),
         )
         credited = pd.to_numeric(
             df["Credited Energy Volume Battery MWh Output"], errors="coerce"
@@ -1858,7 +2190,9 @@ class AssetService:
             credited.isna()
             & ~is_blank(df["Credited Energy Volume Battery MWh Output"]),
             "Credited Energy Volume Battery MWh Output",
-            lambda idx: f"Invalid numeric value in 'Credited Energy Volume Battery MWh Output' at row {idx + 2}.",
+            lambda idx: (
+                f"Invalid numeric value in 'Credited Energy Volume Battery MWh Output' at row {idx + 2}."
+            ),
         )
 
         # ── Price Columns ─────────────────────────────────────────────────────────
@@ -1912,7 +2246,9 @@ class AssetService:
             add_errors(
                 vals.isna() | (vals != 0),
                 col,
-                lambda idx, c=col: f"Invalid numeric value in '{c}' at row {idx + 2}. Must be zero.",
+                lambda idx, c=col: (
+                    f"Invalid numeric value in '{c}' at row {idx + 2}. Must be zero."
+                ),
             )
 
         # ── Revenue Columns ───────────────────────────────────────────────────────
@@ -1920,7 +2256,9 @@ class AssetService:
         add_errors(
             ~is_blank(df["EPEX DA Revenues"]),
             "EPEX DA Revenues",
-            lambda idx: f"Invalid numeric value in 'EPEX DA Revenues' at row {idx + 2}. Must be blank.",
+            lambda idx: (
+                f"Invalid numeric value in 'EPEX DA Revenues' at row {idx + 2}. Must be blank."
+            ),
         )
 
         # Other revenue columns
@@ -1959,13 +2297,17 @@ class AssetService:
             add_errors(
                 is_blank(df[avail_col]),
                 avail_col,
-                lambda idx, c=avail_col: f"Blank value found in '{c}' at row {idx + 2}.",
+                lambda idx, c=avail_col: (
+                    f"Blank value found in '{c}' at row {idx + 2}."
+                ),
             )
             # Availability — invalid numeric
             add_errors(
                 avail.isna() & ~is_blank(df[avail_col]),
                 avail_col,
-                lambda idx, c=avail_col: f"Invalid numeric value in '{c}' at row {idx + 2}.",
+                lambda idx, c=avail_col: (
+                    f"Invalid numeric value in '{c}' at row {idx + 2}."
+                ),
             )
             # Availability — negative
             add_errors(
@@ -1977,20 +2319,26 @@ class AssetService:
             add_errors(
                 avail.notna() & (avail > capacity),
                 avail_col,
-                lambda idx, c=avail_col: f"'{c}' exceeds asset capacity at row {idx + 2}.",
+                lambda idx, c=avail_col: (
+                    f"'{c}' exceeds asset capacity at row {idx + 2}."
+                ),
             )
 
             # Clearing Price — blank
             add_errors(
                 is_blank(df[price_col]),
                 price_col,
-                lambda idx, c=price_col: f"Blank value found in '{c}' at row {idx + 2}.",
+                lambda idx, c=price_col: (
+                    f"Blank value found in '{c}' at row {idx + 2}."
+                ),
             )
             # Clearing Price — invalid numeric
             add_errors(
                 price.isna() & ~is_blank(df[price_col]),
                 price_col,
-                lambda idx, c=price_col: f"Invalid numeric value in '{c}' at row {idx + 2}.",
+                lambda idx, c=price_col: (
+                    f"Invalid numeric value in '{c}' at row {idx + 2}."
+                ),
             )
 
             # Revenue — blank
@@ -2003,7 +2351,9 @@ class AssetService:
             add_errors(
                 rev.isna() & ~is_blank(df[rev_col]),
                 rev_col,
-                lambda idx, c=rev_col: f"Invalid numeric value in '{c}' at row {idx + 2}.",
+                lambda idx, c=rev_col: (
+                    f"Invalid numeric value in '{c}' at row {idx + 2}."
+                ),
             )
 
             # Revenue cross-column checks — vectorised
@@ -2013,7 +2363,9 @@ class AssetService:
             add_errors(
                 valid_mask & (avail == 0) & (rev != 0),
                 rev_col,
-                lambda idx, c=rev_col: f"Revenue found in '{c}' when availability is zero at row {idx + 2}.",
+                lambda idx, c=rev_col: (
+                    f"Revenue found in '{c}' when availability is zero at row {idx + 2}."
+                ),
             )
 
             # Revenue formula mismatch
@@ -2022,7 +2374,9 @@ class AssetService:
             add_errors(
                 valid_mask & (avail != 0) & (diff_rev > 0.5),
                 rev_col,
-                lambda idx, c=rev_col: f"Revenue in '{c}' does not match availability and clearing price at row {idx + 2}.",
+                lambda idx, c=rev_col: (
+                    f"Revenue in '{c}' does not match availability and clearing price at row {idx + 2}."
+                ),
             )
 
         return errors
@@ -2042,7 +2396,7 @@ class AssetService:
         return None
 
     async def remove_aggregator_report(
-        self, db: AsyncSession, asset_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, current_user: dict
     ):
         # 1. Fetch only ACTIVE records
         file_query = await db.execute(
@@ -2055,7 +2409,7 @@ class AssetService:
         a_file = file_query.scalars().first()
 
         if not a_file:
-            return Res.error("E-10097", message="Aggregator file not uploaded.")
+            return Res.error("E-10097", message="Aggregator file not uploaded.", http_status_code=404)
 
         merged_file_query = await db.execute(
             select(AssetFile).where(
@@ -2084,6 +2438,7 @@ class AssetService:
 
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=self._get_audit_module(asset),
@@ -2107,6 +2462,7 @@ class AssetService:
     async def upload_scada_report(
         self,
         db: AsyncSession,
+        redis: Redis,
         asset_id: int,
         file: UploadFile,
         current_user: dict,
@@ -2120,23 +2476,24 @@ class AssetService:
 
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034")
+                return Res.error("E-10034", http_status_code=404)
 
             # 1. Filename Pattern Validation
             if not re.match(r"^[a-z]{3}-\d{2}-.*\.xlsx$", original_name.lower()):
                 return Res.error(
                     "E-10090",
                     message="Invalid file name. Expected format: mon-yy-*.xlsx",
+                    http_status_code=422,
                 )
 
             # 2. File Size Validation
             if size_bytes < 1024:
                 return Res.error(
-                    "E-10094", message="SCADA file size must be at least 1 KB."
+                    "E-10094", message="SCADA file size must be at least 1 KB.", http_status_code=422
                 )
             if size_bytes > 100 * 1024 * 1024:
                 return Res.error(
-                    "E-10095", message="SCADA file size should not exceed 100 MB."
+                    "E-10095", message="SCADA file size should not exceed 100 MB.", http_status_code=413
                 )
 
             # 3. Excel Parsing & Validation
@@ -2146,12 +2503,13 @@ class AssetService:
                     return Res.error(
                         "E-10087",
                         message="Invalid file structure. Only one sheet is allowed.",
+                        http_status_code=422
                     )
 
                 df = pd.read_excel(xl, sheet_name=xl.sheet_names[0])
                 df.columns = [str(c).strip() for c in df.columns]
                 if df.empty:
-                    return Res.error("E-10087", message="Uploaded file is empty.")
+                    return Res.error("E-10087", message="Uploaded file is empty.", http_status_code=422)
 
                 # Validate SCADA
                 validation_errors = self._validate_scada_excel(df, asset)
@@ -2166,11 +2524,13 @@ class AssetService:
                             "file": {"name": original_name},
                             "validation_errors": formatted_errors,
                         },
+                        http_status_code=422,
                     )
             except Exception:
                 traceback.print_exc()
                 return Res.error(
-                    "E-10087", message="Failed to parse excel file content."
+                    "E-10087", message="Failed to parse excel file content.",
+                    http_status_code=422
                 )
 
             # 4. Parse Timestamp (incoming format: YYYY-MM-DD HH:MM:SS)
@@ -2184,7 +2544,9 @@ class AssetService:
             file_month = projection_start.month
             file_year = projection_start.year
 
-            if (validation_month and file_month != validation_month) or (validation_year and file_year != validation_year):
+            if (validation_month and file_month != validation_month) or (
+                validation_year and file_year != validation_year
+            ):
                 return Res.error(
                     "E-10087",
                     data={
@@ -2192,7 +2554,7 @@ class AssetService:
                             f"File content month/year ({file_month}/{file_year}) does not match the expected month/year ({validation_month}/{validation_year})."
                         ]
                     },
-                    http_status_code=400,
+                    http_status_code=422,
                 )
 
             # Save the reformatted DataFrame as the file to store
@@ -2253,6 +2615,7 @@ class AssetService:
             # 8. Audit Log
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -2626,6 +2989,8 @@ class AssetService:
         asset_id: int,
         payload: GenerateMergeFile,
         current_user: dict,
+        backgroundTask: BackgroundTasks,
+        redis: Redis
     ):
         try:
             # 1. Fetch Records
@@ -2638,7 +3003,8 @@ class AssetService:
 
             if agg_f.month != scada_f.month or agg_f.year != scada_f.year:
                 return Res.error(
-                    message=f"Aggregator file is for {agg_f.month}/{agg_f.year} but SCADA file is for {scada_f.month}/{scada_f.year}. Both files must be for the same month and year."
+                    message=f"Aggregator file is for {agg_f.month}/{agg_f.year} but SCADA file is for {scada_f.month}/{scada_f.year}. Both files must be for the same month and year.",
+                    http_status_code=422
                 )
 
             # 2. Load Data
@@ -2721,6 +3087,7 @@ class AssetService:
                 return Res.error(
                     "E-10098",
                     message="Merge failed. No matching timestamps found between Aggregator and SCADA files.",
+                    http_status_code=422
                 )
 
             # Final Columns
@@ -2768,7 +3135,7 @@ class AssetService:
             end_time = merged["Timestamp"].max()
 
             if pd.isna(start_time) or pd.isna(end_time):
-                return Res.error("E-10098", message="Invalid merged timestamp range.")
+                return Res.error("E-10098", message="Invalid merged timestamp range.", http_status_code=422)
 
             start_time_dt = start_time.to_pydatetime()
             end_time_dt = end_time.to_pydatetime()
@@ -2819,6 +3186,7 @@ class AssetService:
             # Audit log
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -2857,7 +3225,7 @@ class AssetService:
             return Res.error("E-10098")
 
     async def remove_scada_report(
-        self, db: AsyncSession, asset_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, current_user: dict
     ):
         try:
             file_query = await db.execute(
@@ -2870,7 +3238,7 @@ class AssetService:
             s_file = file_query.scalars().first()
 
             if not s_file:
-                return Res.error("E-10096", message="SCADA file not uploaded.")
+                return Res.error("E-10096", message="SCADA file not uploaded.", http_status_code=404)
 
             merged_file_query = await db.execute(
                 select(AssetFile).where(
@@ -2899,6 +3267,7 @@ class AssetService:
 
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -2927,7 +3296,7 @@ class AssetService:
             return Res.error("E-10001")
 
     async def download_merged_dataset(
-        self, db: AsyncSession, asset_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, current_user: dict
     ):
         file_query = await db.execute(
             select(AssetFile).where(
@@ -2941,6 +3310,7 @@ class AssetService:
             return Res.error(
                 "E-10107",
                 message="Merged dataset not found. Please ensure SCADA and Aggregator files are uploaded and merged.",
+                http_status_code=404
             )
 
         file_bytes, content_type = FileStorageManager.get_file_object(
@@ -2948,16 +3318,18 @@ class AssetService:
         )
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=AuditLogModules.ASSET_ONBOARDING,
             action=AuditLogScenario.DOWNLOADED_MERGED_DATASET,
             before={
                 "Merged Dataset": merged_file.name,
-                "Download Status": "Not Started",
+                "Download Status": "Not Requested",
             },
             after={
-                "Merged Dataset": "Downloaded by user",
+                "Merged Dataset": merged_file.name,
+                "Download Status": "Requested",
             },
             resource_id=f"AST-{asset_id:03d}",
         )
@@ -2971,6 +3343,7 @@ class AssetService:
     async def activate_asset(
         self,
         db: AsyncSession,
+        redis: Redis,
         user_db: AsyncSession,
         asset_id: int,
         status: bool,
@@ -2981,15 +3354,19 @@ class AssetService:
             return Res.error("E-10013", message="Access denied. Admin role required.")
         if Platform.AMD not in current_user["platform"]:
             return Res.error(
-                "E-10013", message="You are not authorized to perform this action"
+                "E-10013", message="You are not authorized to perform this action",
+                http_status_code=403
             )
         asset = await db.get(Asset, asset_id)
         if not asset:
-            return Res.error("E-10034", message="Asset not found.")
+            return Res.error(
+                "E-10034", message="Asset not found.", http_status_code=404
+            )
         if asset.type == AssetType.SOLAR.value:
             return Res.error(
                 "E-10120",
                 message="Solar assets do not require activation through this flow",
+                http_status_code=422
             )
 
         # Optimization Parameters
@@ -3003,6 +3380,7 @@ class AssetService:
             return Res.error(
                 "E-10116",
                 message="Optimization parameters are missing",
+                http_status_code=422
             )
 
         # Aggregator Report
@@ -3018,6 +3396,7 @@ class AssetService:
             return Res.error(
                 "E-10117",
                 message="Active aggregator report is missing",
+                http_status_code=422,
             )
 
         # SCADA Report
@@ -3033,6 +3412,7 @@ class AssetService:
             return Res.error(
                 "E-10118",
                 message="Active SCADA report is missing",
+                http_status_code=422,
             )
 
         # IAR Report
@@ -3048,6 +3428,7 @@ class AssetService:
             return Res.error(
                 "E-10119",
                 message="Active IAR report is missing",
+                http_status_code=422,
             )
 
         # Update Asset Status
@@ -3100,6 +3481,7 @@ class AssetService:
 
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=(
@@ -3125,21 +3507,25 @@ class AssetService:
         )
 
     async def upload_iar_report(
-        self, db: AsyncSession, asset_id: int, file: UploadFile, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, file: UploadFile, current_user: dict, backgroundTask: BackgroundTasks
     ):
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034")
+                return Res.error("E-10034", http_status_code=404)
 
             file_bytes = await file.read()
-            if len(file_bytes) < 1024 or len(file_bytes) > 100 * 1024 * 1024:
-                return Res.error("E-10114")
+            if len(file_bytes) < 1024:
+                return Res.error("E-10114", http_status_code=422)
+
+            if len(file_bytes) > 100 * 1024 * 1024:
+                return Res.error("E-10114", http_status_code=413)
 
             if not file.filename.lower().endswith(".xlsx"):
                 return Res.error(
                     "E-10115",
                     message="Invalid file format. Please upload correct template",
+                    http_status_code=415
                 )
 
             try:
@@ -3154,6 +3540,7 @@ class AssetService:
                             "file": {"name": file.filename},
                             "validation_errors": validation_errors,
                         },
+                        http_status_code=422
                     )
             except Exception:
                 traceback.print_exc()
@@ -3215,6 +3602,7 @@ class AssetService:
 
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -3236,6 +3624,16 @@ class AssetService:
                 resource_id=asset.asset_id,
             )
             await db.commit()
+
+            backgroundTask.add_task(
+                asset_computation_task.kiq,
+                asset_id=asset_id,
+                month='all',
+                year='all',
+                dependencies=[
+                    IARDataFrame.__name__,
+                ],
+            )
 
             return Res.success(
                 "S-10039",
@@ -3359,7 +3757,7 @@ class AssetService:
                 and actual_sequence[idx].lower() != req_row.lower()
             ):
                 errors.append(
-                    f"Invalid row sequence: Expected ‘{req_row}’ at position {idx+1} (Found ‘{actual_sequence[idx]}’)"
+                    f"Invalid row sequence: Expected ‘{req_row}’ at position {idx + 1} (Found ‘{actual_sequence[idx]}’)"
                 )
                 return errors
         # Header Validations
@@ -3503,22 +3901,22 @@ class AssetService:
         return list(dict.fromkeys(errors))
 
     async def remove_iar_report(
-        self, db: AsyncSession, asset_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, current_user: dict
     ):
 
         try:
             # Role Validation: Only Admins are allowed
             if current_user.get("role") != UserRole.ADMIN.value:
-                return Res.error("E-10013")
+                return Res.error("E-10013", http_status_code=403, message="Access denied. Admin role required.")
 
             # Platform Validation: Admin must belong to AMD platform
             if Platform.AMD not in current_user.get("platform", []):
-                return Res.error("E-10013")
+                return Res.error("E-10013", http_status_code=403, message="Access denied. Admin role required.")
 
             # Asset Validation
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034")
+                return Res.error("E-10034", http_status_code=404)
 
             # Fetch Active IAR File
             file_query = await db.execute(
@@ -3549,6 +3947,7 @@ class AssetService:
             # Audit Logging
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -3583,15 +3982,16 @@ class AssetService:
         current_user: dict = None,
     ):
         try:
-
             if Platform.AMD.value not in current_user.get("platform", []):
-                return Res.error("E-10013", message="Unauthorized")
+                return Res.error("E-10013", message="Unauthorized", http_status_code=403)
 
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034", message="Asset not found")
+                return Res.error(
+                    "E-10034", message="Asset not found", http_status_code=404
+                )
             if asset.type == AssetType.SOLAR.value:
-                return Res.error("E-10120", message="Not applicable for solar asset")
+                return Res.error("E-10120", message="Not applicable for solar asset", http_status_code=422)
 
             query = select(AssetFile).where(AssetFile.asset_id == asset_id)
 
@@ -3652,20 +4052,22 @@ class AssetService:
             return Res.error("E-10001")
 
     async def download_file(
-        self, db: AsyncSession, asset_id: int, file_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, file_id: int, current_user: dict
     ):
         try:
             asset_file = await db.get(AssetFile, file_id)
             if not asset_file:
-                return Res.error("E-10124", message="File not found")
+                return Res.error("E-10124", message="File not found", http_status_code=404)
 
             if asset_file.asset_id != asset_id:
-                return Res.error("E-10124", message="File not found")
+                return Res.error("E-10124", message="File not found", http_status_code=404)
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034", message="Asset not found")
+                return Res.error(
+                    "E-10034", message="Asset not found", http_status_code=404
+                )
 
-            file_bytes, content_type  = FileStorageManager.get_file_object(
+            file_bytes, content_type = FileStorageManager.get_file_object(
                 asset_file.key, storage_type=asset_file.storage_server
             )
 
@@ -3685,16 +4087,21 @@ class AssetService:
                 )
                 await audit_logs(
                     db=db,
+                    redis=redis,
                     user_id=current_user.get("user_id"),
                     user_role=current_user.get("role"),
-                    module=AuditLogModules.ASSET_MANAGEMENT_AMD,  # always post-approval
+                    module=self._get_audit_module(asset),
                     action=download_action,
                     before={
                         "File History Record": period,
                         "File": asset_file.name,
-                        "Download Status": "Not Started",
+                        "Download Status": "Not Requested",
                     },
-                    after="File downloaded by user",
+                    after={
+                        "File History Record": period,
+                        "File": asset_file.name,
+                        "Download Status": "Requested",
+                    },
                     resource_id=asset.asset_id,
                 )
                 await db.commit()
@@ -3702,7 +4109,9 @@ class AssetService:
             return StreamingResponse(
                 BytesIO(file_bytes),
                 media_type=content_type,
-                headers={"Content-Disposition": f"attachment; filename=\"{asset_file.name}\""},
+                headers={
+                    "Content-Disposition": f'attachment; filename="{asset_file.name}"'
+                },
             )
         except Exception:
             traceback.print_exc()
@@ -3711,9 +4120,11 @@ class AssetService:
     async def generate_optimized_dataset(
         self,
         db: AsyncSession,
+        redis: Redis,
         payload: GenerateOptmizedFile,
         asset_id: int,
         current_user,
+        backgroundTask: BackgroundTasks,
     ):
         try:
             # 1. Fetch Merged Dataset
@@ -3742,7 +4153,7 @@ class AssetService:
                 return Res.error(
                     "E-10120",
                     message="Optimization is not applicable for Solar assets.",
-                    http_status_code=400,
+                    http_status_code=422,
                 )
 
             opt_query = await db.execute(
@@ -3755,7 +4166,7 @@ class AssetService:
                 return Res.error(
                     "E-10126",
                     message="Required input data (asset config) is missing.",
-                    http_status_code=400,
+                    http_status_code=422,
                 )
 
             usable_capacity_mwh = float(opt.usable_capacity_mwh)
@@ -3764,7 +4175,7 @@ class AssetService:
                 return Res.error(
                     "E-10126",
                     message="Invalid round-trip efficiency configured.",
-                    http_status_code=400,
+                    http_status_code=422
                 )
 
             lp_params = {
@@ -3829,7 +4240,7 @@ class AssetService:
                 return Res.error(
                     "E-10127",
                     message="No complete continuous days found for optimization.",
-                    http_status_code=400,
+                    http_status_code=422,
                 )
 
             # one way flow, only allow progression of asset status, never regression. This is to prevent accidental data loss from re-optimization
@@ -3950,6 +4361,7 @@ class AssetService:
                 await db.flush()
             await audit_logs(
                 db=db,
+                redis=redis,
                 user_id=current_user.get("user_id"),
                 user_role=current_user.get("role"),
                 module=self._get_audit_module(asset),
@@ -3962,9 +4374,22 @@ class AssetService:
                     "Optimized Dataset": file_name,
                     "Total Rows": len(final_df),
                 },
-                resource_id=str(asset_id),
+                resource_id=f"AST-{asset.id:03d}",
             )
             await db.commit()
+
+            backgroundTask.add_task(
+                asset_computation_task.kiq,
+                asset_id=asset_id,
+                month=optmized_file.month,
+                year=optmized_file.year,
+                dependencies=[
+                    OptimizedDataFrame.__name__,
+                    YearlyOptimizedDataFrame.__name__,
+                    MergedDataFrame.__name__,
+                    YearlyMergedDataFrame.__name__,
+                ],
+            )
 
             return Res.success(
                 "S-10052",
@@ -4372,7 +4797,7 @@ class AssetService:
         }
 
     async def delete_asset_file(
-        self, db: AsyncSession, asset_id: int, file_id: int, current_user: dict
+        self, db: AsyncSession, redis: Redis, asset_id: int, file_id: int, current_user: dict, backgroundTask: BackgroundTasks
     ):
         file_query = await db.execute(
             select(AssetFile).where(
@@ -4396,6 +4821,9 @@ class AssetService:
         await db.delete(asset_file)
 
         # only delete if we are removing Add or Scada report.
+        is_merged_file_delete = False
+        is_optimized_file_delete = False
+        
         if is_agg_scada_file:
             merged_file_query = await db.execute(
                 select(AssetFile).where(
@@ -4407,11 +4835,11 @@ class AssetService:
             )
             merged_file = merged_file_query.scalars().first()
             if merged_file:
-
                 child_files.append(
                     {"file_id": merged_file.id, "file_type": merged_file.type}
                 )
                 await db.delete(merged_file)
+                is_merged_file_delete = True
 
                 optmized_file_query = await db.execute(
                     select(AssetFile).where(
@@ -4428,6 +4856,7 @@ class AssetService:
                         {"file_id": optmized_file.id, "file_type": optmized_file.type}
                     )
                     await db.delete(optmized_file)
+                    is_optimized_file_delete = True
 
         asset = await db.get(Asset, asset_id)
         if asset:
@@ -4453,6 +4882,7 @@ class AssetService:
         )
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=self._get_audit_module(asset),
@@ -4462,7 +4892,24 @@ class AssetService:
             resource_id=asset.asset_id,
         )
 
-        await db.commit()
+        await db.commit(),
+
+        depedency_map = []
+        if (is_merged_file_delete):
+            depedency_map.append(MergedDataFrame.__name__)
+            depedency_map.append(YearlyMergedDataFrame.__name__)
+        if (is_optimized_file_delete):
+            depedency_map.append(OptimizedDataFrame.__name__)
+            depedency_map.append(YearlyOptimizedDataFrame.__name__)
+
+        backgroundTask.add_task(
+            asset_analytics_deletion_task.kiq,
+            asset_id=asset_id,
+            month=asset_file.month,
+            year=asset_file.year,
+            dependencies=depedency_map,
+        )
+
         return Res.success(
             "S-10053",
             message="Asset file removed successfully.",
@@ -4477,6 +4924,7 @@ class AssetService:
     async def submit_asset_for_approval(
         self,
         db: AsyncSession,
+        redis: Redis,
         user_db: AsyncSession,
         asset_id: int,
         current_user: dict,
@@ -4486,24 +4934,24 @@ class AssetService:
         # ROLE CHECK
         if current_user.get("role") != UserRole.ANALYST.value:
             return Res.error(
-                "E-10014", message="Only analysts can submit assets for approval"
+                "E-10013", message="Only analysts can submit assets for approval", http_status_code=403
             )
 
         # PLATFORM CHECK
         if Platform.AMD.value not in current_user["platform"]:
             return Res.error(
-                "E-10013", message="You are not authorized to perform this action"
+                "E-10013", message="You are not authorized to perform this action", http_status_code=403
             )
 
         # FETCH ASSET
         asset = await db.get(Asset, asset_id)
         if not asset:
-            return Res.error("E-10034", message="Asset not found")
+            return Res.error("E-10034", message="Asset not found", http_status_code=404)
 
         # INVALID STATE CHECK
         if asset.status in [AssetStatus.ACTIVE.value, AssetStatus.INACTIVE.value]:
             return Res.error(
-                "E-10138", message="Cannot submit active/inactive asset for approval"
+                "E-10138", message="Cannot submit active/inactive asset for approval", http_status_code=409
             )
 
         # IDEMPOTENCY
@@ -4518,7 +4966,7 @@ class AssetService:
         )
         optimization_params = opt_query.scalars().first()
         if not optimization_params:
-            return Res.error("E-10116", message="Optimization parameters are missing")
+            return Res.error("E-10116", message="Optimization parameters are missing", http_status_code=422)
 
         # Aggregator Report
         agg_query = await db.execute(
@@ -4531,7 +4979,7 @@ class AssetService:
         aggregator_file = agg_query.scalars().first()
 
         if not aggregator_file:
-            return Res.error("E-10117", message="Active aggregator report is missing")
+            return Res.error("E-10117", message="Active aggregator report is missing", http_status_code=422)
 
         # SCADA Report
         scada_query = await db.execute(
@@ -4544,7 +4992,7 @@ class AssetService:
 
         scada_file = scada_query.scalars().first()
         if not scada_file:
-            return Res.error("E-10118", message="Active SCADA report is missing")
+            return Res.error("E-10118", message="Active SCADA report is missing", http_status_code=422)
 
         # IAR Report
         iar_query = await db.execute(
@@ -4557,7 +5005,7 @@ class AssetService:
         iar_file = iar_query.scalars().first()
 
         if not iar_file:
-            return Res.error("E-10119", message="Active IAR report is missing")
+            return Res.error("E-10119", message="Active IAR report is missing", http_status_code=422)
 
         # UPDATE ASSET
         old_status = asset.status
@@ -4568,6 +5016,7 @@ class AssetService:
         # AUDIT LOG
         await audit_logs(
             db=db,
+            redis=redis,
             user_id=current_user.get("user_id"),
             user_role=current_user.get("role"),
             module=AuditLogModules.ASSET_ONBOARDING,

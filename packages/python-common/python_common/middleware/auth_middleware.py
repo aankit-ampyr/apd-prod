@@ -6,6 +6,7 @@ from fastapi import Request
 from jose import JWTError, ExpiredSignatureError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from python_common.constants.defaults import ACCESS_TOKEN_NAME
 from python_common.utils.jwt_utils import verify_token
 from python_common.exceptions import (
     UserSessionExpired,
@@ -13,7 +14,7 @@ from python_common.exceptions import (
     UserDeleted,
     UserNotAuthenticated,
     UserTokenExpired,
-    UserAccountBlocked
+    UserAccountBlocked,
 )
 from typing import Type, Set
 
@@ -58,13 +59,11 @@ class BaseAuthMiddleware(BaseHTTPMiddleware):
             if endpoint != "/" and path.startswith(endpoint):
                 return await call_next(request)
 
-        auth_header = request.headers.get("Authorization")
+        token = request.cookies.get(ACCESS_TOKEN_NAME)
 
         # Token not present
-        if not auth_header or not auth_header.startswith("Bearer "):
+        if not token:
             raise UserNotAuthenticated("Authorization header missing or invalid")
-
-        token = auth_header.split(" ")[1]
 
         async with self.session_factory() as db:
             try:
@@ -81,7 +80,7 @@ class BaseAuthMiddleware(BaseHTTPMiddleware):
                 if user.is_deleted:
                     raise UserDeleted("User not found")
 
-                if not user.is_active:
+                if not user.status:
                     raise UserAccountBlocked("User account is blocked")
 
                 request.state.user = {

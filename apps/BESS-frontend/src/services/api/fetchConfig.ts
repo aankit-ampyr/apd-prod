@@ -38,6 +38,7 @@ export async function fetchBlobFromApi(url: string, params?: any, filename?: str
     const response = await fetch(`${fullUrl}${queryString}`, {
       method: 'GET',
       headers,
+      credentials: "include"
     });
 
     if (!response.ok) {

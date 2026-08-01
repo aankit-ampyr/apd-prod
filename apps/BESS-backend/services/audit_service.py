@@ -48,13 +48,18 @@ class AuditService:
                         return Res.error(
                             status_code="E-20051",
                             message="Invalid date range provided.",
+                            http_status_code=422,
                         )
                     end = end + timedelta(days=1)
                     query = query.where(
                         AuditLog.created_at >= start, AuditLog.created_at < end
                     )
                 except ValueError:
-                    return Res.error("E-20050", message="Invalid search parameter.")
+                    return Res.error(
+                        "E-20050",
+                        message="Invalid search parameter.",
+                        http_status_code=422,
+                    )
 
             query = query.where(
                 AuditLog.role != UserRole.ADMIN.value,

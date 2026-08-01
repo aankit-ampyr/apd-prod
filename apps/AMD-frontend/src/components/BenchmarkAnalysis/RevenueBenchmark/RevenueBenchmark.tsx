@@ -10,10 +10,14 @@ import {
 } from '@/services/redux/selectors';
 import {useEffect, useState} from 'react';
 import {getIndustryComparisonRequest} from '@/services/redux/slice';
+import {fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
 import {downloadAssetIndustryBenchmarkAnalysis} from '@/services/api';
-import {useChartsActionV2, useToast} from '@/hooks';
+import {useChartsActionV2, useToast, useWindowDimensions} from '@/hooks';
+import {BenchmarkAnalysisTabs, BenchmarkAnalysisWidgets, TABLET_SCREEN_BREAKPOINT} from '@/constants';
 import {InductryComparisonGraph} from './InductryComparisonGraph';
 import type {ChartSeries} from './InductryComparisonGraph';
+import {CommentTrigger} from '@/components/common';
+import {CommentContextType, CommentModule} from '@/constants';
 
 type Row = {
   month: string;
@@ -37,6 +41,7 @@ type IndustryComparisonTableProps = {
   onDownload: () => void;
   isLoading?: boolean;
   isFullScreenOverride?: boolean;
+  customActions?: React.ReactNode;
 };
 function formatPound(value: number) {
   return `\u00a3${value.toLocaleString('en-GB')}`;
@@ -145,7 +150,9 @@ const ghostTableData: Row[] = Array.from({length: 6}, (_, index) => ({
 }));
 
 function IndustryComparisonTable(props: Readonly<IndustryComparisonTableProps>) {
-  const {columns, data, onDownload, isLoading = false, isFullScreenOverride = false} = props;
+  const {columns, data, onDownload, isLoading = false, isFullScreenOverride = false, customActions} = props;
+  const {width} = useWindowDimensions();
+  const isTablet = width <= TABLET_SCREEN_BREAKPOINT;
 
   const {chartRef, onMaximize, onMinimize} = useChartsActionV2({
     downloadFileName: 'Benchmark_table.png',
@@ -164,6 +171,7 @@ function IndustryComparisonTable(props: Readonly<IndustryComparisonTableProps>) 
         </Text>
 
         <div className="chart-actions flex items-center gap-3">
+          {customActions}
           <IconButton
             name="download"
             size={20}
@@ -195,7 +203,7 @@ function IndustryComparisonTable(props: Readonly<IndustryComparisonTableProps>) 
         data={data}
         columns={columns}
         loading={isLoading}
-        tableClassName="table-auto w-full"
+        tableClassName={cn('table-auto w-full', isTablet && '[&_th]:px-2! [&_td]:px-2!')}
         className="rounded-lg overflow-hidden"
       />
     </div>
@@ -456,6 +464,18 @@ export const RevenueBenchmark = (props: RevenueBenchMarkProps) => {
     dispatch(getIndustryComparisonRequest(params));
   }, [assetId, year]);
 
+  useEffect(() => {
+    if (!assetId) return;
+    dispatch(
+      fetchCommentsRequest({
+        assetId,
+        context_module: CommentModule.BenchmarkAnalysis,
+        context_tab: BenchmarkAnalysisTabs.RevenueVsBenchmarks,
+        context_year: year ?? undefined,
+      })
+    );
+  }, [assetId, dispatch, year]);
+
   return (
     <>
       <div className="flex rounded-xl border border-border grow flex-col bg-white py-8 px-6 font-InterRegular ">
@@ -496,7 +516,7 @@ export const RevenueBenchmark = (props: RevenueBenchMarkProps) => {
               options={BENCHMARK_OPTIONS}
               onChange={item => setSelectedBenchmark(item.id as any)}
               wrapperClassName="bg-white! border-primary"
-              className='w-50'
+              className="w-50"
               isFilter
             />
           </WithFallback>
@@ -508,8 +528,21 @@ export const RevenueBenchmark = (props: RevenueBenchMarkProps) => {
           getTopPosition={getTopPosition}
           yAxisTicks={yAxisTicks}
           isLoading={isLoading}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.BenchmarkAnalysis}
+              contextTab={BenchmarkAnalysisTabs.RevenueVsBenchmarks}
+              contextWidget={BenchmarkAnalysisWidgets.BenchmarkSelection}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
         />
-        <Alert message="Industry benchmark bands are configured in Settings and apply across views." className='mt-3'/>
+        <Alert message="Industry benchmark bands are configured in Settings and apply across views." className="mt-3" />
       </div>
 
       <IndustryComparisonTable
@@ -517,6 +550,19 @@ export const RevenueBenchmark = (props: RevenueBenchMarkProps) => {
         data={tableDataToShow}
         onDownload={handleDownload}
         isLoading={isLoading}
+        customActions={
+          <CommentTrigger
+            contextModule={CommentModule.BenchmarkAnalysis}
+            contextTab={BenchmarkAnalysisTabs.RevenueVsBenchmarks}
+            contextWidget={BenchmarkAnalysisWidgets.MonthlyTotalRevenueVsIar}
+            contextType={CommentContextType.Widget}
+            contextAssetId={assetId}
+            contextYear={year}
+            variant="icon-only"
+            className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+            iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+          />
+        }
       />
     </>
   );

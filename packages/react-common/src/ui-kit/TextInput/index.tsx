@@ -1,26 +1,26 @@
-import React from "react";
-import { cn } from "../../utils";
-import { InputWrapper } from "../InputWrapper";
-import { Icon, type IconTypes } from "../Icon";
-import { Text } from "../Text";
-import { tv } from "tailwind-variants";
-import { Tooltip } from "../Tooltip";
+import React from 'react';
+import {cn} from '../../utils';
+import {InputWrapper} from '../InputWrapper';
+import {Icon, type IconTypes} from '../Icon';
+import {Text} from '../Text';
+import {tv} from 'tailwind-variants';
+import {Tooltip} from '../Tooltip';
 
 const textInputStyles = tv({
   slots: {
-    root: "flex flex-col gap-1",
-    label: "",
+    root: 'flex flex-col gap-1',
+    label: '',
     input:
-      "w-full bg-transparent outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed font-InterRegular text-caption",
-    leftIcon: "size-4 text-text-placeholder",
-    rightIcon: "size-4 text-text-placeholder",
+      'w-full bg-transparent outline-none placeholder:text-text-placeholder disabled:cursor-not-allowed font-InterRegular text-caption',
+    leftIcon: 'size-4 text-text-placeholder',
+    rightIcon: 'size-4 text-text-placeholder',
   },
   variants: {
     state: {
       default: {},
       focus: {},
       error: {
-        rightIcon: "text-error",
+        rightIcon: 'text-error',
       },
       disabled: {},
     },
@@ -96,14 +96,14 @@ interface TextInputProps {
   showInputInfoIcon?: boolean;
 }
 
-export const TextInput: React.FC<TextInputProps> = (props) => {
+export const TextInput: React.FC<TextInputProps> = props => {
   const {
     label,
     placeholder,
-    value = "",
+    value = '',
     onChange,
     disabled = false,
-    error = "",
+    error = '',
     helperText,
     leftIcon,
     rightIcon,
@@ -143,7 +143,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
   const [isFocused, setIsFocused] = React.useState(false);
   const hasError = Boolean(error && touched && !disabled);
 
-  const currentState = disabled ? "disabled" : hasError ? "error" : "default";
+  const currentState = disabled ? 'disabled' : hasError ? 'error' : 'default';
   const {
     root,
     input,
@@ -167,24 +167,24 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
     let text = e.target.value;
 
     // allow empty input
-    if (text === "") {
-      onChange?.("");
+    if (text === '') {
+      onChange?.('');
       return;
     }
     // INTEGER MODE
     if (integer) {
-      text = text.replace(/[^0-9]/g, "");
+      text = text.replace(/[^0-9]/g, '');
       // Allow any value - validation will handle range errors
     }
 
     // FLOAT MODE
     else if (allowFloat) {
-      text = text.replace(/[^0-9.]/g, "");
+      text = text.replace(/[^0-9.]/g, '');
 
       // prevent multiple dots
-      const parts = text.split(".");
+      const parts = text.split('.');
       if (parts.length > 2) {
-        text = parts[0] + "." + parts.slice(1).join("");
+        text = parts[0] + '.' + parts.slice(1).join('');
       }
 
       // Allow any value - validation will handle range errors
@@ -192,43 +192,29 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
 
     if (preventLeadingSpace) {
       // Prevent leading spaces and collapse multiple spaces
-      text = text.replace(/^\s+/, "");
+      text = text.replace(/^\s+/, '');
     }
     if (preventTrailingSpace) {
-      text = text.replace(/\s{2,}/g, " ");
+      text = text.replace(/\s{2,}/g, ' ');
     }
     // Apply allowed regex: keep only valid characters
     if (allowedRegex) {
       text = text
-        .split("")
-        .filter((char) => allowedRegex.test(char))
-        .join("");
+        .split('')
+        .filter(char => allowedRegex.test(char))
+        .join('');
     }
     onChange?.(text);
   }
 
   return (
-    <div
-      className={cn(root(), className)}
-      style={placeholder ? { minWidth: `${placeholder?.length - 3}ch` } : {}}
-    >
+    <div className={cn(root(), className)} style={placeholder ? {minWidth: `${placeholder?.length - 3}ch`} : {}}>
       {label ? (
-        <Text
-          variant="caption"
-          className={cn(
-            labelClassName,
-            info && "inline-flex items-center gap-1",
-          )}
-        >
-          {label} {required && <span className="text-error">*</span>}{" "}
+        <Text variant="caption" className={cn(labelClassName, info && 'inline-flex items-center gap-1')}>
+          {label} {required && <span className="text-error">*</span>}{' '}
           {inputInfo && (
             <div className="flex items-center gap-1 mb-2">
-              {showInputInfoIcon && (
-                <Icon
-                  name="questionCircle"
-                  className="text-text-placeholder! size-3.5"
-                />
-              )}
+              {showInputInfoIcon && <Icon name="questionCircle" className="text-text-placeholder! size-3.5" />}
 
               <Text variant="12R" className="text-text-placeholder!">
                 {inputInfo}
@@ -237,11 +223,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
           )}
           {info && (
             <span className="relative group">
-              <Tooltip
-                message={infoMessage ?? ""}
-                textClassName="font-InterRegular!"
-                position="bottom"
-              />{" "}
+              <Tooltip message={infoMessage ?? ''} textClassName="font-InterRegular!" position="bottom" portal />{' '}
               <Icon name="infoCircle" className="text-text-secondary! size-4" />
             </span>
           )}
@@ -250,14 +232,13 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
 
       <InputWrapper
         isFilter={isFilter}
-        state={readonly ? "default" : currentState}
+        state={readonly ? 'default' : currentState}
         focus={isFocused}
         className={cn(
-          "flex items-center gap-2 px-2 py-2",
-          readonly ? cn("bg-bg-card/50 border-0!", readOnlyClassName) : "",
+          'flex items-center gap-2 px-2 py-2',
+          readonly ? cn('bg-bg-card/50 border-0!', readOnlyClassName) : '',
           wrapperClassName,
-        )}
-      >
+        )}>
         {leftIcon ? <Icon name={leftIcon} className={leftIconStyle()} /> : null}
 
         <div className="flex w-full items-center">
@@ -277,7 +258,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
               maxLength={maxLength}
               min={min}
               max={max}
-              className={cn(input(), inputClassName, "w-full")}
+              className={cn(input(), inputClassName, 'w-full')}
               autoFocus={autoFocus}
               onKeyDown={onKeyDown}
             />
@@ -289,8 +270,7 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
                 type="button"
                 onClick={onDecrement}
                 disabled={decrementDisabled}
-                className="px-3 border-r cursor-pointer border-gray-300 h-full flex items-center justify-center text-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                className="px-3 border-r cursor-pointer border-gray-300 h-full flex items-center justify-center text-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
                 −
               </button>
 
@@ -298,31 +278,21 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
                 type="button"
                 onClick={onIncrement}
                 disabled={incrementDisabled}
-                className="px-3 h-full cursor-pointer flex items-center justify-center text-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
+                className="px-3 h-full cursor-pointer flex items-center justify-center text-lg text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed">
                 +
               </button>
             </div>
           )}
         </div>
         {hasError ? (
-          <Icon
-            name="infoCircle"
-            className={cn(rightIconStyle(), "text-error")}
-          />
+          <Icon name="infoCircle" className={cn(rightIconStyle(), 'text-error')} />
         ) : rightIcon ? (
           <Icon name={rightIcon} className={rightIconStyle()} />
         ) : null}
       </InputWrapper>
 
       {(helperText || hasError) && (
-        <Text
-          variant="small"
-          className={cn(
-            "text-text-secondary!",
-            hasError ? "text-error-text!" : "",
-          )}
-        >
+        <Text variant="small" className={cn('text-text-secondary!', hasError ? 'text-error-text!' : '')}>
           {hasError ? error : helperText}
         </Text>
       )}
@@ -355,23 +325,20 @@ export const TextInput: React.FC<TextInputProps> = (props) => {
  * @param isFilter - whether ths input is used as a filter or not
  */
 
-interface TextAreaProps extends Omit<
-  TextInputProps,
-  "onFocus" | "onBlur" | "multiline" | "rightIcon" | "leftIcon"
-> {
+interface TextAreaProps extends Omit<TextInputProps, 'onFocus' | 'onBlur' | 'multiline' | 'rightIcon' | 'leftIcon'> {
   onFocus?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
   onBlur?: (e: React.FocusEvent<HTMLTextAreaElement>) => void;
   allowedRegex?: RegExp;
 }
 
-export const TextArea: React.FC<TextAreaProps> = (props) => {
+export const TextArea: React.FC<TextAreaProps> = props => {
   const {
     label,
     placeholder,
-    value = "",
+    value = '',
     onChange,
     disabled = false,
-    error = "",
+    error = '',
     helperText,
     className,
     inputClassName,
@@ -389,8 +356,8 @@ export const TextArea: React.FC<TextAreaProps> = (props) => {
   const [isFocused, setIsFocused] = React.useState(false);
   const hasError = Boolean(error && touched && !disabled);
 
-  const currentState = disabled ? "disabled" : hasError ? "error" : "default";
-  const { root, input } = textInputStyles({
+  const currentState = disabled ? 'disabled' : hasError ? 'error' : 'default';
+  const {root, input} = textInputStyles({
     state: currentState,
   });
 
@@ -408,10 +375,10 @@ export const TextArea: React.FC<TextAreaProps> = (props) => {
     let text = e.target.value;
     if (preventLeadingSpace) {
       // Prevent leading spaces and collapse multiple spaces
-      text = text.replace(/^\s+/, "");
+      text = text.replace(/^\s+/, '');
     }
     if (preventTrailingSpace) {
-      text = text.replace(/\s{2,}/g, " ");
+      text = text.replace(/\s{2,}/g, ' ');
     }
     // Apply allowed regex: keep only valid characters
     if (allowedRegex && !allowedRegex.test(text)) {
@@ -432,8 +399,7 @@ export const TextArea: React.FC<TextAreaProps> = (props) => {
         isFilter={isFilter}
         state={currentState}
         focus={isFocused}
-        className={cn("flex items-center gap-2 px-2 py-2", wrapperClassName)}
-      >
+        className={cn('flex items-center gap-2 px-2 py-2', wrapperClassName)}>
         <textarea
           value={value}
           placeholder={placeholder}
@@ -441,18 +407,12 @@ export const TextArea: React.FC<TextAreaProps> = (props) => {
           onChange={handleChange}
           onFocus={handleFocus}
           onBlur={handleBlur}
-          className={cn("resize-none h-32", input(), inputClassName)}
+          className={cn('resize-none h-32', input(), inputClassName)}
         />
       </InputWrapper>
 
       {(helperText || hasError) && (
-        <Text
-          variant="small"
-          className={cn(
-            "text-text-secondary!",
-            hasError ? "text-error-text!" : "",
-          )}
-        >
+        <Text variant="small" className={cn('text-text-secondary!', hasError ? 'text-error-text!' : '')}>
           {hasError ? error : helperText}
         </Text>
       )}

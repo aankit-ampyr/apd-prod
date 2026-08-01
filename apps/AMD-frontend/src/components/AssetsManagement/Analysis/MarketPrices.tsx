@@ -1,4 +1,5 @@
-import {ThresholdBarGraph, LineChart, Section, CorrelationMatrix} from '@/components';
+import {ThresholdBarGraph, LineChart, Section, CorrelationMatrix, CommentTrigger} from '@/components';
+import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets, WidgetDataPointPayload} from '@/constants';
 import {Text} from '@/ui-kits';
 import {formatCurrencyToPound} from '@/utils';
 import {useEffect, useMemo} from 'react';
@@ -10,6 +11,7 @@ import {
   getAssetMarketPriceSpreadRequest,
   getAssetMarketPriceVolatilityRequest,
 } from '@/services/redux/slice';
+import {setActiveContext, setPanelOpen, fetchCommentsRequest} from '@/services/redux/slice/commentSlice';
 import {
   assetDetailsFetchLoading,
   assetMarketHourlyPricePatternsLoading,
@@ -22,6 +24,7 @@ import {
   assetMarketPriceVolatilityResult,
 } from '@/services/redux/selectors';
 import {GradientKPIObject, GradientKPI} from '../common';
+import {BarDataPoint} from '@lazarus/react-common';
 
 interface TopMissedOpportunityDays {
   date: string;
@@ -53,6 +56,37 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
 
   const marketPriceCorrelationMatrixData = useSelector(assetMarketPriceCorrelationMatrixResult);
   const marketPriceCorrelationMatrixLoading = useSelector(assetMarketPriceCorrelationMatrixLoading);
+
+  const allComments = useSelector((state: any) => state.comment.comments || []);
+  const getCommentCountForDataPoint = <W extends WidgetDataPointPayload['context_widget']>(
+    widgetId: W,
+    label: Extract<WidgetDataPointPayload, {context_widget: W}>['context_data_point'],
+  ) => {
+    return allComments.reduce((acc: number, c: any) => {
+      if (c.context_widget !== widgetId) return acc;
+      if (c.context_data_point !== label) return acc;
+      return acc + 1 + (c.replies?.length || 0);
+    }, 0);
+  };
+
+  const handleBadgeClick = <W extends WidgetDataPointPayload['context_widget']>(
+    widgetId: W,
+    label: Extract<WidgetDataPointPayload, {context_widget: W}>['context_data_point'],
+  ) => {
+    dispatch(
+      setActiveContext({
+        context_type: CommentContextType.DataPoint,
+        context_module: CommentModule.ViewAnalysis,
+        context_tab: ViewAnalysisTabs.MarketPrices,
+        context_widget: widgetId,
+        context_data_point: label,
+        context_asset_id: assetId,
+        context_year: year,
+        context_month: month,
+      })
+    );
+    dispatch(setPanelOpen(true));
+  };
 
   // ===================
   // states and data
@@ -145,28 +179,28 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       title: 'EPEX DA Average',
       value: formatCurrencyToPound(marketPriceSpreadData?.price_summary?.epex_da_avg_price_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'orange'
+      variant: 'orange',
     },
     {
       icon: 'trending-up',
       title: 'EPEX DA Maximum',
       value: formatCurrencyToPound(marketPriceSpreadData?.price_summary?.epex_da_max_price_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'blue'
+      variant: 'blue',
     },
     {
       icon: 'trending-up',
       title: 'SSP Maximum',
       value: formatCurrencyToPound(marketPriceSpreadData?.price_summary?.ssp_max_price_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'yellow'
+      variant: 'yellow',
     },
     {
       icon: 'trending-up',
       title: 'SBP Maximum',
       value: formatCurrencyToPound(marketPriceSpreadData?.price_summary?.sbp_max_price_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'green'
+      variant: 'green',
     },
   ];
 
@@ -176,14 +210,14 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       title: 'Avg Daily EPEX Spread',
       value: formatCurrencyToPound(marketPriceSpreadData?.spread_analysis?.epex_avg_daily_spread_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'blue'
+      variant: 'blue',
     },
     {
       icon: 'award',
       title: 'Best EPEX Spread Day',
       value: formatCurrencyToPound(marketPriceSpreadData?.spread_analysis?.epex_max_daily_spread_per_mwh || 0),
       subLabel: '/ MWh',
-      variant: 'orange'
+      variant: 'orange',
     },
     {
       icon: 'chart-wave',
@@ -208,14 +242,14 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       title: 'Best Sell Hour',
       value: `${String(marketHourlyPricePatternsData?.best_sell_hour || 0).padStart(2, '0')}:00`,
       subLabel: `Avg ${formatCurrencyToPound(marketHourlyPricePatternsData?.highest_avg_epex_price_per_mwh || 0)} / MWh`,
-      variant: 'blue'
+      variant: 'blue',
     },
     {
       icon: 'clock',
       title: 'Hourly Arbitrage',
       value: `${formatCurrencyToPound(marketHourlyPricePatternsData?.hourly_arbitrage_per_mwh || 0)}`,
       subLabel: '/ MWh',
-      variant: 'yellow'
+      variant: 'yellow',
     },
   ];
 
@@ -224,14 +258,14 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       icon: 'activity',
       title: 'Avg Daily Volatility',
       value: formatCurrencyToPound(marketPriceVolatilityData?.kpi?.average_daily_volatility || 0),
-      variant: 'blue'
+      variant: 'blue',
     },
     {
       icon: 'fire',
       title: 'High Volatility Days',
       value: `${marketPriceVolatilityData?.kpi?.high_volatility_days || 0}`,
       subLabel: 'Days',
-      variant: 'orange'
+      variant: 'orange',
     },
     {
       icon: 'octagon-alert',
@@ -254,13 +288,13 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       value: '42',
       subLabel: 'hrs',
       icon: 'shopping-cart-arrow-up',
-      variant: 'blue'
+      variant: 'blue',
     },
     {
       title: 'Estimated Missed Revenue',
       value: '£12,480',
       icon: 'shopping-cart-arrow-up',
-      variant: 'yellow'
+      variant: 'yellow',
     },
   ];
 
@@ -291,13 +325,51 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
     marketPriceSpreadData?.spread_analysis?.daily_epex_spread.map(item => ({
       label: item.date,
       value: item.spread,
+      commentCount: getCommentCountForDataPoint(ViewAnalysisWidgets.DailyEpexSpread, item.date),
     })) ?? [];
 
   const volatilityChartData =
     marketPriceVolatilityData?.chart_data.map(item => ({
       label: item.date,
       value: item.std_deviation,
+      commentCount: getCommentCountForDataPoint(ViewAnalysisWidgets.DailyVolatility, item.date),
     })) ?? [];
+
+  const customTooltipRenderer = (widgetId: string, yAxisLabel: string) => (data: BarDataPoint, barData?: any) => {
+    return (
+      <div className="min-w-[200px] rounded-md border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)] flex flex-col gap-2">
+        <Text variant="14SB" className="mb-1 block text-[17px] font-bold text-text-primary">
+          {data.label}
+        </Text>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 rounded-sm" style={{backgroundColor: barData?.color || 'var(--color-primary)'}} />
+          <Text variant="14R" className="text-text-secondary">
+            {yAxisLabel}
+          </Text>
+          <Text variant="14SB" className="ml-auto font-bold text-text-primary">
+            {formatCurrencyToPound(Number(data.value))}
+          </Text>
+        </div>
+          <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+            <CommentTrigger
+              contextType={CommentContextType.DataPoint}
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketPrices}
+              contextWidget={widgetId}
+              contextDataPoint={data.label}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-with-text"
+              label="Add Comments"
+              className="text-[#088477] w-full flex items-center justify-center hover:bg-transparent!"
+              iconClassName="text-[#088477] !w-[12px] !h-[12px]"
+              labelClassName="text-[#088477] text-[12px] leading-none"
+            />
+          </div>
+      </div>
+    );
+  };
 
   const isCorrelationMatrixLoading = marketPriceCorrelationMatrixLoading || assetLoading;
 
@@ -320,14 +392,47 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
   // side effects
   // ==============
   useEffect(() => {
-    if (!assetId) return;
-    if (!month) return;
-    if (!year) return;
-    dispatch(getAssetMarketPriceSpreadRequest({assetId, month, year}));
-    dispatch(getAssetMarketPriceVolatilityRequest({assetId, month, year}));
-    dispatch(assetMarketHourlyPricePatternsRequest({assetId, month, year}));
-    dispatch(getAssetMarketPriceCorrelationMatrixRequest({assetId, month, year}));
-  }, [assetId, month, year]);
+    if (assetId && year && month) {
+      dispatch(
+        getAssetMarketPriceSpreadRequest({
+          assetId,
+          year,
+          month,
+        }),
+      );
+      dispatch(
+        assetMarketHourlyPricePatternsRequest({
+          assetId,
+          year,
+          month,
+        }),
+      );
+      dispatch(
+        getAssetMarketPriceVolatilityRequest({
+          assetId,
+          year,
+          month,
+        }),
+      );
+      dispatch(
+        getAssetMarketPriceCorrelationMatrixRequest({
+          assetId,
+          year,
+          month,
+        }),
+      );
+    }
+    if (assetId) {
+      dispatch(
+        fetchCommentsRequest({
+          assetId,
+          context_module: CommentModule.ViewAnalysis,
+          context_tab: ViewAnalysisTabs.MarketPrices,
+          context_year: year ?? undefined,
+        })
+      );
+    }
+  }, [assetId, year, month, dispatch]);
 
   return (
     <div className="flex flex-col gap-4 py-4">
@@ -350,14 +455,23 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
         </div>
 
         <ThresholdBarGraph
-          title="Daily EPEX Spread (Max − Min)"
-          className="h-120 p-4 mb-4"
-          data={
-            marketPriceSpreadData?.spread_analysis?.daily_epex_spread.map(item => ({
-              label: item.date,
-              value: item.spread,
-            })) ?? []
+          title="Daily EPEX Spread (Max - Min)"
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketPrices}
+              contextWidget={ViewAnalysisWidgets.DailyEpexSpread}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
           }
+          className="h-120 p-4 mb-4"
+          data={spreadChartData}
           xKey="label"
           yKey="value"
           headerClassName="mt-2"
@@ -370,6 +484,9 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
           barColor={epexSpreadBarColor}
           thresholdLineColor={epexSpreadLineColor}
           thresholdLabelRenderer={epexSpreadThresholdLabel}
+          useBuiltInTooltip={true}
+          tooltipRenderer={customTooltipRenderer(ViewAnalysisWidgets.DailyEpexSpread, 'Price Spread (£/MWh)')}
+          onBadgeClick={(item) => handleBadgeClick(ViewAnalysisWidgets.DailyEpexSpread, item.label as string)}
           xAxisTicks={(() => {
             if (!spreadChartData.length) return [];
             const targetDays = [7, 15, 21, 28];
@@ -391,23 +508,7 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
           xAxisLabelProps={{
             offset: -40,
           }}
-          useBuiltInTooltip
           isLoading={marketPriceSpreadLoading || assetLoading}
-          tooltipRenderer={(data, _barData) => (
-            <div className="rounded-sm bg-white border border-border px-4 py-3 shadow-md">
-              <Text variant="14SB">{data.label}</Text>
-
-              <Text variant="caption" className="text-text-secondary!">
-                Daily Spread :{' '}
-                <span
-                  style={{
-                    color: epexSpreadLineColor,
-                  }}>
-                  <b className="font-InterBold!">{formatCurrencyToPound(Number(data.value))}</b> £/MWh
-                </span>
-              </Text>
-            </div>
-          )}
           barRadius={6}
           barCategoryGap={6}
           verticalGridCount={15}
@@ -425,6 +526,20 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
         </div>
         <LineChart
           data={averagePriceHourlyData}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketPrices}
+              contextWidget={ViewAnalysisWidgets.AveragePriceHourDay}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           downloadFileName={`${assetSystemGenerationId}_${month}_${year}_average_hourly_prices.png`}
           title="Average price by hour of day"
           chartClassName="min-h-120 pl-8 pr-12"
@@ -552,6 +667,20 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
 
         <ThresholdBarGraph
           title="Daily volatility (£/MWh Std Dev)"
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketPrices}
+              contextWidget={ViewAnalysisWidgets.DailyVolatility}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           className="h-120 p-4"
           headerClassName="mt-5"
           data={volatilityChartData}
@@ -591,20 +720,39 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
           useBuiltInTooltip
           isLoading={marketPriceVolatilityLoading || assetLoading}
           tooltipRenderer={(data, barData) => (
-            <div className="rounded-sm bg-white border border-border px-4 py-3 shadow-md">
+            <div className="rounded-sm bg-white border border-border px-4 py-3 shadow-md pointer-events-auto">
               <Text variant="14SB">{data.label}</Text>
 
-              <Text variant="caption" className="text-text-secondary!">
+              <Text variant="caption" className="text-text-secondary! mb-2 block">
                 Std Dev :{' '}
                 <span
                   style={{
                     color: barData?.isThresholdExceeded ? volatilityLineColor : '#15AA7C',
                   }}>
-                  <b className="font-InterBold!">{formatCurrencyToPound(Number(data.value))}</b> £/MWh
+                  <b className="font-InterBold!">{formatCurrencyToPound(Number(data.value))}</b> A£/MWh
                 </span>
               </Text>
+              
+              <div className="mt-2 pt-2 border-t border-[#E2E4EA] flex justify-center w-full">
+                <CommentTrigger
+                  contextType={CommentContextType.DataPoint}
+                  contextModule={CommentModule.ViewAnalysis}
+                  contextTab={ViewAnalysisTabs.MarketPrices}
+                  contextWidget={ViewAnalysisWidgets.DailyVolatility}
+                  contextDataPoint={data.label}
+                  contextAssetId={assetId}
+                  contextYear={year}
+                  contextMonth={month}
+                  variant="icon-with-text"
+                  label="Add Comments"
+                  className="text-[#088477] w-full flex items-center justify-center hover:bg-transparent!"
+                  iconClassName="text-[#088477] !w-[12px] !h-[12px]"
+                  labelClassName="text-[#088477] text-[12px] leading-none"
+                />
+              </div>
             </div>
           )}
+          onBadgeClick={(item) => handleBadgeClick(ViewAnalysisWidgets.DailyVolatility, item.label as string)}
           barRadius={6}
           barCategoryGap={6}
           verticalGridCount={15}
@@ -615,7 +763,7 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
       <Section
         icon="move"
         title="Missed Opportunity Tracker"
-        className='hidden' // keep it hidden for now, will use it when need
+        className="hidden" // keep it hidden for now, will use it when need
         subtitle="Where the asset stayed idle during high-spread windows.">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
           {missedOpportunityKpis.map((kpi, index) => (
@@ -650,6 +798,20 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
         <CorrelationMatrix
           labels={correlationLabels}
           data={correlationData}
+          customActions={
+            <CommentTrigger
+              contextModule={CommentModule.ViewAnalysis}
+              contextTab={ViewAnalysisTabs.MarketPrices}
+              contextWidget={ViewAnalysisWidgets.MarketPriceCorrelation}
+              contextType={CommentContextType.Widget}
+              contextAssetId={assetId}
+              contextYear={year}
+              contextMonth={month}
+              variant="icon-only"
+              className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
+              iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
+            />
+          }
           isLoading={isCorrelationMatrixLoading}
           downloadFileName={`${assetSystemGenerationId}_${month}_${year}_market_price_correlation_matrix.png`}
           // className="py-10 px-10"

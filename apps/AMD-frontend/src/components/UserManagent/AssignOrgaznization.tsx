@@ -1,6 +1,6 @@
 import {UserRole} from '@/constants';
 import type {User} from '@/interface';
-import {Modal, Button, Text, Icon, SelectInput} from '@/ui-kits';
+import {Modal, Button, Text, Icon, SearchableSelectInput} from '@/ui-kits';
 import React from 'react';
 import {useDispatch} from 'react-redux';
 import {useDropdownValues} from '@/hooks';
@@ -87,7 +87,7 @@ export const AssignOrgaznizationModal: React.FC<AssignOrganizationModalProps> = 
         )}
       </div>
 
-      <SelectInput
+      <SearchableSelectInput
         label="Organization"
         required
         placeholder="Select Organization"

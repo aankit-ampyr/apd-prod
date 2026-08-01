@@ -1,4 +1,4 @@
-import {ToastProvider, ScreenOverrideProvider, ConfirmProvider} from '@/context';
+import {ToastProvider, ScreenOverrideProvider, ConfirmProvider, WebSocketProvider} from '@/context';
 import './stylesheet/index.css';
 import {RootNavigator} from '@/navigation/RootNavigation';
 import {Provider, useDispatch, useSelector} from 'react-redux';
@@ -6,9 +6,9 @@ import {PersistGate} from 'redux-persist/integration/react';
 import {store, persistor} from '@/services/redux/store';
 import {PropsWithChildren, useEffect} from 'react';
 import {cancelAuditLogRequest, cancelAuthRequest, cancelUserRequest, resetAuthWithReason} from './services/redux/slice';
-import { useInactivityTimer } from './hooks';
-import { authStatus } from './services/redux/selectors';
-import { UserSessionEndReason } from './constants';
+import {useInactivityTimer} from './hooks';
+import {authStatus} from './services/redux/selectors';
+import {UserSessionEndReason} from './constants';
 
 export default function App() {
   return (
@@ -17,9 +17,11 @@ export default function App() {
         <ToastProvider>
           <ScreenOverrideProvider>
             <ConfirmProvider>
-              <AppRoot>
-                <RootNavigator />
-              </AppRoot>
+              <WebSocketProvider>
+                <AppRoot>
+                  <RootNavigator />
+                </AppRoot>
+              </WebSocketProvider>
             </ConfirmProvider>
           </ScreenOverrideProvider>
         </ToastProvider>

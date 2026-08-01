@@ -1,27 +1,21 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useRef, useState} from 'react';
 import {useDispatch, useSelector} from 'react-redux';
 import {Images} from '@/assets/images';
-import {Button, Text, Badge, IconButton, Sort} from '@/ui-kits';
-import {users, totalPages, userSuccess, userFailure, totalUserResults, currentUserPage} from '@/services/redux/selectors';
+import {Text, Badge, Sort} from '@/ui-kits';
+import {users, totalPages, userSuccess, userFailure, totalUserResults, currentUserPage, userLoading} from '@/services/redux/selectors';
 import {resetUserMessage, userListRequest} from '@/services/redux/slice';
 import type {User, DataTableColumn, UserListRequest, SortType} from '@/interface';
-import {NA, Platform, PLATFORM_LABELS, USER_ROLES, UserRole, STATUS_OPTIONS} from '@/constants';
+import {NA, USER_ROLES, UserRole, STATUS_OPTIONS} from '@/constants';
 import {getErrorMessage, getSuccessMessage, type ErrorCodes, type SuccessCodes} from '@/utils/getMessages';
-import {useToast, useRole, useDropdownValues} from '@/hooks';
-import {cn, enumToSelectOptions} from '@/utils/common-functions';
+import {useToast} from '@/hooks';
+import {cn} from '@/utils/common-functions';
 import {formatDate} from '@/utils';
-import { DataTable, FilterGroup } from '@/components';
-
-/**
- * Platform labels and options
- */
-const PLATFORM_OPTIONS = enumToSelectOptions(Platform, PLATFORM_LABELS);
+import {DataTable, FilterGroup} from '@/components';
 
 /**
  * Page Size for pagination
  */
 const PAGE_SIZE = 10;
-
 /**
  * Filter type for user list filtering
  */
@@ -40,15 +34,16 @@ export function UserManagement() {
   // =================
   const dispatch = useDispatch();
   const {showToast} = useToast();
-  const {isBESSAdmin} = useRole();
 
   // =================
   // selectors
   // =================
-  const usersData = useSelector(users).slice(0, PAGE_SIZE);
+  const userListData = useSelector(users);
+  const usersData = userListData.slice(0, PAGE_SIZE);
   const totalPagesData = useSelector(totalPages);
   const totalResult = useSelector(totalUserResults);
   const currentPage = useSelector(currentUserPage);
+  const isLoading = useSelector(userLoading);
   const success = useSelector(userSuccess) as SuccessCodes;
   const failure = useSelector(userFailure) as ErrorCodes;
 
@@ -56,46 +51,20 @@ export function UserManagement() {
   // states
   // =================
   const [page, setPage] = useState(1);
+  const [showGhostLoader, setShowGhostLoader] = useState(true);
+  const hasObservedLoading = useRef(false);
+  const pendingUserList = useRef<typeof userListData | null>(null);
   const [noData, setNoData] = useState(false);
   const [filter, setFilter] = useState<FilterType>({});
   const [tableMessage, setTableMessage] = useState<string>('');
-  const [currentSelectUser, setCurrentSelectUser] = useState<User | null>(null);
-  const [modalOpen, setModalOpen] = useState<false | 'add' | 'edit' | 'delete' | 'assign'>(false); 
 
-  const normalizedStatus =
-    filter.status !== undefined && filter.status !== null
-      ? Number(filter.status)
-      : undefined;
+  const normalizedStatus = filter.status !== undefined && filter.status !== null ? Number(filter.status) : undefined;
 
   const hasActiveFilters = Boolean(filter.search || filter.role || normalizedStatus !== undefined);
-
-  // ================
-  // functions
-  // ================
-  const closeModal = () => {
-    setModalOpen(false);
-    setCurrentSelectUser(null);
-  };
-
-  const handleEdit = (_user: User) => {
-    setModalOpen('edit');
-    setCurrentSelectUser(_user);
-  };
-
-  const handleAssign = (_user: User) => {
-    setModalOpen('assign');
-    setCurrentSelectUser(_user);
-  };
-
-  const handleDelete = (_user: User) => {
-    setModalOpen('delete');
-    setCurrentSelectUser(_user);
-  };
 
   function handleSort(sort: SortType) {
     setFilter(p => ({...p, sort}));
   }
-
 
   // =================
   // data
@@ -157,12 +126,7 @@ export function UserManagement() {
       align: 'left',
       render: row => {
         return (
-          <Text
-            variant="caption"
-            className={cn(
-              row.last_activity ? 'text-text-secondary!' : 'text-text-secondary/40!',
-              'whitespace-pre-wrap',
-            )}>
+          <Text variant="caption" className={cn(row.last_activity ? 'text-text-secondary!' : 'text-text-secondary/40!', 'whitespace-pre-wrap')}>
             {formatDate(row.last_activity, "dd-MMM-yyyy, '\n'hh:mm a") || NA}
           </Text>
         );
@@ -173,20 +137,25 @@ export function UserManagement() {
       title: 'Status',
       width: {minWidth: '90px'},
       align: 'left',
-      render: row => (
-        <Badge
-          size="sm"
-          className="w-16"
-          message={row.status ? 'Active' : 'Inactive'}
-          color={row.status ? 'green' : 'gray'}
-        />
-      ),
+      render: row => <Badge size="sm" className="w-16" message={row.status ? 'Active' : 'Inactive'} color={row.status ? 'green' : 'gray'} />,
     },
   ];
 
   // =================
   // side effects
   // =================
+  useEffect(() => {
+    if (isLoading) {
+      hasObservedLoading.current = true;
+      return;
+    }
+
+    if (hasObservedLoading.current) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [isLoading]);
+
   useEffect(() => {
     const payload: UserListRequest['params'] = {page, limit: PAGE_SIZE};
     if (filter.search) {
@@ -201,8 +170,28 @@ export function UserManagement() {
     if (filter.sort) {
       payload.sort = filter.sort;
     }
+    pendingUserList.current = userListData;
+    // Don't show ghost loader for sorting
+    if (!filter.sort) {
+      setShowGhostLoader(true);
+    }
     dispatch(userListRequest(payload));
   }, [filter, page, normalizedStatus]);
+
+  useEffect(() => {
+    if (pendingUserList.current !== userListData) {
+      pendingUserList.current = null;
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [userListData]);
+
+  useEffect(() => {
+    if (hasObservedLoading.current && (success || failure)) {
+      hasObservedLoading.current = false;
+      setShowGhostLoader(false);
+    }
+  }, [success, failure]);
 
   useEffect(() => {
     if (success) {
@@ -222,8 +211,8 @@ export function UserManagement() {
           setNoData(true);
         }
       }
-      if (failure === 'E-20005'){
-        setTableMessage(getErrorMessage('E-20011'))
+      if (failure === 'E-20005') {
+        setTableMessage(getErrorMessage('E-20011'));
       }
     }
     return () => {
@@ -232,12 +221,11 @@ export function UserManagement() {
   }, [success, failure, hasActiveFilters]);
 
   useEffect(() => {
-    if (usersData.length > 0){
+    if (usersData.length > 0) {
       setNoData(false);
       setTableMessage('');
     }
-  }, [usersData])
-
+  }, [usersData]);
 
   if (noData) {
     return (
@@ -246,7 +234,6 @@ export function UserManagement() {
         <Text variant="h4" className="text-text-secondary! font-InterMedium!">
           No users have been added yet.
         </Text>
-
       </div>
     );
   }
@@ -303,6 +290,9 @@ export function UserManagement() {
         errorMessage={tableMessage}
         onPageChange={setPage}
         stickyHeader
+        loading={showGhostLoader}
+        ghostRowCount={6}
+        tableHeightWhenScrollable={700}
       />
     </div>
   );

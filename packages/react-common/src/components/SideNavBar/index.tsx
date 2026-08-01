@@ -116,7 +116,7 @@ export function SideNavBar<T extends string = string>({
       {!alwaysShrink && (
         <button
           onClick={() => setExpanded((prev) => !prev)}
-          className="absolute top-16 right-0 translate-x-1/2 z-50 border border-bg-card bg-white cursor-pointer shadow p-1.5 rounded-xs"
+          className="absolute top-16 right-0 translate-x-1/2 z-[1000] border border-bg-card bg-white cursor-pointer shadow p-1.5 rounded-xs"
         >
           <Icon name={isExpanded ? "collapse-right" : "collapse-left"} />
         </button>

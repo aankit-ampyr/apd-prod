@@ -3,16 +3,19 @@ import {DashboardRouteHeaderTitles, getNormalizedRoute, Routes} from '@/navigati
 import {useLocation, useNavigate} from 'react-router-dom';
 import {Text, Avatar, Icon} from '@/ui-kits';
 import {useSelector, useDispatch} from 'react-redux';
-import {authDataSelector} from '@/services/redux/selectors';
-import {resetAuth} from '@/services/redux/slice/authSlice';
+import {authDataSelector, authSuccess} from '@/services/redux/selectors';
+import {logoutRequest, resetAuthMessage} from '@/services/redux/slice/authSlice';
+import {getSuccessMessage, SuccessCodes} from '@/utils';
+import {useToast} from '@/hooks';
 
 export const Header = () => {
   const {pathname} = useLocation();
-  const navigate = useNavigate();
+  const {showToast} = useToast();
   const dispatch = useDispatch();
   const userData = useSelector(authDataSelector);
   const [showDropdown, setShowDropdown] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const success = useSelector(authSuccess) as SuccessCodes;
 
   const dashboardHeaderTitle = useMemo(() => {
     const normalizedRoute = getNormalizedRoute(pathname);
@@ -30,9 +33,18 @@ export const Header = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    if (['S-10092'].includes(success)) {
+      return;
+    }
+
+    return () => {
+      dispatch(resetAuthMessage());
+    };
+  }, [success]);
+
   const handleLogout = () => {
-    dispatch(resetAuth());
-    navigate(Routes.LOGIN);
+    dispatch(logoutRequest());
   };
 
   return (

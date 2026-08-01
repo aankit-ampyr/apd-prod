@@ -22,6 +22,7 @@ interface AnalyticsTableProps {
   titleContainerClassName?:string;
   tableHeightWhenScrollable?: number;
   noDataMessage?: string | React.ReactNode;
+  rowClassName?: string | ((props: {row: any; index: number; isHovered: boolean}) => string | undefined);
 }
 
 export const AnalyticsTable: React.FC<AnalyticsTableProps> = (props) => {
@@ -42,6 +43,7 @@ export const AnalyticsTable: React.FC<AnalyticsTableProps> = (props) => {
     rowHover,
     tableHeightWhenScrollable = 600,
     noDataMessage,
+    rowClassName,
   } = props;
 
   const getAlignClass = (align: DataTableColumn<any>["align"]) => {
@@ -84,6 +86,35 @@ export const AnalyticsTable: React.FC<AnalyticsTableProps> = (props) => {
   }, [data.length]);
 
   const [hoveredRowIndex, setHoveredRowIndex] = useState<number | null>(null);
+
+  const getRowClassName = (row: any, index: number) => {
+    if (typeof rowClassName === "function") {
+      return rowClassName({
+        row,
+        index,
+        isHovered: hoveredRowIndex === index,
+      });
+    }
+
+    return rowClassName;
+  };
+
+  const getCellClassName = (
+    col: DataTableColumn<any>,
+    row: any,
+    index: number,
+  ) => {
+    if (typeof col.cellClassName === "function") {
+      return col.cellClassName({
+        row,
+        index,
+        width: col.width,
+        isHovered: hoveredRowIndex === index,
+      });
+    }
+
+    return col.cellClassName;
+  };
 
   return (
     <div className={cn("w-full ", className)}>
@@ -173,6 +204,7 @@ export const AnalyticsTable: React.FC<AnalyticsTableProps> = (props) => {
                   className={cn(
                       "border-b border-border  last:border-b-0",
                       rowHover && "hover:bg-slate-50",
+                      getRowClassName(row, rowIndex),
                     )}
                   >
                     {columns.map((col, colIndex) => (
@@ -180,7 +212,7 @@ export const AnalyticsTable: React.FC<AnalyticsTableProps> = (props) => {
                         key={`${rowIndex}-${colIndex}`}
                         className={cn(
                           `px-5 py-3 text-small text-secondary font-InterRegular whitespace-nowrap ${getAlignClass(col.align)} ${getRowAlignClass(rowAlign as any)}`,
-                          col.cellClassName,
+                          getCellClassName(col, row, rowIndex),
                         )}
                         style={getColumnWidthStyles(col.width)}
                       >

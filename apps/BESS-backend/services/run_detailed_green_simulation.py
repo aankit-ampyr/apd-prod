@@ -1,14 +1,13 @@
 import io
 import csv
-import pandas as pd
-import numpy as np
-import calendar
+import json
 from fastapi import status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncResult, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from constants.enums import (
+    PSPAuditLogModules,
     SimulationJobStatus,
     SimulationSetupProgress,
     SimulationStatus,
@@ -18,18 +17,19 @@ from constants.enums import (
 from dtos.simulation_dto import (
     BaseSimulationProgress,
     GreenResult,
-    MonthlySimulationMetrics,
 )
 from models.simulation_model import (
     DetailGreenSimulationJob,
     DetailedGreenSimulationResult,
     GreenSimulationHourlyResult,
+    GreenSimulationMonthlyResult,
+    GreenSizingSimulationJob,
     Simulation,
 )
 from simulation_engine import detailed_green_simulation
+from redis.asyncio import Redis
 from utils.log_utils import audit_logs
 from utils.response_utils import Res
-from python_common.utils.common_utils import paginate  # type: ignore
 
 
 class RunDetailedGreenSimulationService:
@@ -127,114 +127,8 @@ class RunDetailedGreenSimulationService:
             output.seek(0)
             output.truncate(0)
 
-    async def __aggregate_monthly_data(
-        self, result: AsyncResult
-    ) -> tuple[list[MonthlySimulationMetrics], int]:
-        """
-        Consumes an async SQLAlchemy stream, loads it into a Pandas DataFrame,
-        calculates monthly KPIs, and returns a list of MonthlySimulationMetrics models.
-        """
-
-        data = []
-        year: int = 1990
-
-        async for row in result.scalars():
-            data.append(
-                {
-                    "timestamp": row.timestamp,
-                    "is_dg_running": row.is_dg_running,
-                    "solar_to_load": row.solar_to_load,
-                    "bess_to_load": row.bess_to_load,
-                    "dg_to_load": row.dg_to_load,
-                    "load_mw": row.load_mw,
-                    "solar_curtailed": row.solar_curtailed,
-                    "solar_mw": row.solar_mw,
-                    "delivery": row.delivery,
-                }
-            )
-
-        # Load into DataFrame
-        df = pd.DataFrame(data)
-
-        # Handle empty results gracefully
-        if df.empty:
-            return [], year
-
-        df["timestamp"] = pd.to_datetime(df["timestamp"])
-        df["month_int"] = df["timestamp"].dt.month
-        year = int(df["timestamp"].dt.year.iloc[0])
-
-        # Booleans for fast counting
-        df["load_active"] = (df["load_mw"] > 0).astype(int)
-        df["delivery_int"] = df["delivery"].astype(int)
-        df["dg_running_int"] = df["is_dg_running"].astype(int)
-        df["delivery_dg_off"] = (df["delivery"] & ~df["is_dg_running"]).astype(int)
-
-        # MWh condition: solar + bess to load ONLY when DG is off
-        df["green_energy_mwh"] = np.where(
-            ~df["is_dg_running"], df["solar_to_load"] + df["bess_to_load"], 0.0
-        )
-
-        grouped = (
-            df.groupby("month_int")
-            .agg(
-                hours_fully_served=("delivery_int", "sum"),
-                total_load_hours=("load_active", "sum"),
-                green_delivery_hours=("delivery_dg_off", "sum"),
-                generator_hours=("dg_running_int", "sum"),
-                sum_solar_mw=("solar_mw", "sum"),
-                green_energy_to_load_mwh=("green_energy_mwh", "sum"),
-                dg_to_load_mwh=("dg_to_load", "sum"),
-                curtailed_mwh=("solar_curtailed", "sum"),
-            )
-            .reset_index()
-        )
-
-        # 4. Perform final percentage calculations (with safe division to prevent divide-by-zero errors)
-        grouped["load_met_pct"] = np.where(
-            grouped["total_load_hours"] > 0,
-            (grouped["hours_fully_served"] / grouped["total_load_hours"]) * 100,
-            0.0,
-        )
-
-        grouped["green_energy_pct"] = np.where(
-            grouped["hours_fully_served"] > 0,
-            (grouped["green_delivery_hours"] / grouped["hours_fully_served"]) * 100,
-            0.0,
-        )
-
-        grouped["wastage_energy_pct"] = np.where(
-            grouped["sum_solar_mw"] > 0,
-            (grouped["curtailed_mwh"] / grouped["sum_solar_mw"]) * 100,
-            0.0,
-        )
-
-        grouped["month"] = grouped["month_int"].apply(lambda x: calendar.month_name[x])
-
-        metrics_list = []
-
-        for row in grouped.itertuples(index=False):
-            metric = MonthlySimulationMetrics(
-                month=row.month,  # type: ignore
-                load_met_pct=row.load_met_pct,  # type: ignore
-                green_energy_pct=row.green_energy_pct,  # type: ignore
-                wastage_energy_pct=row.wastage_energy_pct,  # type: ignore
-                hours_fully_served=int(row.hours_fully_served),  # type: ignore
-                total_load_hours=int(row.total_load_hours),  # type: ignore
-                generator_hours=int(row.generator_hours),  # type: ignore
-                green_energy_to_load_mwh=row.green_energy_to_load_mwh,  # type: ignore
-                dg_to_load_mwh=row.dg_to_load_mwh,  # type: ignore
-                curtailed_mwh=row.curtailed_mwh,  # type: ignore
-                month_int=row.month_int,  # type: ignore
-            )
-            metrics_list.append(metric)
-
-        return metrics_list, year
-
     async def _generate_monthly_result_csv(
-        self,
-        simulation_job_id: int,
-        bess_db: AsyncSession,
+        self, simulation_job_id: int, bess_db: AsyncSession, yield_per: int = 100
     ):
         output = io.StringIO()
         writer = csv.writer(output)
@@ -253,31 +147,35 @@ class RunDetailedGreenSimulationService:
         ]
         writer.writerow(headers)
 
-        stmt = select(GreenSimulationHourlyResult).where(
-            GreenSimulationHourlyResult.job_id == simulation_job_id,
-        )
+        stmt = select(
+            GreenSimulationMonthlyResult.month,
+            GreenSimulationMonthlyResult.load_met_pct,
+            GreenSimulationMonthlyResult.green_energy_pct,
+            GreenSimulationMonthlyResult.wastage_energy_pct,
+            GreenSimulationMonthlyResult.hours_fully_served,
+            GreenSimulationMonthlyResult.total_load_hours,
+            GreenSimulationMonthlyResult.generator_hours,
+            GreenSimulationMonthlyResult.green_energy_to_load_mwh,
+            GreenSimulationMonthlyResult.dg_to_load_mwh,
+            GreenSimulationMonthlyResult.curtailed_mwh,
+        ).where(GreenSimulationMonthlyResult.job_id == simulation_job_id)
 
-        # Stream results to keep aggregation memory-efficient
-        hourly_result = await bess_db.stream(stmt)
-        hourly_data, _ = await self.__aggregate_monthly_data(result=hourly_result)
-
-        for metric in hourly_data:
-            writer.writerow(
-                [
-                    metric.month,
-                    metric.load_met_pct,
-                    metric.green_energy_pct,
-                    metric.wastage_energy_pct,
-                    metric.hours_fully_served,
-                    metric.total_load_hours,
-                    metric.generator_hours,
-                    metric.green_energy_to_load_mwh,
-                    metric.dg_to_load_mwh,
-                    metric.curtailed_mwh,
-                ]
-            )
+        stmt = stmt.execution_options(yield_per=yield_per)
+        result = await bess_db.stream(stmt)
 
         yield output.getvalue()
+        output.seek(0)
+        output.truncate(0)
+
+        async for db_batch in result.partitions():
+            for row in db_batch:
+                writer.writerow(row)
+
+            # Yield the chunk of CSV text to FastAPI
+            yield output.getvalue()
+
+            output.seek(0)
+            output.truncate(0)
 
     async def run_simulation(
         self,
@@ -285,6 +183,7 @@ class RunDetailedGreenSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(Simulation).where(Simulation.id == simulation_id).with_for_update()
@@ -300,19 +199,37 @@ class RunDetailedGreenSimulationService:
 
         if simulation.step < SimulationSetupProgress.GREEN_ENERGY_DETAILED_CONFIG:
             return Res.error(
-                status_code="E-20062", message="Incomplete Simulation configuration."
+                status_code="E-20062",
+                message="Incomplete Simulation configuration.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
+            )
+
+        green_sim_job_result = await bess_db.execute(
+            select(GreenSizingSimulationJob).where(
+                GreenSizingSimulationJob.simulation_id == simulation.id,
+            )
+        )
+
+        sizing_sim_job = green_sim_job_result.scalar_one_or_none()
+        if not sizing_sim_job or sizing_sim_job.status != SimulationJobStatus.COMPLETED:
+            return Res.error(
+                status_code="E-20059",
+                message="Green Sizing simulation not completed.",
+                http_status_code=status.HTTP_400_BAD_REQUEST,
             )
 
         sim_job_result = await bess_db.execute(
-            select(DetailGreenSimulationJob).where(
+            select(DetailGreenSimulationJob)
+            .where(
                 DetailGreenSimulationJob.simulation_id == simulation.id,
             )
+            .with_for_update()
         )
 
         detailed_sim_job = sim_job_result.scalar_one_or_none()
 
         before_config = None
-        log_action = PSPAuditLogScenario.CUSTOM_CONF_SIMULATION_RUN.value
+        log_action = PSPAuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RUN.value
 
         if detailed_sim_job:
             if detailed_sim_job.status == SimulationJobStatus.COMPLETED:
@@ -331,7 +248,9 @@ class RunDetailedGreenSimulationService:
                     http_status_code=status.HTTP_400_BAD_REQUEST,
                 )
 
-            log_action = PSPAuditLogScenario.CUSTOM_CONF_SIMULATION_RERUN.value
+            log_action = (
+                PSPAuditLogScenario.DETAILED_GREEN_ENERGY_SIMULATION_RERUN.value
+            )
             before_config = f"Simulation Status : {SimulationJobStatus(detailed_sim_job.status).name}"
 
             await bess_db.delete(detailed_sim_job)
@@ -343,22 +262,35 @@ class RunDetailedGreenSimulationService:
         bess_db.add(new_simulation_job)
         simulation.status = SimulationStatus.IN_PROGRESS
 
-        # await audit_logs(
-        #     db=bess_db,
-        #     user_id=f"USER-{current_user.get('id')}",
-        #     user_role=current_user.get("role"),  # type: ignore
-        #     module=PSPAuditLogModules.SIMULATION.value,
-        #     action=log_action,
-        #     resource_id=resource_id,
-        #     before=before_config,
-        #     after=f"Simulation Status: {SimulationJobStatus.IN_PROGRESS.name}",
-        # )
+        await bess_db.flush()
 
-        await bess_db.commit()
-        await bess_db.refresh(new_simulation_job)
+        try:
+            await detailed_green_simulation.kiq(
+                simulation.id,
+                job_id=new_simulation_job.job_id,
+                run_by=current_user.get("name"),  # type: ignore
+            )
+            await bess_db.commit()
 
-        await detailed_green_simulation.kiq(
-            simulation.id, job_id=new_simulation_job.job_id
+        except Exception:
+            await bess_db.rollback()
+
+            return Res.error(
+                status_code="E-20065",
+                message="Unable to run simulation.",
+                http_status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=log_action,
+            resource_id=resource_id,
+            before=before_config,
+            after="Simulation Status: STARTED",
+            redis=redis,
         )
 
         return Res.success(
@@ -440,6 +372,7 @@ class RunDetailedGreenSimulationService:
         bess_db: AsyncSession,
         current_user: dict,
         resource_id: str,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(DetailGreenSimulationJob).where(
@@ -457,16 +390,24 @@ class RunDetailedGreenSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # await audit_logs(
-        #     db=bess_db,
-        #     user_id=f"USER-{current_user.get('id')}",
-        #     user_role=current_user.get("role"),  # type: ignore
-        #     module=PSPAuditLogModules.SIMULATION.value,
-        #     action=PSPAuditLogScenario.CUSTOM_CONF_HOURLY_EXPORTED.value,
-        #     resource_id=resource_id,
-        #     before=None,
-        #     after="Action: Custom Configuration Hourly Performance Exported",
-        # )
+        after = {
+            "DETAILED GREEN ANALYSIS...": {
+                "Export Type": "Hourly Simulation Data",
+                "File": f"SIM-{simulation_id}_Hourly_Performance_Report.csv",
+            }
+        }
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.DETAILED_GREEN_ENERGY_HOURLY_EXPORTED.value,
+            resource_id=resource_id,
+            before=None,
+            after=str(json.dumps(after)),
+            redis=redis,
+        )
 
         await bess_db.commit()
 
@@ -477,7 +418,7 @@ class RunDetailedGreenSimulationService:
             ),
             media_type="text/csv",
             headers={
-                "Content-Disposition": f'attachment; filename="bess_hourly_{simulation_id}.csv"'
+                "Content-Disposition": f'attachment; filename="SIM-{simulation_id}_Hourly_Performance_Report.csv"'
             },
         )
 
@@ -487,6 +428,7 @@ class RunDetailedGreenSimulationService:
         current_user: dict,
         resource_id: str,
         bess_db: AsyncSession,
+        redis: Redis,
     ):
         result = await bess_db.execute(
             select(DetailGreenSimulationJob).where(
@@ -503,16 +445,24 @@ class RunDetailedGreenSimulationService:
                 http_status_code=status.HTTP_404_NOT_FOUND,
             )
 
-        # await audit_logs(
-        #     db=bess_db,
-        #     user_id=f"USER-{current_user.get('id')}",
-        #     user_role=current_user.get("role"),  # type: ignore
-        #     module=PSPAuditLogModules.SIMULATION.value,
-        #     action=PSPAuditLogScenario.CUSTOM_CONF_MONTHLY_EXPORTED.value,
-        #     resource_id=resource_id,
-        #     before=None,
-        #     after="Action: Custom Configuration Monthly Performance Exported",
-        # )
+        after = {
+            "DETAILED GREEN ANALYSIS...": {
+                "Export Type": "Monthly Performance Report",
+                "File": f"SIM-{simulation_id}_Monthly_Performance_Report.csv",
+            }
+        }
+
+        await audit_logs(
+            db=bess_db,
+            user_id=f"USER-{current_user.get('id')}",
+            user_role=current_user.get("role"),  # type: ignore
+            module=PSPAuditLogModules.SIMULATION.value,
+            action=PSPAuditLogScenario.DETAILED_GREEN_ENERGY_MONTHLY_EXPORTED.value,
+            resource_id=resource_id,
+            before=None,
+            after=str(json.dumps(after)),
+            redis=redis,
+        )
 
         await bess_db.commit()
 
@@ -523,6 +473,6 @@ class RunDetailedGreenSimulationService:
             ),
             media_type="text/csv",
             headers={
-                "Content-Disposition": f'attachment; filename="bess_monthly_{simulation_id}.csv"'
+                "Content-Disposition": f'attachment; filename="SIM-{simulation_id}_Monthly_Performance_Report.csv"'
             },
         )
