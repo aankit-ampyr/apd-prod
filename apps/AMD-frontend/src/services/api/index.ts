@@ -702,10 +702,10 @@ export async function getAssetBenchmarkMultiMarketOptimizedVsActual(
 export async function getAssetBenchmarkMultiMarketOptimizedVsActualExport(
   params: AssetBenchmarkMultiMarketOptimizedVsActualExportRequest['params'],
 ) {
-  const {assetId, ...rest} = params;
+  const {assetId, fileName, ...rest} = params;
   return await fetchAndDownloadBlob({
     url: API.authUrls.asset_benchmark_multi_market_optimized_vs_actual_export(assetId),
-    filename: rest.fileName || `file_${assetId}.csv`,
+    filename: fileName || `file_${assetId}.csv`,
     params: rest,
   });
 }

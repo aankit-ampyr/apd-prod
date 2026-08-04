@@ -4,7 +4,12 @@ import {enumToSelectOptions} from '@/utils';
 import {useEffect, useRef, useState} from 'react';
 import {BatteryInputs} from './BatteryInputs';
 import {useDispatch, useSelector} from 'react-redux';
-import {bessContainerConfigRequest, getBessConfigRequest, getProjectSimulationSilentRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {
+  bessContainerConfigRequest,
+  editedStepSimulationDataRequest,
+  getBessConfigRequest,
+  getProjectSimulationSilentRequest,
+} from '@/services/redux/slice/simulationWizardSlice';
 import {RootState} from '@/services/redux/rootReducer';
 import {bessConfigSuccess, bessContainerConfigData, initiateSimulationData, projectSimulationData} from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData} from '@/services/redux/selectors';
@@ -91,6 +96,7 @@ export const Bess = ({onSaveComplete, readOnly}: Props) => {
     if (simulation_id) {
       dispatch(getBessConfigRequest({simulation_id}));
       dispatch(getProjectSimulationSilentRequest({simulation_id: simulation_id}));
+      dispatch(editedStepSimulationDataRequest({simulation_id: simulation_id}));
     }
   }, [simulation_id]);
 

@@ -22,7 +22,7 @@ interface MultiMarketComparisonTableProps {
   downloadFileName?: string;
   isFullScreenOverride?: boolean;
   actionWrapperClassName?: string;
-  onDownload: () => void;
+  onDownload?: (months?: number[]) => void;
 
   // states
   selectedMonths?: SelectInputItem['id'][] | null;
@@ -111,6 +111,15 @@ export function MultiMarketComparisonTable(props: MultiMarketComparisonTableProp
     return order;
   }, [filteredEntries]);
 
+  function handleDownload() {
+    if (!onDownload) return;
+    const months = selectedMonths?.map(montKey => {
+      const monthStr = String(montKey).split('-')[1];
+      return Number(monthStr);
+    });
+    onDownload(months);
+  }
+
   const hasData = filteredEntries.length > 0;
   const selectedMonthCount = selectedMonths?.length ?? 0;
   const isCompactSelection = filteredEntries.length > 0 && filteredEntries.length <= 4;
@@ -130,7 +139,7 @@ export function MultiMarketComparisonTable(props: MultiMarketComparisonTableProp
               size={20}
               className="cursor-pointer hover:bg-primary-tint-2! charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-              onClick={onDownload}
+              onClick={handleDownload}
             />
             {!isFullScreenOverride ? (
               <IconButton

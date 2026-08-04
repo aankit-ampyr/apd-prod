@@ -128,7 +128,6 @@ export const dispatchRuleDataLoading = (state: RootState) => state.simulationWiz
 export const dispatchRuleDataSuccess = (state: RootState) => state.simulationWizard.dispatchRuleSuccess;
 
 export const dispatchRuleDataFailure = (state: RootState) => state.simulationWizard.dispatchRuleError;
-
 export const dgSizingDataSuccess = (state: RootState) => state.simulationWizard.dgSizingSuccess;
 
 export const dgSizingDataFailure = (state: RootState) => state.simulationWizard.dgSizingError;
@@ -197,7 +196,7 @@ export const multiYearProjectionComputeData = (state: RootState) => state.simula
 export const multiYearProjectionResultLoading = (state: RootState) => state.simulationWizard.multiYearProjectionResultLoading;
 export const multiYearSaveError = (state: RootState) => state.simulationWizard.multiYearProjectionError;
 export const multiYearRunError = (state: RootState) => state.simulationWizard.runMultiYearProjectionError;
-
+export const multiYearResultsError = (state: RootState) => state.simulationWizard.multiYearProjectionResultsError;
 export const multiYearProjectionResultData = (state: RootState) => state.simulationWizard.multiYearProjectionResultData;
 export const multiYearProjectionProgressLoading = (state: RootState) => state.simulationWizard.multiYearProjectionProgressLoading;
 export const customRunSuccess = (state: RootState) => state.simulationWizard.runCustomSimulationSuccess;
@@ -224,3 +223,13 @@ export const detailedResultSuccess = (state: RootState) => state.simulationWizar
 export const detailedResultLoading = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultLoading;
 export const editedStepData = (state: RootState) => state.simulationWizard.editedStepSimulationData;
 export const detailedLoading = (state: RootState) => state.simulationWizard.detailedGreenAnalysisDataLoading;
+export const editedStepFailure = (state: RootState) => state.simulationWizard.editedStepSimulationError;
+export const bessConfigFailure = (state: RootState) => state.simulationWizard.bessContainerConfigError;
+export const runDGSizingFailure = (state: RootState) => state.simulationWizard.runSimulationError;
+export const customMonthlyFailure = (state: RootState) => state.simulationWizard.monthlySimulationResultsError;
+export const customHourlyFailure = (state: RootState) => state.simulationWizard.hourlyChartError;
+export const customHourlySimulationFailure = (state: RootState) => state.simulationWizard.hourlySimulationResultsError;
+export const greenAnalysisFailure = (state: RootState) => state.simulationWizard.greenAnalysisError;
+export const greenAnalysisRunFailure = (state: RootState) => state.simulationWizard.runGreenAnalysisError;
+export const greenAnalysisResultsFailure = (state: RootState) => state.simulationWizard.greenAnalysisResultsError;
+export const detailedGreenResultsFailure = (state: RootState) => state.simulationWizard.detailedGreenAnalysisResultError;

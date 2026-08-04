@@ -131,7 +131,6 @@ export function AppLayout() {
       try {
         const decodedString = atob(deepLinkRef.current);
         const decodedMeta = JSON.parse(decodedString);
-        
         dispatch(setPendingDeepLink(decodedMeta));
 
         if (window.location.search.includes('deepLink=')) {

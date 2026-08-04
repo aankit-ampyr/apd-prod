@@ -16,7 +16,7 @@ class BenchmarkResponse(BaseModel):
 
 
 class BenchmarkUpdatePayload(BaseModel):
-    id: int
+    metric_id: int
     industry_low: Optional[float] = None
     industry_mid: Optional[float] = None
     industry_high: Optional[float] = None

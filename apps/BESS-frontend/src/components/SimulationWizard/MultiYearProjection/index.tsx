@@ -145,6 +145,7 @@ export const MultiYearProjection = ({setIsStepsHidden, goToStep}: MultiYearProje
   const [annualDegradation, setAnnualDegradation] = useState(2.5);
   const [sizingStrategy, setSizingStrategy] = useState<SizingStrategy>('year1');
   const [isSaved, setIsSaved] = useState(false);
+
   const [activeYearRange, setActiveYearRange] = useState<YearRange>(20);
   const [sortFields, setSortFields] = useState<SortField[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -274,14 +275,13 @@ export const MultiYearProjection = ({setIsStepsHidden, goToStep}: MultiYearProje
     setFactoryDegradation(getNearestScaleMark(Number(projectionData.factory_degradation ?? 8), FACTORY_DEGRADATION_SCALE_MARKS));
     setAnnualDegradation(Number(projectionData.annual_degradation ?? 3));
     setSizingStrategy(mapEnumToSizingStrategy(projectionData.sizing_strategy));
-    // setIsSaved(projectionProgressData?.status === 2);
   }, [projectionData || projectionProgressData?.status, stepData?.last_edited]);
 
   useEffect(() => {
-    if (stepData?.last_edited === 10) {
+    if (stepData?.last_edited === 10 && projectionData) {
       setIsSaved(true);
     }
-  }, [stepData?.last_edited]);
+  }, [stepData?.last_edited, projectionData]);
 
   useEffect(() => {
     if (!simulation_id) return;
@@ -778,7 +778,6 @@ export const MultiYearProjection = ({setIsStepsHidden, goToStep}: MultiYearProje
               onClick={() => {
                 if (!simulation_id) return;
                 dispatch(multiYearProjectionRequest(projectionPayload));
-                // setIsSaved(true);
               }}
               disabled={!simulation_id || isSaved}>
               Save

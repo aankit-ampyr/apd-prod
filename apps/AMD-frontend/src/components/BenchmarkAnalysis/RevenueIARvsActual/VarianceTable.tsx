@@ -25,7 +25,7 @@ interface VarianceTableProps {
 
   className?: string;
   downloadFileName?: string;
-  onDownload?: () => void;
+  onDownload?: (months?: number[]) => void;
   actionWrapperClassName?: string;
 
   // states
@@ -94,6 +94,15 @@ export function VarianceTable(props: VarianceTableProps) {
     [monthlyEntries],
   );
 
+  function handleDownload() {
+    if (!onDownload) return;
+    const months = selectedMonths?.map(montKey => {
+      const monthStr = String(montKey).split('-')[1];
+      return Number(monthStr);
+    });
+    onDownload(months);
+  }
+
   /**
    * The filter is happening locally only since all the month data is comming for the asset
    */
@@ -133,7 +142,7 @@ export function VarianceTable(props: VarianceTableProps) {
               size={20}
               className="cursor-pointer hover:bg-primary-tint-2! charts-action"
               iconClassName="group-hover:text-primary-tint-1! text-primary-tint-1!"
-              onClick={onDownload}
+              onClick={handleDownload}
             />
             {!isFullScreenOverride ? (
               <IconButton

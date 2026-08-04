@@ -1207,6 +1207,7 @@ function SimulationConfigurationSummary() {
     () => {
       const dg = proSimulData?.config?.dg;
       const isTakeoverFullLoad = proSimulData?.config?.dispatch?.is_dg_takeover_full_load;
+      const isBinary = dg?.is_binary;
 
       // If DG is not included
       if (!dg?.is_included) {
@@ -1257,10 +1258,14 @@ function SimulationConfigurationSummary() {
           label: 'Takeover Mode',
           value: proSimulData?.config?.dispatch?.is_dg_takeover_full_load ? 'Yes - DG serves full load' : 'No - DG fills gap',
         },
-        {
-          label: 'DG Output Mode',
-          value: proSimulData?.config?.dispatch?.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
-        },
+        ...(!isBinary
+          ? [
+              {
+                label: 'DG Output Mode',
+                value: proSimulData?.config?.dispatch?.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
+              },
+            ]
+          : []),
       ];
     },
   );

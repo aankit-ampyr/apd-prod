@@ -70,7 +70,7 @@ import {
   simulationResultLoading,
   simulationResultsData,
 } from '@/services/redux/selectors/simulationWizardSelector';
-import {simulationResultsRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {editedStepSimulationDataRequest, simulationResultsRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {getSimulationResultsExport} from '@/services/api';
 import {getErrorMessage} from '@/utils';
 import type {ErrorCodes} from '@/utils';
@@ -687,6 +687,12 @@ export const SimulationResults = (props: SimulationResultsProps) => {
   }, [simulation_id]);
 
   useEffect(() => {
+    if (simulation_id) {
+      dispatch(editedStepSimulationDataRequest({simulation_id}));
+    }
+  }, [simulation_id]);
+
+  useEffect(() => {
     if (!Array.isArray(simulResData?.results)) return;
 
     const dgValues = simulResData.results.map((item: ApiSimulationResult) => Number(item.dg_mw)).filter((value: any) => !Number.isNaN(value));
@@ -990,6 +996,7 @@ function SimulationConfigurationSummary() {
    * =======================================
    */
   const proSimulData = useSelector(projectSimulationData);
+  console.log('proSimulData: ', proSimulData);
 
   /**
    * =======================================
@@ -1151,6 +1158,7 @@ function SimulationConfigurationSummary() {
     () => {
       const dg = proSimulData?.config?.dg;
       const isTakeoverFullLoad = proSimulData?.config?.dispatch?.is_dg_takeover_full_load;
+      const isBinary = dg?.is_binary;
 
       // If DG is not included
       if (!dg?.is_included) {
@@ -1201,10 +1209,14 @@ function SimulationConfigurationSummary() {
           label: 'Takeover Mode',
           value: proSimulData?.config?.dispatch?.is_dg_takeover_full_load ? 'Yes - DG serves full load' : 'No - DG fills gap',
         },
-        {
-          label: 'DG Output Mode',
-          value: proSimulData?.config?.dispatch?.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
-        },
+        ...(!isBinary
+          ? [
+              {
+                label: 'DG Output Mode',
+                value: proSimulData?.config?.dispatch?.is_cycle_charging_enabled ? 'Yes — DG at min load %' : 'No — DG follows load',
+              },
+            ]
+          : []),
       ];
     },
   );

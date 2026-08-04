@@ -58,11 +58,12 @@ export const useNotificationListener = () => {
 
         const meta = {
           context_type: event.data.context_type,
-          context_module: event.data.module,
-          context_tab: event.data.tab,
-          context_widget: null,
-          context_year: event.data.year,
-          context_month: event.data.month,
+          context_module: event.data.context_module,
+          context_tab: event.data.context_tab,
+          context_widget: event.data.context_widget ?? null,
+          context_data_point: event.data.context_data_point ?? null,
+          context_year: event.data.context_year,
+          context_month: event.data.context_month,
           asset_id: event.data.asset_id,
           comment_id: event.data.comment_id,
         };

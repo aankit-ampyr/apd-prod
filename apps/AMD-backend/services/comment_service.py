@@ -6,7 +6,7 @@ import json
 import base64
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict, Any
-from sqlalchemy import select, or_, and_, func, cast, String,not_
+from sqlalchemy import select, or_, and_, func, cast, String,not_, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.comment_model import Comment, Notification
@@ -345,6 +345,8 @@ class CommentService:
         comment_id: int,
         context_type: str,
         preview: Optional[str] = None,
+        context_widget: Optional[str] = None,
+        context_data_point: Optional[str] = None,
     ):
         """Send a push notification via websocket for comment-related activity"""
         try:
@@ -356,12 +358,14 @@ class CommentService:
                 "text": text,
                 "data": {
                     "asset_id": asset_id,
-                    "module": module,
-                    "tab": tab,
-                    "year": year,
-                    "month": month,
+                    "context_module": module,
+                    "context_tab": tab,
+                    "context_year": year,
+                    "context_month": month,
                     "comment_id": comment_id,
                     "context_type": context_type,
+                    "context_widget": context_widget,
+                    "context_data_point": context_data_point,
                 },
             }
             await websocket_manager.send_personal_message(message, user_id)
@@ -493,7 +497,7 @@ class CommentService:
                         title="Mentioned You",
                         message=base_msg,
                         meta={
-                            "comment_id": comment.comment_id,
+                            "comment_id": str(comment.id),
                             "asset_id": asset_id,
                             "context_type": payload.get("context_type"),
                             "context_module": payload.get("context_module"),
@@ -522,6 +526,8 @@ class CommentService:
                         month=payload.get("context_month"),
                         comment_id=comment.id,
                         context_type=context_type,
+                        context_widget=payload.get("context_widget"),
+                        context_data_point=payload.get("context_data_point"),
                         preview=self._get_content_preview(payload.get("content", [])),
                     )
             
@@ -688,7 +694,7 @@ class CommentService:
                 base_query=query,
                 page=page,
                 limit=limit,
-                order_by=[func.coalesce(Comment.updated_at, Comment.created_at).desc()],
+                order_by=[func.coalesce(Comment.updated_at, Comment.created_at).asc()],
                 scalar=True,
             )
 
@@ -1131,8 +1137,8 @@ class CommentService:
                     title="Replied to Your Comment",
                     message=base_msg_parent,
                     meta={
-                        "comment_id": reply.comment_id,
-                        "parent_comment_id": parent_comment.comment_id,
+                        "comment_id": str(reply.id),
+                        "parent_comment_id": str(parent_comment.id),
                         "asset_id": asset_id,
                         "context_type": parent_comment.context_type,
                         "context_module": parent_comment.context_module,
@@ -1159,8 +1165,10 @@ class CommentService:
                     tab=parent_comment.context_tab,
                     year=parent_comment.context_year,
                     month=parent_comment.context_month,
-                    comment_id=parent_comment.id,
+                    comment_id=reply.id,
                     context_type=parent_comment.context_type,
+                    context_widget=parent_comment.context_widget,
+                    context_data_point=parent_comment.context_data_point,
                     preview=self._get_content_preview(payload.get("content", [])),
                 )
 
@@ -1194,8 +1202,8 @@ class CommentService:
                         title="Mentioned You in Reply",
                         message=base_msg_tag,
                         meta={
-                            "comment_id": reply.comment_id,
-                            "parent_comment_id": parent_comment.comment_id,
+                            "comment_id": str(reply.id),
+                            "parent_comment_id": str(parent_comment.id),
                             "asset_id": asset_id,
                             "context_type": parent_comment.context_type,
                             "context_module": parent_comment.context_module,
@@ -1223,6 +1231,8 @@ class CommentService:
                         month=parent_comment.context_month,
                         comment_id=reply.id,
                         context_type=parent_comment.context_type,
+                        context_widget=parent_comment.context_widget,
+                        context_data_point=parent_comment.context_data_point,
                         preview=self._get_content_preview(payload.get("content", [])),
                     )
 
@@ -1323,7 +1333,11 @@ class CommentService:
             if user_id_int not in read_by:
                 new_read_by = list(read_by)
                 new_read_by.append(user_id_int)
-                comment.read_by = new_read_by
+                await db.execute(
+                    update(Comment)
+                    .where(Comment.id == comment_id)
+                    .values(read_by=new_read_by)
+                )
                 await db.commit()
 
             return Res.success(

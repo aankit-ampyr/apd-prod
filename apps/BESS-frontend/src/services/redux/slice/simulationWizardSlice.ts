@@ -2054,6 +2054,32 @@ const simulationWizardSlice = createSlice({
       state.customConfigError = false;
       state.runCustomSimulationError = false;
     },
+    clearAllSimulationErrors(state) {
+      state.projectSimulationError = false;
+      state.editedStepSimulationError = false;
+      state.loadProfileError = false;
+      state.saveSolarProfileError = false;
+      state.bessContainerConfigError = false;
+      state.generatorDgError = false;
+      state.dispatchRuleError = false;
+      state.dgSizingError = false;
+      state.runSimulationError = false;
+      state.simulationResultsError = false;
+      state.customConfigError = false;
+      state.runCustomSimulationError = false;
+      state.monthlySimulationResultsError = false;
+      state.hourlyChartError = false;
+      state.hourlySimulationResultsError = false;
+      state.multiYearProjectionError = false;
+      state.runMultiYearProjectionError = false;
+      state.multiYearProjectionResultsError = false;
+      state.greenAnalysisError = false;
+      state.runGreenAnalysisError = false;
+      state.greenAnalysisResultsError = false;
+      state.detailedGreenAnalysisError = false;
+      state.runDetailedGreenAnalysisError = false;
+      state.detailedGreenAnalysisResultError = false;
+    },
   },
 });
 
@@ -2350,6 +2376,7 @@ export const {
   simulationProgressSilentRequest,
   simulationProgressSilentSuccess,
   simulationProgressSilentFailure,
+  clearAllSimulationErrors,
 } = simulationWizardSlice.actions;
 
 export default simulationWizardSlice.reducer;

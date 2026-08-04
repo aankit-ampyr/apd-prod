@@ -28,6 +28,7 @@ import {
   resetUpdateSimulation,
   resetUpdateSimulationFailure,
   updateProjectSimulationRequest,
+  clearAllSimulationErrors,
 } from '@/services/redux/slice/simulationWizardSlice';
 import {DeleteSimulation, DiscardSimulation} from '@/components/SimulationWizard/DeleteSimulation';
 import {Badge, Button, Icon, Sort, Text, TextInput, Skeleton, SearchableSelectInput} from '@/ui-kits';
@@ -175,6 +176,10 @@ export const SimulationListing = () => {
       setShowGhostLoader(false);
     }
   }, [simulationListSuccessCode, simulationError]);
+
+  useEffect(() => {
+    dispatch(clearAllSimulationErrors());
+  }, []);
 
   useEffect(() => {
     if (values.project) {

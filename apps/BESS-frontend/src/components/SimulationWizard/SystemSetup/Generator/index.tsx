@@ -8,6 +8,7 @@ import {
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData} from '@/services/redux/selectors';
 import {
+  editedStepSimulationDataRequest,
   generatorDgFuelCurveRequest,
   generatorDgRequest,
   getGeneratorDgRequest,
@@ -151,6 +152,7 @@ export const Generator = ({onNextToDispatchRules, readOnly}: GeneratorProps) => 
     if (simulation_id) {
       dispatch(getGeneratorDgRequest({simulation_id}));
       dispatch(getProjectSimulationSilentRequest({simulation_id: simulation_id}));
+      dispatch(editedStepSimulationDataRequest({simulation_id: simulation_id}));
     }
   }, [simulation_id]);
 

@@ -931,7 +931,6 @@ class SimulationDetails(BaseModel):
                     "bess": {"containers": True},
                     "dg": {"created_at": True, "updated_at": True},
                     "dispatch": {
-                        "is_cycle_charging_enabled": True,
                         "created_at": True,
                         "updated_at": True,
                     },

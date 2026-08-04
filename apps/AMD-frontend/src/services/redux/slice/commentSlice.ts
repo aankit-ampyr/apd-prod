@@ -94,9 +94,6 @@ const commentSlice = createSlice({
     createCommentSuccess(state, action: PayloadAction<CreateCommentApiRequest['response']>) {
       state.isLoading = false;
       state.commentSuccess = action.payload.status_code;
-      if (action.payload.data) {
-        state.comments.unshift(action.payload.data); // prepend latest
-      }
     },
     createCommentFailure(state, action: PayloadAction<APIResponse>) {
       state.isLoading = false;

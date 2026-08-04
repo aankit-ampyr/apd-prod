@@ -1,10 +1,7 @@
 from typing import List, Any
 from .asset_analysis_helper import AnalysisServiceHelper
 from sqlalchemy.ext.asyncio import AsyncSession
-from models import (
-    Asset,
-    AssetFile
-)
+from models import Asset, AssetFile
 from sqlalchemy import select
 from utils import Res, audit_logs
 from redis.asyncio import Redis
@@ -18,8 +15,9 @@ from constants.enums import (
     AnalysisWidget,
     AnalysisSections,
     AnalysisModules,
-    AssetFileType
+    AssetFileType,
 )
+import calendar
 from exceptions import ExceptionWithErrorCode
 import pandas as pd
 from io import BytesIO
@@ -57,11 +55,19 @@ class AnalysisService:
     ):
         try:
             if not year:
-                return Res.error("E-10134", message="Year parameter is required", http_status_code=400)
+                return Res.error(
+                    "E-10134",
+                    message="Year parameter is required",
+                    http_status_code=400,
+                )
 
             asset = await db.get(Asset, asset_id)
             if not asset:
-                return Res.error("E-10034", message=f"Asset with ID {asset_id} not found.", http_status_code=404)
+                return Res.error(
+                    "E-10034",
+                    message=f"Asset with ID {asset_id} not found.",
+                    http_status_code=404,
+                )
 
             iar_file = await self.helper._get_iar_file_record(db=db, asset_id=asset_id)
 
@@ -145,11 +151,12 @@ class AnalysisService:
         self,
         db: AsyncSession,
         asset_id: int,
-        year: list[int] | None,
+        redis: Redis,
+        year: int,
         current_user: dict,
     ):
         analysis_res = await self.get_benchmark_analysis(
-            db, asset_id, year, current_user
+            db=db, redis=redis, asset_id=asset_id, year=year, current_user=current_user
         )
 
         res_body = json.loads(analysis_res.body.decode())
@@ -213,7 +220,14 @@ class AnalysisService:
         index=["asset_id", "month", "year"],
     )
     async def get_operations_summary(
-        self, db: AsyncSession, redis: Redis, asset_id: int, month: int, year: int, current_user: dict, **kwargs
+        self,
+        db: AsyncSession,
+        redis: Redis,
+        asset_id: int,
+        month: int,
+        year: int,
+        current_user: dict,
+        **kwargs,
     ):
         try:
             asset = await db.get(Asset, asset_id)
@@ -239,7 +253,7 @@ class AnalysisService:
                 resource_id=asset.asset_id,
             )
             await db.commit()
-            
+
             # if computed result already exits
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
@@ -248,8 +262,6 @@ class AnalysisService:
                     "S-10036",
                     data={"month": month, "year": year, **analytics_data},
                 )
-
-
 
             # ================ load dataframe ===================
             df = await self.helper.load_merged_file(
@@ -335,7 +347,11 @@ class AnalysisService:
         **kwargs,
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
-            return Res.error("E-10013", message="Unauthorized: AMD platform required", http_status_code=403)
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
 
         asset = await db.get(Asset, asset_id)
         if not asset:
@@ -395,7 +411,11 @@ class AnalysisService:
         **kwargs,
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
-            return Res.error("E-10013", message="Unauthorized: AMD platform required", http_status_code=403)
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
 
         asset = await db.get(Asset, asset_id)
         if not asset:
@@ -583,7 +603,11 @@ class AnalysisService:
 
             valid_strategies = ["epex_daily", "epex_efa", "multi", "actual"]
             if market_strategy not in valid_strategies:
-                return Res.error("E-10134", message="Invalid market strategy passed", http_status_code=400)
+                return Res.error(
+                    "E-10134",
+                    message="Invalid market strategy passed",
+                    http_status_code=400,
+                )
 
             actual_df = await self.helper.load_actual_strategy_df(
                 db=db, asset_id=asset_id, month=month, year=year
@@ -613,7 +637,11 @@ class AnalysisService:
 
         except Exception:
             traceback.print_exc()
-            return Res.error("E-10135", message="Aggregation/calculation failed", http_status_code=500)
+            return Res.error(
+                "E-10135",
+                message="Aggregation/calculation failed",
+                http_status_code=500,
+            )
 
     async def download_market_statistics_table(
         self,
@@ -708,7 +736,11 @@ class AnalysisService:
 
             valid_strategies = ["epex_daily", "epex_efa", "multi", "actual"]
             if market_strategy not in valid_strategies:
-                return Res.error("E-10134", message="Invalid market strategy passed", http_status_code=400)
+                return Res.error(
+                    "E-10134",
+                    message="Invalid market strategy passed",
+                    http_status_code=400,
+                )
 
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
@@ -816,7 +848,11 @@ class AnalysisService:
             summary_data = res_data.get("data", {}).get(key, [])
 
             if not summary_data:
-                return Res.error("E-10132", message=f"No {m_type} data available.", http_status_code=404)
+                return Res.error(
+                    "E-10132",
+                    message=f"No {m_type} data available.",
+                    http_status_code=404,
+                )
 
             export_df = pd.DataFrame(summary_data)
 
@@ -983,7 +1019,7 @@ class AnalysisService:
                 return Res.error(
                     "E-10121",
                     message="Hourly price pattern not supported for solar asset",
-                    http_status_code=422
+                    http_status_code=422,
                 )
 
             analytics_data = kwargs.get("analytics_data")
@@ -1095,43 +1131,55 @@ class AnalysisService:
         index=["asset_id", "year"],
     )
     async def get_revenue_iar_vs_actual(
-        self, db: AsyncSession, asset_id: int, year: int, current_user: dict, **kwargs
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        months: List[int] | None,
+        current_user: dict,
+        **kwargs,
     ):
+        def filter_data_by_months(data, months):
+            if months is None:
+                return data
+
+            filtered_data = {"monthly_data": {}}
+            data_to_filter = data.get("monthly_data", {})
+            filtered_data["monthly_data"] = self.helper._filter_yearly_data_by_months(
+                data_to_filter, months
+            )
+            return filtered_data
+
         try:
             # will throw error if no IAR file found for the asset, allowing the exception to be handled before cache data is returned
             iar_file = await self.helper._get_iar_file_record(db=db, asset_id=asset_id)
 
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
-            if analytics_data:
-                return Res.success(
-                    "S-10066",
-                    data={
-                        "asset_id": asset_id,
-                        "year": year,
-                        **analytics_data,
-                    },
+            if analytics_data is None:
+                merged_df = await self.helper.load_yearly_merged_df(
+                    asset_id=asset_id, year=year, db=db
                 )
 
-            merged_df = await self.helper.load_yearly_merged_df(
-                asset_id=asset_id, year=year, db=db
-            )
-
-            iar_df = await self.helper.load_iar_file_df(asset_id=asset_id, db=db, iar_file=iar_file)
-
-            settings_year_map = (
-                await self.helper.load_yearwise_monthly_hardcoded_metric_values(
-                    db=db, year=year
+                iar_df = await self.helper.load_iar_file_df(
+                    asset_id=asset_id, db=db, iar_file=iar_file
                 )
-            )
 
-            analytics_data = self.helper.get_revenue_iar_vs_actual(
-                merged_master_dataframes=merged_df,
-                iar_master_datagrame=iar_df,
-                settings_year_map=settings_year_map,
-                year=year,
-            )
-            compute_context["result"] = analytics_data
+                settings_year_map = (
+                    await self.helper.load_yearwise_monthly_hardcoded_metric_values(
+                        db=db, year=year
+                    )
+                )
+
+                analytics_data = self.helper.get_revenue_iar_vs_actual(
+                    merged_master_dataframes=merged_df,
+                    iar_master_datagrame=iar_df,
+                    settings_year_map=settings_year_map,
+                    year=year,
+                )
+                compute_context["result"] = analytics_data
+
+            analytics_data = filter_data_by_months(analytics_data, months)
 
             return Res.success(
                 "S-10066",
@@ -1151,10 +1199,19 @@ class AnalysisService:
             )
 
     async def export_revenue_iar_vs_actual(
-        self, db: AsyncSession, asset_id: int, year: int, current_user: dict
+        self,
+        db: AsyncSession,
+        asset_id: int,
+        year: int,
+        months: List[int] | None,
+        current_user: dict,
     ):
         result = await self.get_revenue_iar_vs_actual(
-            db=db, asset_id=asset_id, year=year, current_user=current_user
+            db=db,
+            asset_id=asset_id,
+            year=year,
+            months=months,
+            current_user=current_user,
         )
 
         res_body = (
@@ -1281,9 +1338,21 @@ class AnalysisService:
         db: AsyncSession,
         asset_id: int,
         year: int,
+        months: List[int] | None,
         current_user: dict,
         **kwargs,
     ):
+        def filter_data_by_months(data, months):
+            if months is None:
+                return data
+
+            filtered_data = {"monthly_data": {}}
+            data_to_filter = data.get("monthly_data", {})
+            filtered_data["monthly_data"] = self.helper._filter_yearly_data_by_months(
+                data_to_filter, months
+            )
+            return filtered_data
+
         try:
             asset = await db.get(Asset, asset_id)
             if not asset:
@@ -1293,34 +1362,28 @@ class AnalysisService:
 
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
-            if analytics_data:
-                return Res.success(
-                    "S-10067",
-                    data={
-                        "asset_id": asset_id,
-                        "year": year,
-                        **analytics_data,
-                    },
+            if analytics_data is None:
+
+                merged_df = await self.helper.load_yearly_merged_df(
+                    asset_id=asset_id,
+                    year=year,
+                    db=db,
                 )
 
-            merged_df = await self.helper.load_yearly_merged_df(
-                asset_id=asset_id,
-                year=year,
-                db=db,
-            )
+                optimized_df = await self.helper.load_yearly_optimized_df(
+                    asset_id=asset_id,
+                    year=year,
+                    db=db,
+                )
 
-            optimized_df = await self.helper.load_yearly_optimized_df(
-                asset_id=asset_id,
-                year=year,
-                db=db,
-            )
+                analytics_data = self.helper.get_multi_market_optimized_vs_actual(
+                    master_merged_dataframe=merged_df,
+                    master_optimized_dataframe=optimized_df,
+                    year=year,
+                )
+                compute_context["result"] = analytics_data
 
-            analytics_data = self.helper.get_multi_market_optimized_vs_actual(
-                master_merged_dataframe=merged_df,
-                master_optimized_dataframe=optimized_df,
-                year=year,
-            )
-            compute_context["result"] = analytics_data
+            analytics_data = filter_data_by_months(analytics_data, months)
 
             return Res.success(
                 "S-10067",
@@ -1344,12 +1407,14 @@ class AnalysisService:
         asset_id: int,
         year: int,
         current_user: dict,
+        months: List[int] | None,
     ):
         result = await self.get_multi_market_optimized_vs_actual(
             db=db,
             asset_id=asset_id,
             year=year,
             current_user=current_user,
+            months=months,
         )
         res_body = (
             json.loads(result.body.decode()) if hasattr(result, "body") else result
@@ -2638,7 +2703,7 @@ class AnalysisService:
         module=AnalysisModules.EXECUTIVE_ANALYSIS,
         section=AnalysisSections.EXECUTIVE_SUMMARY,
         widget=AnalysisWidget.EXECUTIVE_MONTHLY_REVENUE_COMPARISON,
-        index=['asset_id', 'year'],
+        index=["asset_id", "year"],
     )
     async def get_monthly_revenue_comparison(
         self,
@@ -2646,26 +2711,31 @@ class AnalysisService:
         redis: Redis,
         asset_id: int,
         year: int,
-        month: int,
         current_user: dict,
+        months: List[int] = None,
         **kwargs,
     ):
-        try:
-            asset = await db.get(Asset, asset_id)
-            if not asset:
-                return Res.error("E-10034", status_code=404)
+        def filter_monthly_data(data: Any):
+            if months is None:
+                return data
 
-            analytics_data = kwargs.get("analytics_data")
-            compute_context = kwargs.get("compute_context")
-            if analytics_data:
-                return Res.success(
-                    "S-10083",
-                    data={
-                        "asset_id": asset_id,
-                        "year": year,
-                        **analytics_data,
-                    },
-                )
+            # apply filtering
+            filterd_data = {"monthly_comparison": []}
+            monthly_comparision = data["monthly_comparison"]
+            filterd_data["monthly_comparison"] = [
+                d for d in monthly_comparision if d["month"] in months
+            ]
+
+            return filterd_data
+
+        asset = await db.get(Asset, asset_id)
+        if not asset:
+            return Res.error("E-10034", http_status_code=404)
+
+        analytics_data = kwargs.get("analytics_data")
+        compute_context = kwargs.get("compute_context")
+
+        if analytics_data is None:
 
             # Fetch all hardcoded values
             hardcoded_map = (
@@ -2692,36 +2762,34 @@ class AnalysisService:
                 hardcoded_map=hardcoded_map,
             )
             compute_context["result"] = analytics_data
-            await audit_logs(
-                db=db,
-                redis=redis,
-                user_id=current_user.get("user_id"),
-                user_role=current_user.get("role"),
-                module=AuditLogModules.EXECUTIVE_ANALYSIS,
-                action=AuditLogScenario.VIEWED_EXECUTIVE_ANALYSIS,
-                before={
-                    "Asset": asset.name,
-                    "Year": year,
-                    "Screen": "Monthly Revenue Comparison",
-                },
-                after="User viewed Monthly Revenue Comparison",
-                resource_id=asset.asset_id,
-            )
-            await db.commit()
 
-            return Res.success(
-                "S-10086",
-                data={
-                    "asset_id": asset_id,
-                    "year": year,
-                    **analytics_data,
-                },
-            )
-        except ExceptionWithErrorCode:
-            raise
-        except Exception:
-            traceback.print_exc()
-            return Res.error("E-10001")
+        analytics_data = filter_monthly_data(analytics_data)
+
+        await audit_logs(
+            db=db,
+            redis=redis,
+            user_id=current_user.get("user_id"),
+            user_role=current_user.get("role"),
+            module=AuditLogModules.EXECUTIVE_ANALYSIS,
+            action=AuditLogScenario.VIEWED_EXECUTIVE_ANALYSIS,
+            before={
+                "Asset": asset.name,
+                "Year": year,
+                "Screen": "Monthly Revenue Comparison",
+            },
+            after="User viewed Monthly Revenue Comparison",
+            resource_id=asset.asset_id,
+        )
+        await db.commit()
+
+        return Res.success(
+            "S-10086",
+            data={
+                "asset_id": asset_id,
+                "year": year,
+                **analytics_data,
+            },
+        )
 
     async def export_monthly_revenue_comparison(
         self,
@@ -2729,6 +2797,7 @@ class AnalysisService:
         asset_id: int,
         year: int,
         months: list,
+        redis: Redis,
         current_user: dict,
     ):
         try:
@@ -2736,7 +2805,8 @@ class AnalysisService:
                 db=db,
                 asset_id=asset_id,
                 year=year,
-                month=None,
+                redis=redis,
+                months=months,
                 current_user=current_user,
             )
 
@@ -2750,10 +2820,10 @@ class AnalysisService:
             year = res_body["data"]["year"]
 
             # month filter if provided
-            if months:
-                monthly_comparison = [
-                    r for r in monthly_comparison if r["month"] in months
-                ]
+            # if months:
+            #     monthly_comparison = [
+            #         r for r in monthly_comparison if r["month"] in months
+            #     ]
 
             output = StringIO()
             output.write("\ufeff")  # BOM for Excel UTF-8
@@ -2781,7 +2851,7 @@ class AnalysisService:
             for row in monthly_comparison:
                 writer.writerow(
                     [
-                        row["month"],
+                        calendar.month_abbr[row["month"]],
                         year,
                         f"{row['actual_revenue']:,.2f}",
                         (
@@ -2835,7 +2905,7 @@ class AnalysisService:
         module=AnalysisModules.EXECUTIVE_ANALYSIS,
         section=AnalysisSections.EXECUTIVE_SUMMARY,
         widget=AnalysisWidget.EXECUTIVE_REVENUE_BY_STREAM,
-        index=['asset_id', 'year'],
+        index=["asset_id", "year"],
     )
     async def get_revenue_by_stream_analysis(
         self,
@@ -2873,11 +2943,7 @@ class AnalysisService:
             if analytics_data:
                 return Res.success(
                     "S-10083",
-                    data={
-                        "asset_id": asset_id,
-                        "year": year,
-                        **filter_analytics_data
-                    },
+                    data={"asset_id": asset_id, "year": year, **filter_analytics_data},
                 )
 
             # load dependencies
@@ -2915,7 +2981,7 @@ class AnalysisService:
                 resource_id=asset.asset_id,
             )
             await db.commit()
-        
+
             return Res.success(
                 "S-10086",
                 data={"asset_id": asset_id, "year": year, **filter_analytics_data},
@@ -2931,6 +2997,7 @@ class AnalysisService:
         db: AsyncSession,
         asset_id: int,
         year: int,
+        redis: Redis,
         months: List[int],
         current_user: dict,
     ):
@@ -2940,6 +3007,7 @@ class AnalysisService:
                 asset_id=asset_id,
                 months=months,
                 year=year,
+                redis=redis,
                 current_user=current_user,
             )
 
@@ -2977,7 +3045,7 @@ class AnalysisService:
             for row in monthly_data:
                 writer.writerow(
                     [
-                        row["month"],
+                        calendar.month_abbr[row["month"]],
                         year,
                         row["sffr"],
                         row["epex"],
@@ -3010,7 +3078,7 @@ class AnalysisService:
         module=AnalysisModules.EXECUTIVE_ANALYSIS,
         section=AnalysisSections.EXECUTIVE_SUMMARY,
         widget=AnalysisWidget.EXECUTIVE_SUMMARY,
-        index=['asset_id', 'year'],
+        index=["asset_id", "year"],
     )
     async def get_executive_summary(
         self,
@@ -3081,7 +3149,6 @@ class AnalysisService:
             )
             await db.commit()
 
-
             return Res.success(
                 "S-10085", data={"asset_id": asset_id, "year": year, **analytics_data}
             )
@@ -3122,7 +3189,7 @@ class AnalysisService:
                 return Res.error(
                     "E-10216",
                     message="Executive summary is not available for a single month.",
-                    http_status_code=422
+                    http_status_code=422,
                 )
 
             output = StringIO()
@@ -3277,29 +3344,35 @@ class AnalysisService:
         if res_body.get("status") == "error":
             return result
 
-        data = res_body["data"].get('strategy_cycling_comparison', [])
+        data = res_body["data"].get("strategy_cycling_comparison", [])
         output = StringIO()
         writer = csv.writer(output)
 
         header = [
-            'Strategy',
-            'Total Discharge',
-            'Total Cycle',
-            'Daily Cycle',
-            'Degradation %',
-            'Warranty Status',
+            "Strategy",
+            "Total Discharge",
+            "Total Cycle",
+            "Daily Cycle",
+            "Degradation %",
+            "Warranty Status",
         ]
         writer.writerow(header)
-        
+
         for row in data:
-            writer.writerow([
-                row.get('strategy', ''),
-                row.get('total_discharge_mwh', ''),
-                row.get('total_cycle', ''),
-                row.get('daily_cycle', ''),
-                row.get('degradation_percent', ''),
-                "EXCEEDED" if row.get('is_warranty_exceeded', False) else "WITHIN LIMIT",
-            ])
+            writer.writerow(
+                [
+                    row.get("strategy", ""),
+                    row.get("total_discharge_mwh", ""),
+                    row.get("total_cycle", ""),
+                    row.get("daily_cycle", ""),
+                    row.get("degradation_percent", ""),
+                    (
+                        "EXCEEDED"
+                        if row.get("is_warranty_exceeded", False)
+                        else "WITHIN LIMIT"
+                    ),
+                ]
+            )
 
         output.seek(0)
         file_name = f"strategy_energy_throughput_summary_{asset_id}_{month}_{year}.csv"

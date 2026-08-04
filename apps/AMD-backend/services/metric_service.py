@@ -71,7 +71,7 @@ class MetricService:
         updated_records = []
 
         # validate ids
-        ids = [item.id for item in payload]
+        ids = [item.metric_id for item in payload]
         if set(ids) != set(ASSET_BENCHMARK_METRICS):
             return Res.error(
                 "E-10001", message="un-supported metric is passed", http_status_code=400
@@ -81,7 +81,7 @@ class MetricService:
             result = await db.execute(
                 select(MetricIndustryConfiguration)
                 .options(selectinload(MetricIndustryConfiguration.metric))
-                .where(MetricIndustryConfiguration.metric_id == item.id)
+                .where(MetricIndustryConfiguration.metric_id == item.metric_id)
             )
             benchmark = result.scalars().first()
 
@@ -102,7 +102,7 @@ class MetricService:
             ) or 0
 
             if not benchmark:
-                return Res.error("E-10208", message=f"Benchmark with id {item.id} not found", http_status_code=404)
+                return Res.error("E-10208", message=f"Benchmark with id {item.metric_id} not found", http_status_code=404)
 
             if (industry_low > industry_mid):
                 return Res.error("E-10205", message="industry_low cannot be greater than industry_mid", http_status_code=422)

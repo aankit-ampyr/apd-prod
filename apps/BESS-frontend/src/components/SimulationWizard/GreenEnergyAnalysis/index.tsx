@@ -356,22 +356,39 @@ export const GreenEnergyAnalysis = ({setIsStepsHidden}: {setIsStepsHidden: (hidd
   useEffect(() => {
     if (!greenAnalysis) return;
 
-    setSolarMin(Number(greenAnalysis.solar_min));
-    setSolarMax(Number(greenAnalysis.solar_max));
-    setSolarStep(Number(greenAnalysis.solar_step));
+    const initialState = {
+      solarMin: Number(greenAnalysis.solar_min),
+      solarMax: Number(greenAnalysis.solar_max),
+      solarStep: Number(greenAnalysis.solar_step),
 
-    setBessMin(Number(greenAnalysis.bess_min));
-    setBessMax(Number(greenAnalysis.bess_max));
+      bessMin: Number(greenAnalysis.bess_min),
+      bessMax: Number(greenAnalysis.bess_max),
 
-    setDgMin(Number(greenAnalysis.dg_min));
-    setDgMax(Number(greenAnalysis.dg_max));
-    setDgStep(Number(greenAnalysis.dg_step_size));
+      dgMin: Number(greenAnalysis.dg_min),
+      dgMax: Number(greenAnalysis.dg_max),
+      dgStep: Number(greenAnalysis.dg_step_size),
 
-    setMinGreenEnergy(Number(greenAnalysis.min_green_energy));
-    setIsMaxWastageEnabled(greenAnalysis.max_wastage !== null);
+      minGreenEnergy: Number(greenAnalysis.min_green_energy),
+      maxWastage: greenAnalysis.max_wastage ?? 20,
+      isMaxWastageEnabled: greenAnalysis.max_wastage !== null,
+    };
 
-    setMaxWastage(greenAnalysis.max_wastage ?? 20);
-    setHasUserEditedAfterCompletion(false);
+    setSavedState(initialState);
+
+    setSolarMin(initialState.solarMin);
+    setSolarMax(initialState.solarMax);
+    setSolarStep(initialState.solarStep);
+
+    setBessMin(initialState.bessMin);
+    setBessMax(initialState.bessMax);
+
+    setDgMin(initialState.dgMin);
+    setDgMax(initialState.dgMax);
+    setDgStep(initialState.dgStep);
+
+    setMinGreenEnergy(initialState.minGreenEnergy);
+    setMaxWastage(initialState.maxWastage);
+    setIsMaxWastageEnabled(initialState.isMaxWastageEnabled);
 
     setIsDirty(false);
   }, [greenAnalysis]);

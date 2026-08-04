@@ -1,12 +1,36 @@
-import {ScreenWrapper, StepsWithUnderscore, DispatchRules, SystemSetup, SimulationResults, CustomConfiguration} from '@/components';
+import {ScreenWrapper, StepsWithUnderscore, DispatchRules, SystemSetup, SimulationResults, CustomConfiguration, NotFound} from '@/components';
 import {StepsWithUnderscoreType} from '@/interface';
 import {
+  bessConfigFailure,
+  customConfigError,
+  customConfigRunError,
+  customHourlyFailure,
+  customHourlySimulationFailure,
+  customMonthlyFailure,
+  detailedGreenError,
+  detailedGreenResultsFailure,
+  detailedGreenRunError,
+  dgSizingDataFailure,
+  dispatchRuleDataFailure,
+  editedStepFailure,
+  generatorFailure,
+  greenAnalysisFailure,
+  greenAnalysisResultsFailure,
+  greenAnalysisRunFailure,
   initiateSimulationData,
+  loadProfileError,
+  multiYearResultsError,
+  multiYearRunError,
+  multiYearSaveError,
   projectSimulationData,
+  projectSimulationError,
+  runDGSizingFailure,
+  saveSolarProfileError,
   showDetailedAnalysisSelector,
   showDetailedMultiYearProjectionAnalysisSelector,
   showGreenAnalysisResults,
   simulationProject,
+  simulationResultError,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {allProjectsData} from '@/services/redux/selectors';
 import {Images} from '@lazarus/react-common/assets';
@@ -30,6 +54,7 @@ import {useLocation, useNavigate, useParams} from 'react-router-dom';
 import {MultiYearProjection} from '@/components/SimulationWizard/MultiYearProjection';
 import {GreenEnergyAnalysis} from '@/components/SimulationWizard/GreenEnergyAnalysis';
 import {SimulationStatusProvider} from '@/components/SimulationWizard/SimulationStatusContext';
+import {Routes} from '@/navigation/Routes';
 
 const getWizardStepStorageKey = (simulationId: string | number) => `simulation_wizard_step_${simulationId}`;
 const WIZARD_RELOAD_CONSUMED_TOKEN_KEY = 'simulation_wizard_reload_consumed_token';
@@ -94,8 +119,6 @@ function SimulationWizard() {
   const {id: simulationIdFromUrl} = useParams();
   const location = useLocation();
   const navigate = useNavigate();
-  const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
-  const [currentStep, setCurrentStep] = useState<number | null>(null);
 
   const simulData: any = useSelector(initiateSimulationData);
 
@@ -106,6 +129,35 @@ function SimulationWizard() {
   const showGreenAnalysisResult = useSelector(showGreenAnalysisResults);
   const currentProject = useSelector(simulationProject);
   const allProjects = useSelector(allProjectsData);
+  const projectSimulError = useSelector(projectSimulationError);
+  const editedStepError = useSelector(editedStepFailure);
+  const loadProfileSaveError = useSelector(loadProfileError);
+  const solarSaveError = useSelector(saveSolarProfileError);
+  const bessError = useSelector(bessConfigFailure);
+  const generatorError = useSelector(generatorFailure);
+  const dgSizingError = useSelector(dgSizingDataFailure);
+  const dispatchSaveError = useSelector(dispatchRuleDataFailure);
+  const dgSizingRunError = useSelector(runDGSizingFailure);
+  const simulResultError = useSelector(simulationResultError);
+  const customConfigSaveError = useSelector(customConfigError);
+  const customRunError = useSelector(customConfigRunError);
+  const customMonthlyError = useSelector(customMonthlyFailure);
+  const customHourlyError = useSelector(customHourlyFailure);
+  const customHourlySimlError = useSelector(customHourlySimulationFailure);
+  const multiSaveErr = useSelector(multiYearSaveError);
+  const multiRunErr = useSelector(multiYearRunError);
+  const multiResultsErr = useSelector(multiYearResultsError);
+  const greenAnalysisErr = useSelector(greenAnalysisFailure);
+  const greenAnalysisRunErr = useSelector(greenAnalysisRunFailure);
+  const greenAnalysisResultsErr = useSelector(greenAnalysisResultsFailure);
+  const greenDetailedError = useSelector(detailedGreenError);
+  const greenDetailedRunErr = useSelector(detailedGreenRunError);
+  const greenDetailedResultsErr = useSelector(detailedGreenResultsFailure);
+
+  const [showProjectSwitcher, setShowProjectSwitcher] = useState(false);
+  const [currentStep, setCurrentStep] = useState<number | null>(null);
+  const [isStepsHidden, setIsStepsHidden] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Get project_id from simulation data
   const project_id = simulData?.project_id ?? proSimulData?.project_id;
@@ -118,8 +170,33 @@ function SimulationWizard() {
   const simulationProgress = simulData?.progress ?? proSimulData?.progress;
   const editedStep = simulData?.edited_step ?? proSimulData?.edited_step;
 
-  const [isStepsHidden, setIsStepsHidden] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const showNotFound = [
+    projectSimulError,
+    editedStepError,
+    loadProfileSaveError,
+    solarSaveError,
+    bessError,
+    generatorError,
+    dispatchSaveError,
+    dgSizingError,
+    dgSizingRunError,
+    simulResultError,
+    customConfigSaveError,
+    customRunError,
+    customMonthlyError,
+    customHourlyError,
+    customHourlySimlError,
+    multiSaveErr,
+    multiRunErr,
+    multiResultsErr,
+    greenAnalysisErr,
+    greenAnalysisRunErr,
+    greenAnalysisResultsErr,
+    greenDetailedError,
+    greenDetailedRunErr,
+    greenDetailedResultsErr,
+  ].includes('E-20043');
+
   const syncStepHistory = (step: number, replace = false) => {
     if (!simulation_id) return;
 
@@ -317,6 +394,11 @@ function SimulationWizard() {
     },
   ];
 
+  const goToStep = (step: number) => {
+    if (!step) return;
+    syncStepHistory(step);
+  };
+
   const getStepHeading = () => {
     switch (currentStep) {
       case 1:
@@ -341,10 +423,19 @@ function SimulationWizard() {
   if (isLoading || currentStep === null) {
     return <WizardGhostLoader />;
   }
-  const goToStep = (step: number) => {
-    if (!step) return;
-    syncStepHistory(step);
-  };
+
+  if (showNotFound) {
+    return (
+      <NotFound
+        title="Simulation Not Found"
+        description="The requested simulation could not be found or is no longer available."
+        ctaLabel="Back to Simulation Wizard"
+        fallbackRoute={Routes.SIMULATION_WIZARD}
+        navigate={navigate}
+      />
+    );
+  }
+
   return (
     <ScreenWrapper
       className={`bg-[linear-gradient(122.55deg,#F3F9FF_3.63%,#F2F3FF_92.69%)] ${isStepsHidden ? 'pt-8' : 'pt-0'}`}

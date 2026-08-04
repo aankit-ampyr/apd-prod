@@ -15,7 +15,7 @@ import {
   simulationProgressLoading,
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData, projectLoading} from '@/services/redux/selectors';
-import {dgSizingRequest, getDGSizingRequest, simulationProgressRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {dgSizingRequest, editedStepSimulationDataRequest, getDGSizingRequest, simulationProgressRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
 import {Alert, Button, Icon, SelectInput, Skeleton, Text, TextInput} from '@/ui-kits';
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
@@ -230,6 +230,12 @@ export const DGSizing = ({onNextToRunSimulation}: DGSizingProps) => {
       dispatch(getAllProjectListRequest());
     }
   }, [authData?.id, projectId, currentProject, isProjectLoading, dispatch]);
+
+  useEffect(() => {
+    if (simulation_id) {
+      dispatch(editedStepSimulationDataRequest({simulation_id}));
+    }
+  }, [simulation_id]);
 
   useEffect(() => {
     if (!isDgSizingLoading && hasFetchedProgress) {

@@ -44,6 +44,7 @@ class AnalysisController:
         self,
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
+        redis: Redis = Depends(get_redis_conn),
         db: AsyncSession = Depends(get_db),
         current_user: dict = Depends(
             allowed_roles(
@@ -59,7 +60,7 @@ class AnalysisController:
             )
 
         return await self.service.download_benchmark_analysis(
-            db=db, asset_id=asset.id, year=year, current_user=current_user
+            db=db, redis=redis, asset_id=asset.id, year=year, current_user=current_user
         )
 
     async def get_operations_summary(
@@ -445,6 +446,7 @@ class AnalysisController:
         self,
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
+        months: List[int] = Query(None),  # List of months to filter
         db: AsyncSession = Depends(get_db),
         current_user: dict = Depends(
             allowed_roles(
@@ -460,13 +462,14 @@ class AnalysisController:
             )
 
         return await self.service.get_revenue_iar_vs_actual(
-            db=db, asset_id=asset.id, year=year, current_user=current_user
+            db=db, asset_id=asset.id, year=year, current_user=current_user, months=months
         )
 
     async def export_revenue_iar_vs_actual(
         self,
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
+        months: List[int] = Query(None),  # List of months to filter
         db: AsyncSession = Depends(get_db),
         current_user: dict = Depends(
             allowed_roles(
@@ -482,13 +485,14 @@ class AnalysisController:
             )
 
         return await self.service.export_revenue_iar_vs_actual(
-            db=db, asset_id=asset.id, year=year, current_user=current_user
+            db=db, asset_id=asset.id, year=year, current_user=current_user, months=months
         )
 
     async def get_multi_market_optimized_vs_actual(
         self,
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
+        months: List[int] = Query(None),  # List of months to filter
         db: AsyncSession = Depends(get_db),
         current_user: dict = Depends(
             allowed_roles(
@@ -505,7 +509,7 @@ class AnalysisController:
             )
 
         return await self.service.get_multi_market_optimized_vs_actual(
-            db=db, asset_id=asset.id, year=year, current_user=current_user
+            db=db, asset_id=asset.id, year=year, current_user=current_user, months=months
         )
 
     async def export_multi_market_optimized_vs_actual(
@@ -513,6 +517,7 @@ class AnalysisController:
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
         db: AsyncSession = Depends(get_db),
+        months: List[int] = Query(None),  # List of months to filter
         current_user: dict = Depends(
             allowed_roles(
                 UserRole.ADMIN.value,
@@ -529,7 +534,7 @@ class AnalysisController:
             )
 
         return await self.service.export_multi_market_optimized_vs_actual(
-            db=db, asset_id=asset.id, year=year, current_user=current_user
+            db=db, asset_id=asset.id, year=year, current_user=current_user, months=months
         )
 
     async def get_ancillary_summary(
@@ -1011,7 +1016,7 @@ class AnalysisController:
         self,
         asset: Asset = Depends(verify_asset_access),
         year: int = Query(...),
-        month: int = Query(None),
+        months: List[int] = Query(None),
         db: AsyncSession = Depends(get_db),
         redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(
@@ -1029,7 +1034,7 @@ class AnalysisController:
             redis=redis,
             asset_id=asset.id,
             year=year,
-            month=month,
+            months=months,
             current_user=current_user,
         )
 
@@ -1039,6 +1044,7 @@ class AnalysisController:
         months: List[int] = Query(None),
         year: int = Query(...),
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(
             allowed_roles(UserRole.ADMIN.value, UserRole.MANAGER.value)
         ),
@@ -1054,6 +1060,7 @@ class AnalysisController:
             asset_id=asset.id,
             months=months,
             year=year,
+            redis=redis,
             current_user=current_user,
         )
 
@@ -1063,6 +1070,7 @@ class AnalysisController:
         year: int = Query(...),
         months: List[int] = Query(None),
         db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
         current_user: dict = Depends(
             allowed_roles(UserRole.ADMIN.value, UserRole.MANAGER.value)
         ),
@@ -1078,6 +1086,7 @@ class AnalysisController:
             asset_id=asset.id,
             year=year,
             months=months,
+            redis=redis,
             current_user=current_user,
         )
 

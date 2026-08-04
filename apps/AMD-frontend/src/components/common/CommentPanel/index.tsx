@@ -68,9 +68,15 @@ export function CommentPanel() {
   // Auto-scroll logic for Deep Linking
   useEffect(() => {
     if (!isLoading && activeContext?.comment_id && allComments.length > 0) {
-      if (lastScrolledCommentId.current === activeContext.comment_id) return;
+      // Parse numeric id — supports both "5" (new format) and "COM-0005" (legacy format)
+      const rawId = String(activeContext.comment_id);
+      const match = rawId.match(/\d+/);
+      const numericId = match ? parseInt(match[0], 10) : null;
 
-      const elementId = `comment-item-${activeContext.comment_id}`;
+      if (!numericId) return;
+      if (lastScrolledCommentId.current === numericId) return;
+
+      const elementId = `comment-item-${numericId}`;
       let attempts = 0;
 
       // Poll until the element is actually rendered in the DOM
@@ -90,7 +96,7 @@ export function CommentPanel() {
             element.style.backgroundColor = originalBg;
           }, 3000);
 
-          lastScrolledCommentId.current = activeContext.comment_id;
+          lastScrolledCommentId.current = numericId;
 
           if (pendingDeepLink) {
             dispatch(setPendingDeepLink(null));
@@ -165,23 +171,47 @@ export function CommentPanel() {
     }
   }, [commentStatusSuccess, pendingDeepLink, dispatch, showToast]);
 
+  // Tracks which comment IDs have already had a readCommentRequest dispatched this unread session.
+  // Prevents sending duplicate read requests when the mention filter changes.
+  const readRequestedIdsRef = useRef<Set<number>>(new Set());
+
+  // Helper: dispatch a readCommentRequest for a comment if not already sent this session
+  const dispatchReadIfNeeded = (commentId: number, assetId: number) => {
+    if (assetId && !readRequestedIdsRef.current.has(commentId)) {
+      readRequestedIdsRef.current.add(commentId);
+      dispatch(readCommentRequest({assetId, commentId}));
+    }
+  };
+
+  // Helper: check if a comment block passes the current mention filter
+  const passesMentionFilter = (content: any[]) => {
+    if (!filterUserId) return true;
+    return content.some((b: any) => b.type === 'mention' && String(b.user?.id) === filterUserId);
+  };
+
+  // Effect 1: Unread tab open/close
+  // Builds the snapshot (ALL unread, frozen for the session) and dispatches read requests
+  // only for the currently visible (mention-filter-passing) comments.
   useEffect(() => {
     if (isUnreadFilterActive && !prevIsUnreadActive.current) {
+      readRequestedIdsRef.current = new Set(); // reset session tracker
       const unreadIds = new Set<number>();
+
       allComments.forEach((c: any) => {
         const assetId = activeContext?.context_asset_id || c.context_asset_id || 0;
         if (!c.is_read && !isCommentOwner(c, currentUser)) {
           unreadIds.add(c.id);
-          if (assetId) {
-            dispatch(readCommentRequest({assetId, commentId: c.id}));
+          // Only mark as read what the user can currently see
+          if (passesMentionFilter(Array.isArray(c.content) ? c.content : [])) {
+            dispatchReadIfNeeded(c.id, assetId);
           }
         }
         if (c.replies) {
           c.replies.forEach((r: any) => {
             if (!r.is_read && !isCommentOwner(r, currentUser)) {
               unreadIds.add(r.id);
-              if (assetId) {
-                dispatch(readCommentRequest({assetId, commentId: r.id}));
+              if (passesMentionFilter(Array.isArray(r.content) ? r.content : [])) {
+                dispatchReadIfNeeded(r.id, assetId);
               }
             }
           });
@@ -190,9 +220,29 @@ export function CommentPanel() {
       setSnapshotUnreadIds(unreadIds);
     } else if (!isUnreadFilterActive && prevIsUnreadActive.current) {
       setSnapshotUnreadIds(null);
+      readRequestedIdsRef.current = new Set();
     }
     prevIsUnreadActive.current = isUnreadFilterActive;
-  }, [isUnreadFilterActive, allComments, currentUser, activeContext, dispatch]);
+  }, [isUnreadFilterActive, allComments, currentUser, activeContext, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Effect 2: Mention filter changed while unread tab is open
+  // Dispatches read requests for snapshot items that are now newly visible.
+  useEffect(() => {
+    if (!isUnreadFilterActive || !snapshotUnreadIds) return;
+    allComments.forEach((c: any) => {
+      const assetId = activeContext?.context_asset_id || c.context_asset_id || 0;
+      if (snapshotUnreadIds.has(c.id) && passesMentionFilter(Array.isArray(c.content) ? c.content : [])) {
+        dispatchReadIfNeeded(c.id, assetId);
+      }
+      if (c.replies) {
+        c.replies.forEach((r: any) => {
+          if (snapshotUnreadIds.has(r.id) && passesMentionFilter(Array.isArray(r.content) ? r.content : [])) {
+            dispatchReadIfNeeded(r.id, assetId);
+          }
+        });
+      }
+    });
+  }, [filterUserId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -226,6 +276,11 @@ export function CommentPanel() {
             if (card) {
               // block: 'end' aligns the bottom of the thread card with the bottom of the viewport
               card.scrollIntoView({behavior: 'smooth', block: 'end'});
+            }
+          } else if (scrollTargetId === 'new-thread') {
+            const container = scrollContainerRef.current;
+            if (container) {
+              container.scrollTo({top: container.scrollHeight, behavior: 'smooth'});
             }
           } else {
             // For updates, target the inner text first so it doesn't align to the huge outer card
@@ -303,6 +358,8 @@ export function CommentPanel() {
     }
     if (parentCommentId) {
       setScrollTargetId(`reply-${parentCommentId}`);
+    } else {
+      setScrollTargetId('new-thread');
     }
 
     setIsSubmitting(true);
@@ -356,7 +413,7 @@ export function CommentPanel() {
   // Filter comments based on active context
   const contextComments = useMemo(() => {
     if (!activeContext) return [];
-    return allComments.filter((c: any) => {
+    const result = allComments.filter((c: any) => {
       const getHierarchyLevel = (type: any) => {
         const t = Number(type);
         if (t === CommentContextType.Screen) return 1;
@@ -423,6 +480,8 @@ export function CommentPanel() {
 
       return true;
     });
+
+    return result;
   }, [allComments, activeContext]);
 
   const displayedComments = useMemo(() => {
@@ -430,22 +489,22 @@ export function CommentPanel() {
 
     if (filterUserId) {
       filtered = filtered.reduce((acc: any[], c: any) => {
-        const isMentionedInParent =
-          Array.isArray(c.content) &&
-          c.content.some((b: any) => b.type === 'mention' && b.user?.id?.toString() === filterUserId);
+        const safeContent = Array.isArray(c.content) ? c.content : [];
+        const isMentionedInParent = safeContent.some(
+          (b: any) => b.type === 'mention' && String(b.user?.id) === filterUserId,
+        );
 
-        const matchingReplies =
-          c.replies?.filter((r: any) => {
-            return (
-              Array.isArray(r.content) &&
-              r.content.some((b: any) => b.type === 'mention' && b.user?.id?.toString() === filterUserId)
-            );
-          }) || [];
+        const matchingReplies = (c.replies || []).filter((r: any) => {
+          const rContent = Array.isArray(r.content) ? r.content : [];
+          return rContent.some((b: any) => b.type === 'mention' && String(b.user?.id) === filterUserId);
+        });
 
         if (isMentionedInParent || matchingReplies.length > 0) {
           acc.push({
             ...c,
-            replies: isMentionedInParent ? c.replies : matchingReplies,
+            // Show only the replies that mention the user — never all replies.
+            // The thread frame is always shown when the parent itself has a mention.
+            replies: matchingReplies,
           });
         }
         return acc;
@@ -485,24 +544,37 @@ export function CommentPanel() {
             ...c,
             replies: c.replies ? c.replies.filter((r: any) => snapshotUnreadIds.has(r.id)) : [],
           }))
-          .filter((c: any) => snapshotUnreadIds.has(c.id) || (c.replies && c.replies.length > 0));
+          .filter((c: any) => {
+            const parentUnread = snapshotUnreadIds.has(c.id);
+            const hasUnreadReplies = c.replies && c.replies.length > 0;
+            // If mention filter is also active, a read parent with no unread matching replies
+            // must not produce an empty thread box — drop it.
+            if (filterUserId && !parentUnread && !hasUnreadReplies) return false;
+            if (filterUserId && parentUnread && !hasUnreadReplies) {
+              // Parent is unread and mentions the user, but no replies visible — keep it (thread frame only)
+              return true;
+            }
+            return parentUnread || hasUnreadReplies;
+          });
       } else {
         filtered = filtered
           .map((c: any) => ({
             ...c,
             replies: c.replies ? c.replies.filter((r: any) => !r.is_read && !isCommentOwner(r, currentUser)) : [],
           }))
-          .filter((c: any) => (!c.is_read && !isCommentOwner(c, currentUser)) || (c.replies && c.replies.length > 0));
+          .filter((c: any) => {
+            const parentUnread = !c.is_read && !isCommentOwner(c, currentUser);
+            const hasUnreadReplies = c.replies && c.replies.length > 0;
+            // Same intersection logic for live unread state
+            if (filterUserId && !parentUnread && !hasUnreadReplies) return false;
+            return parentUnread || hasUnreadReplies;
+          });
       }
     }
-    return filtered
-      .map((c: any) => ({
-        ...c,
-        replies: c.replies
-          ? [...c.replies].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          : [],
-      }))
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return filtered.map((c: any) => ({
+      ...c,
+      replies: c.replies ? [...c.replies] : [],
+    }));
   }, [contextComments, searchQuery, filterUserId, isUnreadFilterActive]);
 
   const contextDetails = useMemo(() => {

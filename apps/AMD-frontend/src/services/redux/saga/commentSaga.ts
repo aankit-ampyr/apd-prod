@@ -52,6 +52,7 @@ function* handleCreateComment(action: ReturnType<typeof createCommentRequest>): 
     const response: any = yield call(createComment, action.payload as any);
     if (response.data?.status === SUCCESS_KEY) {
       yield put(createCommentSuccess(response.data));
+      yield put(fetchCommentsRequest({assetId: (action.payload as any).params.assetId}));
     } else {
       yield put(createCommentFailure(response.data));
     }

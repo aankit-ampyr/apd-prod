@@ -213,12 +213,13 @@ export function RevenueIARvsActual(props: AssetBenchnarkTabGroup) {
     }));
   }
 
-  async function handleDownload() {
+  async function handleDownload(months?: number[]) {
     if (!assetId) return;
     if (!year) return;
     await getAssetBenchmarkRevenueIARvsActualExport({
       assetId,
       year,
+      months,
       fileName: `Revenue_IAR_vs_Actual_${assetSystemGenerationId ?? assetId ?? 'asset'}_${year ?? benchmarkData?.year ?? 'year'}.csv`,
     });
   }

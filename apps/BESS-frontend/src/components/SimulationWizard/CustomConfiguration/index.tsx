@@ -224,11 +224,11 @@ export const CustomConfiguration = ({setIsStepsHidden, goToStep}: CustomConfigur
   }, [saveError, runError]);
 
   useEffect(() => {
-    if (stepData?.last_edited === 8) {
+    if (stepData?.last_edited === 8 && customData) {
       setSaveEnabled(false);
       setRunEnabled(true);
     }
-  }, [stepData?.last_edited]);
+  }, [stepData?.last_edited, customData]);
 
   // If Step 3 sizing simulation is run again, clear stale custom simulation result UI.
   useEffect(() => {

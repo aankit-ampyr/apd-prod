@@ -2921,7 +2921,7 @@ class AnalysisServiceHelper:
                 + actual_values["TNUoS"]
             )
 
-            monthly_data_payload[m] = {
+            monthly_data_payload[str(m)] = {
                 "streams": streams_list,
                 "total_excluding_bm_tnuos": {
                     "iar_revenue": round(iar_ex_bm, 2),
@@ -3105,7 +3105,7 @@ class AnalysisServiceHelper:
                 else "N/A"
             )
 
-            monthly_data_payload[m] = {
+            monthly_data_payload[str(m)] = {
                 "revenue_streams": revenue_streams,
                 "totals": {
                     "total_actual_revenue": total_actual_revenue,

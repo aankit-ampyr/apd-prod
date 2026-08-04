@@ -888,6 +888,7 @@ export interface AssetBenchmarkRevenueIARvsActualRequest {
   params: {
     assetId: number;
     year: number;
+    months?: number[];
   };
   response: APIResponse<AssetBenchmarkRevenueActualvsIAR>;
 }
@@ -896,6 +897,7 @@ export interface AssetBenchmarkRevenueIARvsActualExportRequest {
   params: {
     assetId: number;
     year: number;
+    months?: number[];
     fileName?: string; // optional, if not provided, default name will be used in backend
   };
 }
@@ -904,6 +906,7 @@ export interface AssetBenchmarkMultiMarketOptimizedVsActualRequest {
   params: {
     assetId: number;
     year: number;
+    months?: number[];
   };
   response: APIResponse<AssetBenchmarkMultiMarketOptmizationVsActual>;
 }
@@ -912,6 +915,7 @@ export interface AssetBenchmarkMultiMarketOptimizedVsActualExportRequest {
   params: {
     assetId: number;
     year: number;
+    months?: number[];
     fileName?: string; // optional, if not provided, default name will be used in backend
   };
 }
@@ -1062,7 +1066,7 @@ export interface MetricsBenchmarksRequest {
 
 export interface UpdateBenchmarkMetricRequest {
   payload: Array<{
-    id: number;
+    metric_id: number;
     industry_low?: number;
     industry_mid?: number;
     industry_high?: number;

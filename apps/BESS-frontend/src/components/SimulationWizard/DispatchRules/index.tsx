@@ -18,7 +18,7 @@ import {
 } from '@/services/redux/selectors/simulationWizardSelector';
 import {authDataSelector, allProjectsData, projectLoading} from '@/services/redux/selectors';
 import {getAllProjectListRequest} from '@/services/redux/slice/projectsSlice';
-import {dispatchRuleRequest, getDispatchRuleRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {dispatchRuleRequest, editedStepSimulationDataRequest, getDispatchRuleRequest} from '@/services/redux/slice/simulationWizardSlice';
 import {Alert, Button, Icon, Skeleton, Text} from '@/ui-kits';
 import {IOSSingleSlider, RadioCard} from '@lazarus/react-common/components';
 import {useEffect, useRef, useState} from 'react';
@@ -338,6 +338,12 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
       dispatch(getAllProjectListRequest());
     }
   }, [authData?.id, projectId, currentProject, isProjectLoading, dispatch]);
+
+  useEffect(() => {
+    if (simulation_id) {
+      dispatch(editedStepSimulationDataRequest({simulation_id}));
+    }
+  }, [simulation_id]);
 
   useEffect(() => {
     // Enable Save & Continue when no dispatch data exists (new project with defaults)

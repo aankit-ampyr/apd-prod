@@ -3,7 +3,12 @@ import {useCallback, useEffect, useRef, useState} from 'react';
 import {SelectSolarProfile} from './SelectSolarProfile';
 import {CSVUpload} from './CSVUpload';
 import {useDispatch, useSelector} from 'react-redux';
-import {getProjectSimulationSilentRequest, getSolarProfileRequest, saveSolarProfileRequest} from '@/services/redux/slice/simulationWizardSlice';
+import {
+  editedStepSimulationDataRequest,
+  getProjectSimulationSilentRequest,
+  getSolarProfileRequest,
+  saveSolarProfileRequest,
+} from '@/services/redux/slice/simulationWizardSlice';
 import {
   saveSolarProfileLoading,
   saveSolarProfileSuccess,
@@ -184,6 +189,7 @@ export const SolarProfile = ({onSaveComplete, readOnly, setIsStepsHidden}: Props
     if (simulation_id) {
       dispatch(getProjectSimulationSilentRequest({simulation_id: simulation_id}));
       dispatch(getSolarProfileRequest({simulation_id: simulation_id}));
+      dispatch(editedStepSimulationDataRequest({simulation_id: simulation_id}));
     }
   }, [simulation_id, dispatch]);
 

@@ -187,12 +187,13 @@ export function MultiMarketOptmizationVsActual(props: MultiMarketOptmizationVsAc
     }));
   }
 
-  async function handleDataDownload() {
+  async function handleDataDownload(months?: number[]) {
     if (!assetId) return;
     if (!year) return;
     await getAssetBenchmarkMultiMarketOptimizedVsActualExport({
       assetId,
       year,
+      months,
       fileName: `Monthly_Revenue_Comparison_${assetSystemGenerationId ?? assetId ?? 'asset'}_${year ?? benchmarkData?.year ?? 'year'}.csv`,
     });
   }

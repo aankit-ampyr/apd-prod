@@ -270,7 +270,7 @@ export function Benchmark() {
 
     setErrors([]);
     const payload = tableData.map(item => ({
-      id: item.id,
+      metric_id: item.metric_id,
       industry_low: item.industry_low != null ? Number(item.industry_low) : undefined,
       industry_mid: item.industry_mid != null ? Number(item.industry_mid) : undefined,
       industry_high: item.industry_high != null ? Number(item.industry_high) : undefined,

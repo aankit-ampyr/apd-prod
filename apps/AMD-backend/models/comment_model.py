@@ -47,7 +47,7 @@ class Comment(Base):
     read_by = Column(ARRAY(Integer), nullable=True)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=True)
+    updated_at = Column(DateTime(timezone=True), nullable=True)  # Only set explicitly by update_comment — no onupdate hook to avoid spurious timestamp changes
 
     is_deleted = Column(Boolean, default=False, nullable=False)
 
