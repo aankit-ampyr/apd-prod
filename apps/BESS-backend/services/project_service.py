@@ -1163,7 +1163,12 @@ class ProjectService:
             project_query = await bess_db.execute(query)
             project = project_query.scalar_one_or_none()
 
-            if not project or project.is_deleted:
+            if (
+                not project
+                or project.is_deleted
+                or project.is_archived
+                or not project.is_active
+            ):
                 return Res.error(
                     "E-20015",
                     message="Project not found.",
@@ -1304,7 +1309,9 @@ class ProjectService:
 
             if not is_authorized:
                 return Res.error(
-                    "E-20004", message="Not authorized to perform the action.", http_status_code=http_status.HTTP_403_FORBIDDEN
+                    "E-20004",
+                    message="Not authorized to perform the action.",
+                    http_status_code=http_status.HTTP_403_FORBIDDEN,
                 )
 
             count = getattr(sequence, "simulation_count") if sequence else 0

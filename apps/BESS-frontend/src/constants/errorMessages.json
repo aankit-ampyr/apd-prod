@@ -259,6 +259,16 @@
     "message": "Simulation result not found.",
     "type": "validation_error"
   },
+  "E-20065": {
+    "key": "project_already_archived",
+    "message": "This project has been moved to the Archived Projects list.",
+    "type": "validation_error"
+  },
+  "E-20066": {
+    "key": "project_inactive",
+    "message": "This project is no longer active.",
+    "type": "validation_error"
+  },
 
   "E-10003": {
     "key": "email_required",

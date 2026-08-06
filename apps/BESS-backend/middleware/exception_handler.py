@@ -16,6 +16,8 @@ from exceptions import (
     UserAccountBlocked,
     ProjectDeleted,
     SimulationNotFound,
+    ProjectArchived,
+    ProjectInactive,
 )
 
 logging.basicConfig(level=logging.INFO)
@@ -28,8 +30,12 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         except InvalidPlatformAccess:
-            return Res.error("E-10011", message="You are not authorized to access this platform.", http_status_code=403)
-        
+            return Res.error(
+                "E-10011",
+                message="You are not authorized to access this platform.",
+                http_status_code=403,
+            )
+
         except UserNotAuthenticated:
             return Res.error("E-20064", http_status_code=401)
         except UserTokenExpired:
@@ -37,7 +43,9 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
                 "User token expired",
                 extra={"error_code": "E-20002", "path": request.url.path},
             )
-            return Res.error("E-20002", message="User token expired", http_status_code=401)
+            return Res.error(
+                "E-20002", message="User token expired", http_status_code=401
+            )
         except UserSessionExpired:
             return Res.error("E-20002", http_status_code=401)
         except UserNotAuthorized:
@@ -56,6 +64,11 @@ class ExceptionHandlerMiddleware(BaseHTTPMiddleware):
             return Res.error(
                 status_code="E-20004", message=str(e), http_status_code=403
             )
+        except ProjectArchived as e:
+            return Res.error("E-20065", message=str(e), http_status_code=404)
+        except ProjectInactive as e:
+            return Res.error("E-20066", message=str(e), http_status_code=404)
+
         except Exception as e:
             traceback.print_exc()
             return Res.error(message=str(e))

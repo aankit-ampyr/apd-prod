@@ -2709,7 +2709,7 @@ class InvoiceAnalysisService:
 
             data = res_body.get("data", {})
             per_stream_comparison = data.get("per_stream_comparison", [])
-            total_stream_comparision = data.get("per_stream_comparision_total", {})
+            total_stream_comparision = data.get("total_stream_data", {})
 
             if not per_stream_comparison:
                 return Res.error(

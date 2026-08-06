@@ -195,7 +195,7 @@ function SimulationWizard() {
     greenDetailedError,
     greenDetailedRunErr,
     greenDetailedResultsErr,
-  ].includes('E-20043');
+  ].find(errorCode => ['E-20043', 'E-20065', 'E-20066', 'E-20004'].includes(errorCode as any));
 
   const syncStepHistory = (step: number, replace = false) => {
     if (!simulation_id) return;
@@ -425,10 +425,15 @@ function SimulationWizard() {
   }
 
   if (showNotFound) {
+    const isProjectUnavailable = ['E-20065', 'E-20066', 'E-20004'].includes(showNotFound as any);
     return (
       <NotFound
-        title="Simulation Not Found"
-        description="The requested simulation could not be found or is no longer available."
+        title={isProjectUnavailable ? 'Project Not Available' : 'Simulation Not Found'}
+        description={
+          isProjectUnavailable
+            ? 'This project is unavailable or you no longer have access to it.'
+            : 'The requested simulation could not be found or is no longer available.'
+        }
         ctaLabel="Back to Simulation Wizard"
         fallbackRoute={Routes.SIMULATION_WIZARD}
         navigate={navigate}

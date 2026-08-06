@@ -3,15 +3,12 @@ Project Management controller for BESS platform.
 Uses BESS DB for projects; User DB for auth.
 """
 
-import traceback
 from typing import Optional
 
 from fastapi import Depends, Request
 from redis.asyncio import Redis
 from context.dependency import get_redis_conn
-from models.user_model import User
 from sqlalchemy.ext.asyncio import AsyncSession
-from utils.response_utils import Res
 from db.dependencies import get_user_db, get_bess_db, allowed_roles
 from dtos.project_dto import ProjectCreate, ProjectUpdate
 from services.project_service import ProjectService
@@ -75,7 +72,11 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.create_project(
-            payload=payload, bess_db=bess_db, user_db=user_db, current_user=current_user, redis=redis
+            payload=payload,
+            bess_db=bess_db,
+            user_db=user_db,
+            current_user=current_user,
+            redis=redis,
         )
 
     async def edit_project(
@@ -106,7 +107,10 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.delete_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
+            project_id=project_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            redis=redis,
         )
 
     async def restore_project(
@@ -117,7 +121,10 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.restore_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
+            project_id=project_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            redis=redis,
         )
 
     async def archive_project(
@@ -128,7 +135,10 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.archive_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
+            project_id=project_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            redis=redis,
         )
 
     async def unarchive_project(
@@ -139,7 +149,10 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.unarchive_project(
-            project_id=project_id, bess_db=bess_db, current_user=current_user, redis=redis
+            project_id=project_id,
+            bess_db=bess_db,
+            current_user=current_user,
+            redis=redis,
         )
 
     async def initiate_or_fetch_simulation(
@@ -195,5 +208,8 @@ class ProjectController:
         redis: Redis = Depends(get_redis_conn),
     ):
         return await self.service.initiate_simulation(
-            bess_db=bess_db, project_id=project_id, current_user=current_user, redis=redis
+            bess_db=bess_db,
+            project_id=project_id,
+            current_user=current_user,
+            redis=redis,
         )

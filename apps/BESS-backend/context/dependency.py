@@ -4,8 +4,15 @@ from sqlalchemy import select
 from constants.enums import SimulationSetupProgress, UserRole
 from sqlalchemy.orm import joinedload
 from models.simulation_model import Simulation
+from models.project_model import ProjectUserAssignment
 from db.dependencies import get_bess_db
-from exceptions import PermissionDenied, SimulationNotFound, UserNotAuthorized
+from exceptions import (
+    PermissionDenied,
+    SimulationNotFound,
+    UserNotAuthorized,
+    ProjectInactive,
+    ProjectArchived,
+)
 
 
 async def get_redis_conn(request: Request) -> redis.Redis:
@@ -22,19 +29,20 @@ async def validate_simulation_access(
     )
     result = await bess_db.execute(query)
     simulation: Simulation = result.scalar_one_or_none()
+
     if not simulation:
         raise SimulationNotFound()
+
+    if simulation.project.is_archived:
+        raise ProjectArchived()
+
+    if not simulation.project.is_active:
+        raise ProjectInactive()
 
     # Store in request.state for accessibility across the router/controller
     request.state.sim_id = simulation.sim_id
     request.state.last_edited = simulation.edit_step
     request.state.project_id = simulation.project.proj_id
-
-    if request.method == "GET":
-        return simulation.project.proj_id
-
-    if "compute" == [segment for segment in request.url.path.split("/") if segment][-1]:
-        return simulation.project.proj_id
 
     user = getattr(request.state, "user", None)
     if not user:
@@ -49,10 +57,23 @@ async def validate_simulation_access(
         or simulation.project.owned_by_user_id == user_id
     )
 
-    if not is_authorized:
-        raise PermissionDenied()
+    if is_authorized:
+        return simulation.project.proj_id
 
-    return simulation.project.proj_id
+    if "compute" == [segment for segment in request.url.path.split("/") if segment][-1]:
+        return simulation.project.proj_id
+
+    if request.method == "GET":
+        assignment_result = await bess_db.execute(
+            select(ProjectUserAssignment).where(
+                ProjectUserAssignment.project_id == simulation.project.id,
+                ProjectUserAssignment.user_id == user_id,
+            )
+        )
+        if assignment_result.scalar_one_or_none():
+            return simulation.project.proj_id
+
+    raise PermissionDenied()
 
 
 async def get_resource_id(request: Request):

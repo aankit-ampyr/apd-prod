@@ -8,6 +8,7 @@ import {
   deleteSimulationSuccess,
   initiateSimulationData,
   projectSimulationData,
+  projectSimulationError,
   projectSimulationSuccess,
   simulationListData,
   simulationListError,
@@ -148,7 +149,7 @@ export const SimulationListing = () => {
   const [tableMessage, setTableMessage] = useState('');
   const [projectInitialized, setProjectInitialized] = useState(false);
 
-  const {errors, values, handleBlur, setFieldValue, touched} = useFormik({
+  const {errors, values, handleBlur, setFieldValue, touched, setFieldTouched} = useFormik({
     initialValues,
     validationSchema: undefined,
     onSubmit: () => {},
@@ -198,6 +199,9 @@ export const SimulationListing = () => {
     const savedProjectId = localStorage.getItem('selectedProjectId');
     if (savedProjectId) {
       setFieldValue('project', Number(savedProjectId));
+    } else {
+      setFieldValue('project', null);
+      localStorage.removeItem('selectedProjectId');
     }
     setProjectInitialized(true);
   }, []);
@@ -273,8 +277,8 @@ export const SimulationListing = () => {
   const simulationStatusOptions = isAssignedUser ? SIMULATION_STATUS.filter(status => status.id !== 2) : SIMULATION_STATUS;
 
   const isProjectSelected = Boolean(values.project);
-  const shouldDisableFilters = !isProjectSelected || simulationError === 'E-20006';
-  const shouldDisableStartSimulation = !isProjectSelected;
+  const shouldDisableFilters = !isProjectSelected || simulationError === 'E-20006' || simulationError === 'E-20015';
+  const shouldDisableStartSimulation = !isProjectSelected || simulationError === 'E-20015';
   const isPermissionLoading = values.project && authData?.id && !allProjData?.length;
 
   const handleFilterChange = (values: FilterType) => {
@@ -541,7 +545,7 @@ export const SimulationListing = () => {
       return <SimulationListingGhostLoader />;
     }
 
-    if (!values.project) {
+    if (!values.project || simulationError === 'E-20015') {
       return (
         <div className="flex flex-col items-center justify-center h-full gap-4 py-10">
           <img src={Images.files} alt="No Projects" className="w-22" />
@@ -620,6 +624,8 @@ export const SimulationListing = () => {
 
                   if (!item?.id) {
                     setFieldValue('project', null);
+                    setFieldTouched('project', false);
+
                     localStorage.removeItem('selectedProjectId');
                     return;
                   }
@@ -702,9 +708,12 @@ function SimulationActionCell({
 }: Readonly<{row: SimulationRow; isAssignedUser: boolean; onAction: (row: SimulationRow, modalType: SimulationModalType) => void}>) {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const {showToast} = useToast();
+
   const projSimlSuccess = useSelector(projectSimulationSuccess) as SuccessCodes;
   const proSimulData = useSelector(projectSimulationData);
   const resumeRequestedRef = useRef(false);
+  const projectSimulErr = useSelector(projectSimulationError);
 
   const handleResumeSetup = () => {
     resumeRequestedRef.current = true;
@@ -718,6 +727,17 @@ function SimulationActionCell({
       dispatch(resetProjectSimulation());
     }
   }, [projSimlSuccess, proSimulData, dispatch, navigate]);
+
+  useEffect(() => {
+    if (
+      (projectSimulErr === 'E-20043' || projectSimulErr === 'E-20004' || projectSimulErr === 'E-20065' || projectSimulErr === 'E-20066') &&
+      resumeRequestedRef.current
+    ) {
+      resumeRequestedRef.current = false;
+      showToast(getErrorMessage(projectSimulErr), 'error');
+      dispatch(resetProjectSimulation());
+    }
+  }, [projectSimulErr]);
 
   if (isAssignedUser) {
     if (row.editedStep >= 13) {

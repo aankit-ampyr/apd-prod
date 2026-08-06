@@ -14,3 +14,18 @@ class PermissionDenied(Exception):
     ):
         self.message = message
         super().__init__(self.message)
+
+
+class ProjectInactive(Exception):
+    def __init__(self, message: str = "This project is no longer active."):
+        self.message = message
+        super().__init__(self.message)
+
+
+class ProjectArchived(Exception):
+    def __init__(
+        self,
+        message: str = "This project has been moved to the Archived Projects list.",
+    ):
+        self.message = message
+        super().__init__(self.message)
