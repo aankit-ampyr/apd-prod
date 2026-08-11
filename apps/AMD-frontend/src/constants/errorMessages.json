@@ -1273,5 +1273,50 @@
     "key": "unauthorized_access",
     "message": "You are not authorized to access this platform.",
     "type": "data_error"
+  },
+  "E-10274": {
+    "key": "solar_scada_invalid_extension",
+    "message": "Only .xlsx or .xls files are supported.",
+    "type": "validation_error"
+  },
+  "E-10275": {
+    "key": "solar_scada_file_too_small",
+    "message": "Solar file size must be at least 1 KB.",
+    "type": "validation_error"
+  },
+  "E-10276": {
+    "key": "solar_scada_file_too_large",
+    "message": "Solar file size should not exceed 100 MB.",
+    "type": "validation_error"
+  },
+  "E-10277": {
+    "key": "solar_scada_invalid_content",
+    "message": "Failed to parse or validate the solar SCADA file content.",
+    "type": "validation_error"
+  },
+  "E-10278": {
+    "key": "solar_scada_period_mismatch",
+    "message": "File content month/year does not match the expected upload period.",
+    "type": "validation_error"
+  },
+  "E-10279": {
+    "key": "solar_scada_not_applicable",
+    "message": "Solar SCADA upload is not applicable for Battery assets.",
+    "type": "validation_error"
+  },
+  "E-10280": {
+    "key": "solar_dataset_not_available",
+    "message": "Solar dataset is not available for the selected period.",
+    "type": "data_error"
+  },
+  "E-10281": {
+    "key": "solar_analysis_not_applicable",
+    "message": "Solar analysis is not applicable for Battery assets.",
+    "type": "validation_error"
+  },
+  "E-10282": {
+    "key": "solar_scada_report_missing",
+    "message": "Solar SCADA report is missing.",
+    "type": "validation_error"
   }
 }

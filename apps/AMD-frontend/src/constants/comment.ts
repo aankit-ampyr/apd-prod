@@ -86,6 +86,7 @@ export enum ViewAnalysisTabs {
   ImbalanceAnalysis = 'imbalance-analysis',
   BatteryHealth = 'battery-health',
   TBSpread = 'tb-spread',
+  SolarGeneration = 'solar-generation',
 }
 
 export enum ViewAnalysisWidgets {
@@ -119,6 +120,8 @@ export enum ViewAnalysisWidgets {
   WarrantyLimitExceedance = 'warranty-limit-exceedance',
   DailyTbSpreadTrend = 'daily-tb-spread-trend',
   DailyTbSpreadDetails = 'daily-tb-spread-details',
+  SolarKpiVitals = 'solar-kpi-vitals',
+  SolarGenerationSplit = 'solar-generation-split',
 }
 
 export enum BenchmarkAnalysisTabs {
@@ -362,6 +365,16 @@ export const APP_MODULE_HIERARCHY: AppModuleHierarchyType = {
           {id: ViewAnalysisWidgets.DailyTbSpreadTrend, name: 'Daily TB Spread Trend', type: WidgetType.Chart},
           // Tables
           {id: ViewAnalysisWidgets.DailyTbSpreadDetails, name: 'Daily TB Spread Details', type: WidgetType.Table},
+        ],
+      },
+      {
+        id: ViewAnalysisTabs.SolarGeneration,
+        name: 'Solar',
+        widgets: [
+          // KPIs
+          {id: ViewAnalysisWidgets.SolarKpiVitals, name: 'Solar KPI Vitals', type: WidgetType.KPI},
+          // Charts
+          {id: ViewAnalysisWidgets.SolarGenerationSplit, name: 'Off-Peak / Peak Generation', type: WidgetType.Chart},
         ],
       },
     ],

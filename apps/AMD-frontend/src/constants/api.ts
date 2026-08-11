@@ -59,6 +59,7 @@ export const API: ApiConfigInterface = {
     asset_taggable_users: (assetId: number) => `api/v1/assets/${assetId}/comments/users/taggable`,
     asset_aggregator_report_upload: (assetId: number) => `api/v1/assets/${assetId}/aggregator-report`,
     asset_scada_report_upload: (assetId: number) => `api/v1/assets/${assetId}/scada-report`,
+    asset_solar_scada_report_upload: (assetId: number) => `api/v1/assets/${assetId}/solar-scada-report`,
     asset_merge_dataset: (assetId: number) => `api/v1/assets/${assetId}/merge-dataset`,
     asset_optimized_dataset: (assetId: number) => `api/v1/assets/${assetId}/optimized-dataset`,
     asset_merged_dataset_download: (assetId: number) => `api/v1/assets/${assetId}/merged-dataset/download`,
@@ -152,6 +153,14 @@ export const API: ApiConfigInterface = {
       `api/v1/assets/${assetId}/analysis/market/revenue-distribution`,
     asset_analysis_market_hourly_price_patterns: (assetId: number) =>
       `api/v1/assets/${assetId}/analysis/market/hourly-price-patterns`,
+
+    // asset analysis-solar related APIs
+    asset_analysis_solar_kpi_vitals: (assetId: number) => `api/v1/assets/${assetId}/analysis/solar/kpi-vitals`,
+    asset_analysis_solar_generation_split: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/solar/generation-split`,
+    asset_analysis_solar_daily_trend: (assetId: number) => `api/v1/assets/${assetId}/analysis/solar/daily-trend`,
+    asset_analysis_solar_irradiance_trend: (assetId: number) =>
+      `api/v1/assets/${assetId}/analysis/solar/irradiance-trend`,
 
     // executive analysis related APIs
     asset_executive_analysis_monthly_revenue_comparison: (assetId: number) =>

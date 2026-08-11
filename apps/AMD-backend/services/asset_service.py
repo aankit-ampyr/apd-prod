@@ -42,9 +42,11 @@ from constants.enums import (
     AssetFileType,
     UserRole,
     Platform,
+    AnalysisModules,
     APDAuditLogScenario as AuditLogScenario,
     APDAuditLogModules as AuditLogModules,
 )
+from services.solar_etl_service import SolarETLService
 from constants.dependency_class import (
     OptimizedDataFrame,
     YearlyOptimizedDataFrame,
@@ -247,7 +249,6 @@ class AssetService:
             month=data.month,
             year=data.year,
             dependencies=data.dependencies,
-            db=db,
         )
 
         return Res.success('S-10000')
@@ -358,11 +359,15 @@ class AssetService:
         for asset, org in rows:
             asset_files = asset.files
 
-            # get only merged files
+            # get only merged files (BESS) or the processed solar dataset (Solar)
             merged_files = [
                 f
                 for f in asset_files
-                if f.type == AssetFileType.MERGED_SCADA_AGGREGATOR.value
+                if f.type
+                in (
+                    AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                    AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                )
             ]
 
             # get file count
@@ -873,8 +878,12 @@ class AssetService:
             )
             .where(
                 AssetFile.asset_id == asset_id,
-                AssetFile.type
-                == AssetFileType.MERGED_SCADA_AGGREGATOR.value,  # ✅ key change
+                AssetFile.type.in_(
+                    [
+                        AssetFileType.MERGED_SCADA_AGGREGATOR.value,
+                        AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                    ]
+                ),
                 AssetFile.month.isnot(None),
                 AssetFile.year.isnot(None),
             )
@@ -983,11 +992,7 @@ class AssetService:
                 "name": countries_list.get(asset.country_id).get("label"),
             },
             "location": asset.state,
-            "current_step": (
-                getattr(asset, "current_step", None)
-                if asset.type != AssetType.SOLAR.value
-                else AssetSteps.BASIC_INFORMATION.value
-            ),
+            "current_step": getattr(asset, "current_step", None),
             "has_iar": bool(iar_file),
             "submitted_by": submited_by,
             "activated_by": approved_by,
@@ -1002,6 +1007,28 @@ class AssetService:
             "updated_at": asset.updated_at.isoformat() if asset.updated_at else None,
             "is_asset_alert_seen_before": is_asset_alert_seen_before,
         }
+        # Time-Periods (applicable to every asset type)
+        data["active_period"] = (
+            {
+                "month": int(asset.active_month),
+                "year": int(asset.active_year),
+            }
+            if asset.active_month is not None and asset.active_year is not None
+            else None
+        )
+
+        data["available_periods"] = (
+            [
+                {
+                    "month": int(p.month),
+                    "year": int(p.year),
+                }
+                for p in available_periods
+            ]
+            if available_periods is not None
+            else []
+        )
+
         if asset.type != AssetType.SOLAR.value:
             # Optmization Params
             data["max_charging_rate"] = opt.max_charging_rate_mw if opt else None
@@ -1107,16 +1134,7 @@ class AssetService:
                 else None
             )
 
-            # Time-Periods
-            data["active_period"] = (
-                {
-                    "month": int(asset.active_month),
-                    "year": int(asset.active_year),
-                }
-                if asset.active_month is not None and asset.active_year is not None
-                else None
-            )
-
+            # Invoice Time-Periods
             data["invoice_active_period"] = (
                 {
                     "month": int(asset.active_invoice_month),
@@ -1125,18 +1143,6 @@ class AssetService:
                 if asset.active_invoice_month is not None
                 and asset.active_invoice_year is not None
                 else None
-            )
-
-            data["available_periods"] = (
-                [
-                    {
-                        "month": int(p.month),
-                        "year": int(p.year),
-                    }
-                    for p in available_periods
-                ]
-                if available_periods is not None
-                else []
             )
 
             data["available_invoice_periods"] = (
@@ -1161,6 +1167,14 @@ class AssetService:
                 ]
                 if available_summary_statement_periods is not None
                 else []
+            )
+        else:
+            # Solar Files
+            data["solar_scada_report_file"] = format_report_file(
+                files_map.get(AssetFileType.SOLAR_SCADA_REPORT.value)
+            )
+            data["solar_processed_dataset_file"] = format_generated_file(
+                files_map.get(AssetFileType.SOLAR_PROCESSED_DATASET.value)
             )
 
         return Res.success("S-10026", data=data)
@@ -1197,11 +1211,7 @@ class AssetService:
             state=payload.location,
             country_id=payload.country_id,
             organization_id=payload.organization_id,
-            status=(
-                AssetStatus.ACTIVE.value
-                if payload.type == AssetType.SOLAR
-                else AssetStatus.DRAFT.value
-            ),
+            status=AssetStatus.DRAFT.value,
             current_step=AssetSteps.BASIC_INFORMATION.value,
             created_by=current_user.get("id"),
         )
@@ -1320,13 +1330,8 @@ class AssetService:
                     )
                 )
                 asset.current_step = AssetSteps.BASIC_INFORMATION.value
-
-                if new_type_val == AssetType.SOLAR.value:
-                    asset.status = AssetStatus.ACTIVE.value
-                    audit_after = "Asset type changed to Solar. Data purged. Status set to ACTIVE."
-                else:
-                    asset.status = AssetStatus.DRAFT.value
-                    audit_after = f"Asset type changed from Solar. Status set to DRAFT."
+                asset.status = AssetStatus.DRAFT.value
+                audit_after = "Asset type changed. Data purged. Status set to DRAFT."
 
                 # LOG THE PURGE
                 await audit_logs(
@@ -3295,6 +3300,266 @@ class AssetService:
             traceback.print_exc()
             return Res.error("E-10001")
 
+    async def upload_solar_scada_report(
+        self,
+        db: AsyncSession,
+        redis: Redis,
+        asset_id: int,
+        file: UploadFile,
+        current_user: dict,
+        backgroundTask: BackgroundTasks,
+        validation_month: int = None,
+        validation_year: int = None,
+    ):
+        try:
+            file_bytes = await file.read()
+            size_bytes = len(file_bytes)
+            original_name = file.filename
+
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error("E-10034", http_status_code=404)
+
+            if asset.type == AssetType.BATTERY.value:
+                return Res.error(
+                    "E-10279",
+                    message="Solar SCADA upload is not applicable for Battery assets.",
+                    http_status_code=422,
+                )
+
+            # 1. Extension & File Size Validation
+            if not original_name.lower().endswith((".xlsx", ".xls")):
+                return Res.error(
+                    "E-10274",
+                    message="Only .xlsx or .xls files are supported.",
+                    http_status_code=422,
+                )
+            if size_bytes < 1024:
+                return Res.error(
+                    "E-10275",
+                    message="Solar file size must be at least 1 KB.",
+                    http_status_code=422,
+                )
+            if size_bytes > 100 * 1024 * 1024:
+                return Res.error(
+                    "E-10276",
+                    message="Solar file size should not exceed 100 MB.",
+                    http_status_code=413,
+                )
+
+            # 2. Parse & validate the workbook, build the normalized 15-min dataset
+            try:
+                dataset, validation_errors = SolarETLService().parse(file_bytes)
+                if validation_errors:
+                    formatted_errors = [
+                        f"{err['column']} (Row {err['row']}): {err['message']}"
+                        for err in validation_errors
+                    ]
+                    return Res.error(
+                        "E-10277",
+                        data={
+                            "file": {"name": original_name},
+                            "validation_errors": formatted_errors,
+                        },
+                        http_status_code=422,
+                    )
+            except Exception:
+                traceback.print_exc()
+                return Res.error(
+                    "E-10277",
+                    message="Failed to parse excel file content.",
+                    http_status_code=422,
+                )
+
+            # 3. Derive month/year from the dominant period of the data, rather
+            # than trusting the filename.
+            periods = dataset["Timestamp"].dt.to_period("M")
+            dominant = periods.mode().iloc[0]
+            file_month = int(dominant.month)
+            file_year = int(dominant.year)
+            projection_start = dataset["Timestamp"].min().tz_localize("UTC")
+            projection_end = dataset["Timestamp"].max().tz_localize("UTC")
+
+            if (validation_month and file_month != validation_month) or (
+                validation_year and file_year != validation_year
+            ):
+                return Res.error(
+                    "E-10278",
+                    data={
+                        "validation_errors": [
+                            f"File content month/year ({file_month}/{file_year}) does not match the expected month/year ({validation_month}/{validation_year})."
+                        ]
+                    },
+                    http_status_code=422,
+                )
+
+            # 4. Store the raw upload as-is, for audit/reprocessing.
+            raw_stored_name = f"{uuid4().hex}-{original_name}"
+            raw_storage_path = f"assets/asset-{asset_id}/solar-scada-reports/"
+
+            raw_existing_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_SCADA_REPORT.value,
+                    AssetFile.month == file_month,
+                    AssetFile.year == file_year,
+                )
+            )
+            raw_record = raw_existing_query.scalars().first()
+            was_existing = raw_record is not None
+            old_name = raw_record.name if was_existing else "Not Uploaded"
+
+            FileStorageManager.upload_file(
+                file_bytes, raw_stored_name, raw_storage_path, is_encrypted=False
+            )
+
+            if raw_record:
+                raw_record.name = original_name
+                raw_record.projection_start_date = projection_start
+                raw_record.projection_end_date = projection_end
+                raw_record.key = f"{raw_storage_path}{raw_stored_name}"
+                raw_record.size = size_bytes
+                raw_record.row = len(dataset)
+                raw_record.month = file_month
+                raw_record.year = file_year
+                raw_record.uploaded_at = datetime.now()
+            else:
+                raw_record = AssetFile(
+                    asset_id=asset_id,
+                    type=AssetFileType.SOLAR_SCADA_REPORT.value,
+                    month=file_month,
+                    year=file_year,
+                    projection_start_date=projection_start,
+                    projection_end_date=projection_end,
+                    name=original_name,
+                    key=f"{raw_storage_path}{raw_stored_name}",
+                    size=size_bytes,
+                    row=len(dataset),
+                    storage_server=FileStorageManager.STORAGE_TYPE,
+                    is_active=True,
+                )
+                db.add(raw_record)
+
+            # 5. Store the normalized 15-minute dataset -- this is what the
+            # analytics worker reads from, not the raw upload.
+            output_buffer = BytesIO()
+            dataset.to_excel(output_buffer, index=False, engine="openpyxl")
+            output_buffer.seek(0)
+            processed_bytes = output_buffer.read()
+
+            processed_stored_name = f"{uuid4().hex}-processed-{original_name}"
+            processed_storage_path = f"assets/asset-{asset_id}/solar-processed-datasets/"
+
+            processed_existing_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                    AssetFile.month == file_month,
+                    AssetFile.year == file_year,
+                )
+            )
+            processed_record = processed_existing_query.scalars().first()
+
+            FileStorageManager.upload_file(
+                processed_bytes, processed_stored_name, processed_storage_path, is_encrypted=False
+            )
+
+            if processed_record:
+                processed_record.name = f"processed-{original_name}"
+                processed_record.projection_start_date = projection_start
+                processed_record.projection_end_date = projection_end
+                processed_record.key = f"{processed_storage_path}{processed_stored_name}"
+                processed_record.size = len(processed_bytes)
+                processed_record.row = len(dataset)
+                processed_record.month = file_month
+                processed_record.year = file_year
+                processed_record.uploaded_at = datetime.now()
+            else:
+                processed_record = AssetFile(
+                    asset_id=asset_id,
+                    type=AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                    month=file_month,
+                    year=file_year,
+                    projection_start_date=projection_start,
+                    projection_end_date=projection_end,
+                    name=f"processed-{original_name}",
+                    key=f"{processed_storage_path}{processed_stored_name}",
+                    size=len(processed_bytes),
+                    row=len(dataset),
+                    storage_server=FileStorageManager.STORAGE_TYPE,
+                    is_active=True,
+                )
+                db.add(processed_record)
+
+            await db.flush()
+
+            asset.active_month = file_month
+            asset.active_year = file_year
+
+            # 6. Audit Log
+            await audit_logs(
+                db=db,
+                redis=redis,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=self._get_audit_module(asset),
+                action=(
+                    AuditLogScenario.SOLAR_SCADA_REPLACED
+                    if was_existing
+                    else AuditLogScenario.SOLAR_SCADA_UPLOADED
+                ),
+                before={"Solar SCADA Report": old_name},
+                after={
+                    "Solar SCADA Report": original_name,
+                    "Period": f"{file_month}/{file_year}",
+                },
+                resource_id=asset.asset_id,
+            )
+
+            await db.commit()
+
+            # 7. Kick off the async analytics recompute for this period --
+            # mirrors how every other upload/merge/optimize step enqueues
+            # `asset_computation_task` instead of computing inline.
+            backgroundTask.add_task(
+                asset_computation_task.kiq,
+                asset_id=asset_id,
+                month=file_month,
+                year=file_year,
+                modules=[AnalysisModules.SOLAR_ANALYSIS],
+            )
+
+            return Res.success(
+                "S-10166",
+                message="Solar SCADA report uploaded successfully.",
+                data={
+                    "id": raw_record.id,
+                    "asset_id": asset.id,
+                    "name": original_name,
+                    "size": size_bytes,
+                    "uploaded_at": raw_record.uploaded_at.isoformat(),
+                    "projection_summary": {
+                        "start_timestamp": projection_start.isoformat(),
+                        "end_timestamp": projection_end.isoformat(),
+                    },
+                    "total_rows": len(dataset),
+                    "month": file_month,
+                    "year": file_year,
+                    "processed_dataset": {
+                        "id": processed_record.id,
+                        "asset_id": asset.id,
+                        "name": processed_record.name,
+                        "month": file_month,
+                        "year": file_year,
+                    },
+                },
+            )
+
+        except Exception:
+            traceback.print_exc()
+            await db.rollback()
+            return Res.error("E-10001")
+
     async def download_merged_dataset(
         self, db: AsyncSession, redis: Redis, asset_id: int, current_user: dict
     ):
@@ -3363,73 +3628,82 @@ class AssetService:
                 "E-10034", message="Asset not found.", http_status_code=404
             )
         if asset.type == AssetType.SOLAR.value:
-            return Res.error(
-                "E-10120",
-                message="Solar assets do not require activation through this flow",
-                http_status_code=422
+            # Solar Processed Dataset (SCADA upload step)
+            solar_scada_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
+            if not solar_scada_query.scalars().first():
+                return Res.error(
+                    "E-10282",
+                    message="Solar SCADA report is missing",
+                    http_status_code=422,
+                )
+        else:
+            # Optimization Parameters
+            opt_query = await db.execute(
+                select(AssetOptimizationParameter).where(
+                    AssetOptimizationParameter.asset_id == asset_id
+                )
+            )
+            optimization_params = opt_query.scalars().first()
+            if not optimization_params:
+                return Res.error(
+                    "E-10116",
+                    message="Optimization parameters are missing",
+                    http_status_code=422
+                )
 
-        # Optimization Parameters
-        opt_query = await db.execute(
-            select(AssetOptimizationParameter).where(
-                AssetOptimizationParameter.asset_id == asset_id
+            # Aggregator Report
+            agg_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.AGGREGATOR_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
-        optimization_params = opt_query.scalars().first()
-        if not optimization_params:
-            return Res.error(
-                "E-10116",
-                message="Optimization parameters are missing",
-                http_status_code=422
-            )
+            aggregator_file = agg_query.scalars().first()
+            if not aggregator_file:
+                return Res.error(
+                    "E-10117",
+                    message="Active aggregator report is missing",
+                    http_status_code=422,
+                )
 
-        # Aggregator Report
-        agg_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.AGGREGATOR_REPORT.value,
-                AssetFile.is_active.is_(True),
+            # SCADA Report
+            scada_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SCADA_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
-        aggregator_file = agg_query.scalars().first()
-        if not aggregator_file:
-            return Res.error(
-                "E-10117",
-                message="Active aggregator report is missing",
-                http_status_code=422,
-            )
+            scada_file = scada_query.scalars().first()
+            if not scada_file:
+                return Res.error(
+                    "E-10118",
+                    message="Active SCADA report is missing",
+                    http_status_code=422,
+                )
 
-        # SCADA Report
-        scada_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.SCADA_REPORT.value,
-                AssetFile.is_active.is_(True),
+            # IAR Report
+            iar_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
-        scada_file = scada_query.scalars().first()
-        if not scada_file:
-            return Res.error(
-                "E-10118",
-                message="Active SCADA report is missing",
-                http_status_code=422,
-            )
-
-        # IAR Report
-        iar_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
-                AssetFile.is_active.is_(True),
-            )
-        )
-        iar_file = iar_query.scalars().first()
-        if not iar_file:
-            return Res.error(
-                "E-10119",
-                message="Active IAR report is missing",
-                http_status_code=422,
-            )
+            iar_file = iar_query.scalars().first()
+            if not iar_file:
+                return Res.error(
+                    "E-10119",
+                    message="Active IAR report is missing",
+                    http_status_code=422,
+                )
 
         # Update Asset Status
         new_status = AssetStatus.ACTIVE.value if status else AssetStatus.INACTIVE.value
@@ -3990,8 +4264,6 @@ class AssetService:
                 return Res.error(
                     "E-10034", message="Asset not found", http_status_code=404
                 )
-            if asset.type == AssetType.SOLAR.value:
-                return Res.error("E-10120", message="Not applicable for solar asset", http_status_code=422)
 
             query = select(AssetFile).where(AssetFile.asset_id == asset_id)
 
@@ -4077,6 +4349,8 @@ class AssetService:
                 AssetFileType.INTERNAL_APPRAISAL_REPORT.value: AuditLogScenario.DOWNLOADED_IAR_FILE,
                 AssetFileType.MERGED_SCADA_AGGREGATOR.value: AuditLogScenario.MERGED_DATASET_DOWNLOADED,
                 AssetFileType.OPTIMIZED_DATASET.value: AuditLogScenario.OPTIMIZED_DATASET_DOWNLOADED,
+                AssetFileType.SOLAR_SCADA_REPORT.value: AuditLogScenario.DOWNLOADED_SOLAR_SCADA_FILE,
+                AssetFileType.SOLAR_PROCESSED_DATASET.value: AuditLogScenario.DOWNLOADED_SOLAR_SCADA_FILE,
             }
             download_action = action_map.get(asset_file.type)
             if download_action:
@@ -4817,13 +5091,43 @@ class AssetService:
             AssetFileType.SCADA_REPORT.value,
             AssetFileType.AGGREGATOR_REPORT.value,
         ]
+        is_solar_scada_file = asset_file_type in [
+            AssetFileType.SOLAR_SCADA_REPORT.value,
+            AssetFileType.SOLAR_PROCESSED_DATASET.value,
+        ]
 
         await db.delete(asset_file)
 
         # only delete if we are removing Add or Scada report.
         is_merged_file_delete = False
         is_optimized_file_delete = False
-        
+        is_solar_processed_dataset_delete = False
+
+        if is_solar_scada_file:
+            # The raw upload and the ETL-derived dataset are always removed
+            # together, mirroring the SCADA/Aggregator -> Merged cascade below.
+            solar_sibling_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type.in_(
+                        [
+                            AssetFileType.SOLAR_SCADA_REPORT.value,
+                            AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                        ]
+                    ),
+                    AssetFile.month == asset_file.month,
+                    AssetFile.year == asset_file.year,
+                    AssetFile.id != asset_file.id,
+                )
+            )
+            solar_sibling_file = solar_sibling_query.scalars().first()
+            if solar_sibling_file:
+                child_files.append(
+                    {"file_id": solar_sibling_file.id, "file_type": solar_sibling_file.type}
+                )
+                await db.delete(solar_sibling_file)
+                is_solar_processed_dataset_delete = True
+
         if is_agg_scada_file:
             merged_file_query = await db.execute(
                 select(AssetFile).where(
@@ -4859,10 +5163,12 @@ class AssetService:
                     is_optimized_file_delete = True
 
         asset = await db.get(Asset, asset_id)
-        if asset:
+        if asset and asset.type != AssetType.SOLAR.value:
             # One step less that actual since current_step is basically till which step is completed. So if we are removing SCADA, we are going back to just after aggregator upload step
             # if asset has reached REVIEW step, it means optimization parameters were already saved once,
             # so we don't downgrade the step. For all other steps, we move it to OPTIMIZATION_CONFIGURATION
+            # (Solar assets don't use this onboarding-step wizard at all -- they
+            # go ACTIVE immediately on creation -- so this block never applies to them.)
             if asset.current_step != AssetSteps.REVIEW.value:
                 asset.current_step = (
                     AssetSteps.OPTIMIZATION_CONFIGURATION.value
@@ -4876,6 +5182,8 @@ class AssetService:
             AssetFileType.AGGREGATOR_REPORT.value: AuditLogScenario.AGGREGATOR_REPORT_REMOVED,
             AssetFileType.SCADA_REPORT.value: AuditLogScenario.SCADA_REPORT_REMOVED,
             AssetFileType.INTERNAL_APPRAISAL_REPORT.value: AuditLogScenario.INTERNAL_APPRAISAL_REPORT_REMOVED,
+            AssetFileType.SOLAR_SCADA_REPORT.value: AuditLogScenario.SOLAR_SCADA_REMOVED,
+            AssetFileType.SOLAR_PROCESSED_DATASET.value: AuditLogScenario.SOLAR_SCADA_REMOVED,
         }
         delete_action = action_map.get(
             asset_file_type, AuditLogScenario.SCADA_REPORT_REMOVED
@@ -4909,6 +5217,15 @@ class AssetService:
             year=asset_file.year,
             dependencies=depedency_map,
         )
+
+        if is_solar_scada_file or is_solar_processed_dataset_delete:
+            backgroundTask.add_task(
+                asset_analytics_deletion_task.kiq,
+                asset_id=asset_id,
+                month=asset_file.month,
+                year=asset_file.year,
+                modules=[AnalysisModules.SOLAR_ANALYSIS],
+            )
 
         return Res.success(
             "S-10053",
@@ -4958,54 +5275,66 @@ class AssetService:
         if asset.status == AssetStatus.PENDING_APPROVAL.value:
             return Res.success("S-10063", data={"id": asset.id, "status": asset.status})
 
-        # Optimization Parameters
-        opt_query = await db.execute(
-            select(AssetOptimizationParameter).where(
-                AssetOptimizationParameter.asset_id == asset_id
+        if asset.type == AssetType.SOLAR.value:
+            # Solar Processed Dataset (SCADA upload step)
+            solar_scada_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
-        optimization_params = opt_query.scalars().first()
-        if not optimization_params:
-            return Res.error("E-10116", message="Optimization parameters are missing", http_status_code=422)
-
-        # Aggregator Report
-        agg_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.AGGREGATOR_REPORT.value,
-                AssetFile.is_active.is_(True),
+            if not solar_scada_query.scalars().first():
+                return Res.error("E-10282", message="Solar SCADA report is missing", http_status_code=422)
+        else:
+            # Optimization Parameters
+            opt_query = await db.execute(
+                select(AssetOptimizationParameter).where(
+                    AssetOptimizationParameter.asset_id == asset_id
+                )
             )
-        )
-        aggregator_file = agg_query.scalars().first()
+            optimization_params = opt_query.scalars().first()
+            if not optimization_params:
+                return Res.error("E-10116", message="Optimization parameters are missing", http_status_code=422)
 
-        if not aggregator_file:
-            return Res.error("E-10117", message="Active aggregator report is missing", http_status_code=422)
-
-        # SCADA Report
-        scada_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.SCADA_REPORT.value,
-                AssetFile.is_active.is_(True),
+            # Aggregator Report
+            agg_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.AGGREGATOR_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
+            aggregator_file = agg_query.scalars().first()
 
-        scada_file = scada_query.scalars().first()
-        if not scada_file:
-            return Res.error("E-10118", message="Active SCADA report is missing", http_status_code=422)
+            if not aggregator_file:
+                return Res.error("E-10117", message="Active aggregator report is missing", http_status_code=422)
 
-        # IAR Report
-        iar_query = await db.execute(
-            select(AssetFile).where(
-                AssetFile.asset_id == asset_id,
-                AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
-                AssetFile.is_active.is_(True),
+            # SCADA Report
+            scada_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.SCADA_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
             )
-        )
-        iar_file = iar_query.scalars().first()
 
-        if not iar_file:
-            return Res.error("E-10119", message="Active IAR report is missing", http_status_code=422)
+            scada_file = scada_query.scalars().first()
+            if not scada_file:
+                return Res.error("E-10118", message="Active SCADA report is missing", http_status_code=422)
+
+            # IAR Report
+            iar_query = await db.execute(
+                select(AssetFile).where(
+                    AssetFile.asset_id == asset_id,
+                    AssetFile.type == AssetFileType.INTERNAL_APPRAISAL_REPORT.value,
+                    AssetFile.is_active.is_(True),
+                )
+            )
+            iar_file = iar_query.scalars().first()
+
+            if not iar_file:
+                return Res.error("E-10119", message="Active IAR report is missing", http_status_code=422)
 
         # UPDATE ASSET
         old_status = asset.status

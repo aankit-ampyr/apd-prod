@@ -98,6 +98,11 @@ import {
   ListActiveNotificationsRequest,
   MarkNotificationReadRequest,
   AssetAnalysisBatteryStrategyEnergyThroughputSummaryExportRequest,
+  UploadSolarScadaReportRequest,
+  AssetAnalysisSolarKpiVitalsRequest,
+  AssetAnalysisSolarGenerationSplitRequest,
+  AssetAnalysisSolarDailyTrendRequest,
+  AssetAnalysisSolarIrradianceTrendRequest,
 } from '@/interface';
 
 const defaultHeaders = {
@@ -349,6 +354,14 @@ export async function uploadScadaReport({assetId, formData}: UploadScadaReportRe
   });
 }
 
+export async function uploadSolarScadaReport({assetId, formData}: UploadSolarScadaReportRequest['payload']) {
+  return await createAxiosInstance({
+    url: API.authUrls.asset_solar_scada_report_upload(assetId),
+    method: 'POST',
+    data: formData,
+  });
+}
+
 export async function mergeAssetDatasets(data: RemoveScadaReportRequest['payload']) {
   const {assetId, ...rest} = data;
   return await createAxiosInstance({
@@ -568,6 +581,42 @@ export async function getAssetTBSpreadDetails(params: AssetTBSpreadDetailsReques
   const {assetId, ...rest} = params;
   return await createAxiosInstance({
     url: API.authUrls.asset_analysis_tb_spread_details(assetId),
+    method: 'GET',
+    params: rest,
+  });
+}
+
+export async function getAssetSolarKpiVitals(params: AssetAnalysisSolarKpiVitalsRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_kpi_vitals(assetId),
+    method: 'GET',
+    params: rest,
+  });
+}
+
+export async function getAssetSolarGenerationSplit(params: AssetAnalysisSolarGenerationSplitRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_generation_split(assetId),
+    method: 'GET',
+    params: rest,
+  });
+}
+
+export async function getAssetSolarDailyTrend(params: AssetAnalysisSolarDailyTrendRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_daily_trend(assetId),
+    method: 'GET',
+    params: rest,
+  });
+}
+
+export async function getAssetSolarIrradianceTrend(params: AssetAnalysisSolarIrradianceTrendRequest['params']) {
+  const {assetId, ...rest} = params;
+  return await createAxiosInstance({
+    url: API.authUrls.asset_analysis_solar_irradiance_trend(assetId),
     method: 'GET',
     params: rest,
   });

@@ -3381,3 +3381,246 @@ class AnalysisService:
             media_type="text/csv",
             headers={"Content-Disposition": f"attachment; filename={file_name}"},
         )
+
+    # ================== #
+    #  Solar Analysis    #
+    # ================== #
+
+    @asset_analytics_db_cache(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_KPI_VITALS,
+        index=["asset_id", "month", "year"],
+    )
+    async def get_solar_kpi_vitals(
+        self,
+        db: AsyncSession,
+        redis: Redis,
+        asset_id: int,
+        month: int,
+        year: int,
+        current_user: dict,
+        **kwargs,
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error(
+                    "E-10034",
+                    message=f"Asset with ID {asset_id} not found.",
+                    http_status_code=404,
+                )
+            if asset.type == AssetType.BATTERY.value:
+                return Res.error(
+                    "E-10281",
+                    message="Solar analysis is not applicable for Battery assets.",
+                    http_status_code=422,
+                )
+
+            await audit_logs(
+                db=db,
+                redis=redis,
+                user_id=current_user.get("user_id"),
+                user_role=current_user.get("role"),
+                module=AuditLogModules.VIEW_ANALYSIS,
+                action=AuditLogScenario.VIEWED_SOLAR_ANALYSIS,
+                before={
+                    "Asset": asset.name,
+                    "Month/Year": f"{month}/{year}",
+                },
+                after="User viewed Solar Analysis visualisations",
+                resource_id=asset.asset_id,
+            )
+            await db.commit()
+
+            analytics_data = kwargs.get("analytics_data")
+            compute_context = kwargs.get("compute_context")
+            if analytics_data:
+                return Res.success(
+                    "S-10167",
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        **analytics_data,
+                    },
+                )
+
+            df = await self.helper.load_solar_operations_file(
+                asset_id=asset_id, month=month, year=year, db=db
+            )
+            analytics_data = await self.helper.get_solar_kpi_vitals(
+                df=df, db=db, asset_id=asset_id, month=month, year=year
+            )
+            compute_context["result"] = analytics_data
+
+            return Res.success(
+                "S-10167",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    **analytics_data,
+                },
+            )
+        except ExceptionWithErrorCode:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            return Res.error(errors=[str(e)])
+
+    @asset_analytics_db_cache(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_GENERATION_SPLIT,
+        index=["asset_id", "month", "year"],
+    )
+    async def get_solar_generation_split(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, **kwargs
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error(
+                    "E-10034",
+                    message=f"Asset with ID {asset_id} not found.",
+                    http_status_code=404,
+                )
+
+            analytics_data = kwargs.get("analytics_data")
+            compute_context = kwargs.get("compute_context")
+            if analytics_data:
+                return Res.success(
+                    "S-10168",
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        **analytics_data,
+                    },
+                )
+
+            df = await self.helper.load_solar_operations_file(
+                asset_id=asset_id, month=month, year=year, db=db
+            )
+            analytics_data = self.helper.get_solar_generation_split(df)
+            compute_context["result"] = analytics_data
+
+            return Res.success(
+                "S-10168",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    **analytics_data,
+                },
+            )
+        except ExceptionWithErrorCode:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            return Res.error(errors=[str(e)])
+
+    @asset_analytics_db_cache(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_DAILY_TREND,
+        index=["asset_id", "month", "year"],
+    )
+    async def get_solar_daily_generation_trend(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, **kwargs
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error(
+                    "E-10034",
+                    message=f"Asset with ID {asset_id} not found.",
+                    http_status_code=404,
+                )
+
+            analytics_data = kwargs.get("analytics_data")
+            compute_context = kwargs.get("compute_context")
+            if analytics_data:
+                return Res.success(
+                    "S-10169",
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        **analytics_data,
+                    },
+                )
+
+            df = await self.helper.load_solar_operations_file(
+                asset_id=asset_id, month=month, year=year, db=db
+            )
+            analytics_data = self.helper.get_solar_daily_generation_trend(df)
+            compute_context["result"] = analytics_data
+
+            return Res.success(
+                "S-10169",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    **analytics_data,
+                },
+            )
+        except ExceptionWithErrorCode:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            return Res.error(errors=[str(e)])
+
+    @asset_analytics_db_cache(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_WEATHER,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_IRRADIANCE_TREND,
+        index=["asset_id", "month", "year"],
+    )
+    async def get_solar_irradiance_trend(
+        self, db: AsyncSession, asset_id: int, month: int, year: int, **kwargs
+    ):
+        try:
+            asset = await db.get(Asset, asset_id)
+            if not asset:
+                return Res.error(
+                    "E-10034",
+                    message=f"Asset with ID {asset_id} not found.",
+                    http_status_code=404,
+                )
+
+            analytics_data = kwargs.get("analytics_data")
+            compute_context = kwargs.get("compute_context")
+            if analytics_data:
+                return Res.success(
+                    "S-10170",
+                    data={
+                        "asset_id": asset_id,
+                        "month": month,
+                        "year": year,
+                        **analytics_data,
+                    },
+                )
+
+            df = await self.helper.load_solar_operations_file(
+                asset_id=asset_id, month=month, year=year, db=db
+            )
+            analytics_data = self.helper.get_solar_irradiance_trend(df)
+            compute_context["result"] = analytics_data
+
+            return Res.success(
+                "S-10170",
+                data={
+                    "asset_id": asset_id,
+                    "month": month,
+                    "year": year,
+                    **analytics_data,
+                },
+            )
+        except ExceptionWithErrorCode:
+            raise
+        except Exception as e:
+            traceback.print_exc()
+            return Res.error(errors=[str(e)])

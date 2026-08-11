@@ -14,7 +14,7 @@ interface DragAndDropProps {
   onRemove?: () => void;
   disabled?: boolean;
   file?: Asset['aggregator_report_file'];
-  label?: 'aggregator' | 'scada';
+  label?: 'aggregator' | 'scada' | 'solar';
   uploadError?: {
     file_name?: string;
     validation_errors?: string[];

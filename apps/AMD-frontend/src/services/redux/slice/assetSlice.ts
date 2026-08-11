@@ -11,6 +11,7 @@ import type {
   OptimizationParamsEditRequest,
   UploadAggregatorReportRequest,
   UploadScadaReportRequest,
+  UploadSolarScadaReportRequest,
   MergeAssetDatasetsRequest,
   AssetOperationalAnalyticsRequest,
   AssetMarketSummaryRequest,
@@ -50,6 +51,10 @@ import type {
   AssetAnalysisBatteryHealthAnnualProjectionReportRequest,
   AssetAnalysisBatteryHealthDailyCyclesRequest,
   AssetAnalysisBatteryHealthWarrantyExceedanceRequest,
+  AssetAnalysisSolarKpiVitalsRequest,
+  AssetAnalysisSolarGenerationSplitRequest,
+  AssetAnalysisSolarDailyTrendRequest,
+  AssetAnalysisSolarIrradianceTrendRequest,
   UpdateAssetReportingPeriodRequest,
   AssetExecutiveAnalysisMonthlyRevenueComparisonRequest,
   AssetExecutiveAnalysisRevenueByStreamRequest,
@@ -65,7 +70,7 @@ import type {
   AssetInvoiceSummaryStatementListRequest,
 } from '@/interface/api-interface';
 import {mergeDeepRight} from 'ramda';
-import {AssetFileType, AssetStatus, AssetSteps, AssetType} from '@/constants';
+import {AssetFileType, AssetStatus, AssetSteps, AssetType, SolarAssetSteps} from '@/constants';
 
 const initialState: AssetSliceInitialState = {
   // loading states
@@ -73,6 +78,7 @@ const initialState: AssetSliceInitialState = {
   assetDetailsFetchLoading: false,
   aggregatorReportUploadLoading: false,
   scadaReportUploadLoading: false,
+  solarScadaReportUploadLoading: false,
   iarReportUploadLoading: false,
   mergeLoading: false,
   optimizedDatasetGenerationLoading: false,
@@ -121,6 +127,7 @@ const initialState: AssetSliceInitialState = {
   // file upload errors
   aggregatorReportUploadError: null,
   scadaReportUploadError: null,
+  solarScadaReportUploadError: null,
   iarReportUploadError: null,
   invoiceSettlementUploadError: null,
   invoiceUploadError: null,
@@ -168,6 +175,12 @@ const initialState: AssetSliceInitialState = {
       summary: null,
       details: null,
     },
+    solar: {
+      kpi_vitals: null,
+      generation_split: null,
+      daily_trend: null,
+      irradiance_trend: null,
+    },
   },
   analyticsLoading: {
     operations: {
@@ -210,6 +223,12 @@ const initialState: AssetSliceInitialState = {
     tb_spread: {
       summary: false,
       details: false,
+    },
+    solar: {
+      kpi_vitals: false,
+      generation_split: false,
+      daily_trend: false,
+      irradiance_trend: false,
     },
   },
   analyticsError: {
@@ -254,6 +273,12 @@ const initialState: AssetSliceInitialState = {
     tb_spread: {
       summary: false,
       details: false,
+    },
+    solar: {
+      kpi_vitals: false,
+      generation_split: false,
+      daily_trend: false,
+      irradiance_trend: false,
     },
   },
 
@@ -777,6 +802,89 @@ const assetSlice = createSlice({
         state.scadaReportUploadError.file = action.payload.data?.file || {name: 'Uploaded File'};
         state.scadaReportUploadError.validation_errors = action.payload.data?.validation_errors || [
           action.payload.message || 'Failed to parse scada report content',
+        ];
+      }
+    },
+
+    // =======================================
+    // upload solar scada report
+    // =======================================
+    uploadSolarScadaReportRequest: (
+      state,
+      _action: PayloadAction<UploadSolarScadaReportRequest['payload']>,
+    ) => {
+      state.solarScadaReportUploadLoading = true;
+      state.solarScadaReportUploadError = null;
+      state.assetError = false;
+      state.assetErrorMessage = '';
+      state.assetSuccess = false;
+    },
+    uploadSolarScadaReportSuccess: (
+      state,
+      action: PayloadAction<UploadSolarScadaReportRequest['response']>,
+    ) => {
+      state.solarScadaReportUploadLoading = false;
+      state.assetSuccess = action.payload.status_code;
+      if (state.currentSelectedAsset && action.payload.data) {
+        const rawFileData = {
+          id: action.payload.data.id,
+          asset_id: action.payload.data.asset_id,
+          name: action.payload.data.name,
+          size: action.payload.data.size,
+          uploaded_at: action.payload.data.uploaded_at,
+          projection_summary: action.payload.data.projection_summary,
+          total_rows: action.payload.data.total_rows,
+          type: AssetFileType.SolarScadaReport,
+          month: action.payload.data.month,
+          year: action.payload.data.year,
+        };
+        state.currentSelectedAsset.solar_scada_report_file = rawFileData;
+
+        const processedFileData = action.payload.data.processed_dataset
+          ? {
+              id: action.payload.data.processed_dataset.id,
+              name: action.payload.data.processed_dataset.name,
+              month: action.payload.data.processed_dataset.month,
+              year: action.payload.data.processed_dataset.year,
+              asset_id: action.payload.data.processed_dataset.asset_id,
+            }
+          : null;
+        state.currentSelectedAsset.solar_processed_dataset_file = processedFileData;
+
+        // initialize if null to avoid error when filtering in case of multiple uploads without page refresh
+        if (!state.currentAssetFiles) {
+          state.currentAssetFiles = [];
+        }
+
+        [rawFileData, processedFileData].forEach(fileData => {
+          if (!fileData) return;
+          let isInserted = false;
+          for (let i = 0; i < state.currentAssetFiles.length; i++) {
+            if (state.currentAssetFiles[i].id === fileData.id) {
+              state.currentAssetFiles[i] = fileData as any;
+              isInserted = true;
+              break;
+            }
+          }
+          if (!isInserted) {
+            state.currentAssetFiles = [...state.currentAssetFiles, fileData as any];
+          }
+        });
+      }
+    },
+    uploadSolarScadaReportFailure: (
+      state,
+      action: PayloadAction<UploadSolarScadaReportRequest['error_response']>,
+    ) => {
+      state.solarScadaReportUploadLoading = false;
+      state.assetError = action.payload.status_code;
+      if (['E-10277', 'E-10278'].includes(action.payload.status_code)) {
+        if (!state.solarScadaReportUploadError) {
+          state.solarScadaReportUploadError = {};
+        }
+        state.solarScadaReportUploadError.file = action.payload.data?.file || {name: 'Uploaded File'};
+        state.solarScadaReportUploadError.validation_errors = action.payload.data?.validation_errors || [
+          action.payload.message || 'Failed to parse solar SCADA report content',
         ];
       }
     },
@@ -1757,6 +1865,118 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // Asset Solar KPI Vitals
+    // =======================================
+    getAssetSolarKpiVitalsRequest: (
+      state,
+      _action: PayloadAction<AssetAnalysisSolarKpiVitalsRequest['params']>,
+    ) => {
+      state.analyticsLoading.solar.kpi_vitals = true;
+      state.analyticsError.solar.kpi_vitals = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getAssetSolarKpiVitalsSuccess: (
+      state,
+      action: PayloadAction<AssetAnalysisSolarKpiVitalsRequest['response']>,
+    ) => {
+      state.analyticsLoading.solar.kpi_vitals = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.analytics.solar.kpi_vitals = action.payload.data;
+      }
+    },
+    getAssetSolarKpiVitalsFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.kpi_vitals = false;
+      state.analyticsError.solar.kpi_vitals = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Asset Solar Generation Split
+    // =======================================
+    getAssetSolarGenerationSplitRequest: (
+      state,
+      _action: PayloadAction<AssetAnalysisSolarGenerationSplitRequest['params']>,
+    ) => {
+      state.analyticsLoading.solar.generation_split = true;
+      state.analyticsError.solar.generation_split = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getAssetSolarGenerationSplitSuccess: (
+      state,
+      action: PayloadAction<AssetAnalysisSolarGenerationSplitRequest['response']>,
+    ) => {
+      state.analyticsLoading.solar.generation_split = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.analytics.solar.generation_split = action.payload.data;
+      }
+    },
+    getAssetSolarGenerationSplitFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.generation_split = false;
+      state.analyticsError.solar.generation_split = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Asset Solar Daily Generation Trend
+    // =======================================
+    getAssetSolarDailyTrendRequest: (
+      state,
+      _action: PayloadAction<AssetAnalysisSolarDailyTrendRequest['params']>,
+    ) => {
+      state.analyticsLoading.solar.daily_trend = true;
+      state.analyticsError.solar.daily_trend = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getAssetSolarDailyTrendSuccess: (
+      state,
+      action: PayloadAction<AssetAnalysisSolarDailyTrendRequest['response']>,
+    ) => {
+      state.analyticsLoading.solar.daily_trend = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.analytics.solar.daily_trend = action.payload.data;
+      }
+    },
+    getAssetSolarDailyTrendFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.daily_trend = false;
+      state.analyticsError.solar.daily_trend = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
+    // Asset Solar Irradiance Trend
+    // =======================================
+    getAssetSolarIrradianceTrendRequest: (
+      state,
+      _action: PayloadAction<AssetAnalysisSolarIrradianceTrendRequest['params']>,
+    ) => {
+      state.analyticsLoading.solar.irradiance_trend = true;
+      state.analyticsError.solar.irradiance_trend = false;
+      state.assetError = false;
+      state.assetSuccess = false;
+    },
+    getAssetSolarIrradianceTrendSuccess: (
+      state,
+      action: PayloadAction<AssetAnalysisSolarIrradianceTrendRequest['response']>,
+    ) => {
+      state.analyticsLoading.solar.irradiance_trend = false;
+      state.assetSuccess = action.payload.status_code;
+      if (action.payload.data) {
+        state.analytics.solar.irradiance_trend = action.payload.data;
+      }
+    },
+    getAssetSolarIrradianceTrendFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.analyticsLoading.solar.irradiance_trend = false;
+      state.analyticsError.solar.irradiance_trend = action.payload.status_code;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
     // Executive Analysis monthly revenue Comparison
     // =======================================
     getExecutiveAnalysisMonthlyRevenueComparisonRequest: (
@@ -2106,6 +2326,53 @@ const assetSlice = createSlice({
     },
 
     // =======================================
+    // filter solar scada files
+    // =======================================
+    filterSolarScadaFilesRequest: (state, _action: PayloadAction<GetAssetFilesRequest['params']>) => {
+      state.isLoading = true;
+    },
+    filterSolarScadaFilesSuccess: (
+      state,
+      action: PayloadAction<{params: GetAssetFilesRequest['params']; response: GetAssetFilesRequest['response']}>,
+    ) => {
+      state.isLoading = false;
+      state.assetSuccess = action.payload.response.status_code;
+      if (action.payload.response.data && state.currentSelectedAsset) {
+        const solarScadaFile = action.payload.response.data.find(
+          item => item.type === AssetFileType.SolarScadaReport,
+        );
+        const solarProcessedFile = action.payload.response.data.find(
+          item => item.type === AssetFileType.SolarProcessedDataset,
+        );
+
+        if (solarScadaFile) {
+          state.currentSelectedAsset.solar_scada_report_file = solarScadaFile;
+        } else {
+          state.currentSelectedAsset.solar_scada_report_file = null;
+        }
+
+        if (solarProcessedFile) {
+          state.currentSelectedAsset.solar_processed_dataset_file = {
+            id: solarProcessedFile.id,
+            name: solarProcessedFile.name,
+            month: solarProcessedFile.month!,
+            year: solarProcessedFile.year!,
+            asset_id: solarProcessedFile.asset_id,
+          };
+        } else {
+          state.currentSelectedAsset.solar_processed_dataset_file = null;
+        }
+
+        // reset the state
+        state.solarScadaReportUploadError = null;
+      }
+    },
+    filterSolarScadaFilesFailure: (state, action: PayloadAction<APIResponse>) => {
+      state.isLoading = false;
+      state.assetError = action.payload.status_code;
+    },
+
+    // =======================================
     // filter invoices files
     // =======================================
     filterInvoiceFilesRequest: (state, _action: PayloadAction<InvoiceListRequest['params']>) => {
@@ -2238,6 +2505,21 @@ const assetSlice = createSlice({
           state.currentSelectedAsset.iar_report_file = null;
           state.currentSelectedAsset.has_iar = false;
           isIarRemoved = true;
+        }
+        // solar's raw upload and processed dataset are always deleted together (see
+        // delete_asset_file's cascade) -- whichever one wasn't the direct target comes
+        // back as a child file, same as the merged/optimized dataset cascade below.
+        if (
+          state.currentSelectedAsset.solar_scada_report_file?.id === file_id ||
+          childFileIds.includes(state.currentSelectedAsset.solar_scada_report_file?.id as number)
+        ) {
+          state.currentSelectedAsset.solar_scada_report_file = null;
+        }
+        if (
+          state.currentSelectedAsset.solar_processed_dataset_file?.id === file_id ||
+          childFileIds.includes(state.currentSelectedAsset.solar_processed_dataset_file?.id as number)
+        ) {
+          state.currentSelectedAsset.solar_processed_dataset_file = null;
         }
         // remove merged dataset either direct deletion or if the removed file is a child file of the merged dataset
         if (
@@ -2525,6 +2807,12 @@ const assetSlice = createSlice({
         state.currentSelectedAsset.current_step = AssetSteps.AggregatorScada;
       }
     },
+
+    gotoSolarReviewStep: state => {
+      if (state.currentSelectedAsset) {
+        state.currentSelectedAsset.current_step = SolarAssetSteps.ScadaUpload;
+      }
+    },
     cancelAssetsRequest(state) {
       state.isLoading = false;
       state.assetDetailsFetchLoading = false;
@@ -2532,6 +2820,8 @@ const assetSlice = createSlice({
       state.aggregatorReportUploadError = null;
       state.scadaReportUploadLoading = false;
       state.scadaReportUploadError = null;
+      state.solarScadaReportUploadLoading = false;
+      state.solarScadaReportUploadError = null;
       state.iarReportUploadLoading = false;
       state.iarReportUploadError = null;
       state.mergeLoading = false;
@@ -2607,6 +2897,7 @@ const assetSlice = createSlice({
     resetAssetFileUploadError: state => {
       state.aggregatorReportUploadError = null;
       state.scadaReportUploadError = null;
+      state.solarScadaReportUploadError = null;
       state.iarReportUploadError = null;
     },
   },
@@ -2662,6 +2953,11 @@ export const {
   uploadScadaReportRequest,
   uploadScadaReportSuccess,
   uploadScadaReportFailure,
+
+  // solar scada report upload
+  uploadSolarScadaReportRequest,
+  uploadSolarScadaReportSuccess,
+  uploadSolarScadaReportFailure,
 
   // merge dataset
   mergeDatasetRequest,
@@ -2864,6 +3160,26 @@ export const {
   getAssetTBSpreadDetailsSuccess,
   getAssetTBSpreadDetailsFailure,
 
+  // get asset solar kpi vitals
+  getAssetSolarKpiVitalsRequest,
+  getAssetSolarKpiVitalsSuccess,
+  getAssetSolarKpiVitalsFailure,
+
+  // get asset solar generation split
+  getAssetSolarGenerationSplitRequest,
+  getAssetSolarGenerationSplitSuccess,
+  getAssetSolarGenerationSplitFailure,
+
+  // get asset solar daily generation trend
+  getAssetSolarDailyTrendRequest,
+  getAssetSolarDailyTrendSuccess,
+  getAssetSolarDailyTrendFailure,
+
+  // get asset solar irradiance trend
+  getAssetSolarIrradianceTrendRequest,
+  getAssetSolarIrradianceTrendSuccess,
+  getAssetSolarIrradianceTrendFailure,
+
   // get files request
   currentAssetFilesRequest,
   currentAssetFilesSuccess,
@@ -2873,6 +3189,11 @@ export const {
   filterAggregatorScadaFilesRequest,
   filterAggregatorScadaFilesSuccess,
   filterAggregatorScadaFilesFailure,
+
+  // filter solar scada files
+  filterSolarScadaFilesRequest,
+  filterSolarScadaFilesSuccess,
+  filterSolarScadaFilesFailure,
 
   // filter merged dataset files
   filterInvoiceFilesRequest,
@@ -2941,5 +3262,6 @@ export const {
   gotoReviewStep,
   resetAssetMessage,
   gotoIARStep,
+  gotoSolarReviewStep,
 } = assetSlice.actions;
 export default assetSlice.reducer;

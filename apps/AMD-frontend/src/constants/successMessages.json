@@ -483,5 +483,30 @@
     "key": "summary_statement_deleted",
     "message": "Summary Statement file deleted successfully.",
     "type": "success"
+  },
+  "S-10166": {
+    "key": "solar_scada_uploaded",
+    "message": "Solar SCADA report uploaded successfully.",
+    "type": "success"
+  },
+  "S-10167": {
+    "key": "solar_kpi_vitals_fetched",
+    "message": "Solar KPI vitals fetched successfully.",
+    "type": "success"
+  },
+  "S-10168": {
+    "key": "solar_generation_split_fetched",
+    "message": "Solar generation split fetched successfully.",
+    "type": "success"
+  },
+  "S-10169": {
+    "key": "solar_daily_generation_trend_fetched",
+    "message": "Solar daily generation trend fetched successfully.",
+    "type": "success"
+  },
+  "S-10170": {
+    "key": "solar_irradiance_trend_fetched",
+    "message": "Solar irradiance trend fetched successfully.",
+    "type": "success"
   }
 }

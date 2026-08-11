@@ -8,12 +8,13 @@ import {
   AssetMarketPrices,
   AssetImabalanceAnalysis,
   AssetTbSpread,
+  AssetSolarGeneration,
   CommentTrigger,
   NoOrganzationAssign,
   NoAssetAccess,
   NoAssetsAvailable,
 } from '@/components';
-import {CommentContextType, CommentModule, ViewAnalysisTabs} from '@/constants';
+import {AssetType, CommentContextType, CommentModule, ViewAnalysisTabs} from '@/constants';
 import {MonthYear, SelectInputItem} from '@/interface';
 import {Routes} from '@/navigation/Routes';
 import {
@@ -52,7 +53,19 @@ const TabsRoute = {
   PERFORMANCE: 'Performance',
   BATTERY_HEALTH: 'Battery Health',
   TB_SPREAD: 'TB Spread',
+  GENERATION: 'Solar',
 };
+
+const BESS_TAB_NAMES: string[] = [
+  TabsRoute.OPERATIONS,
+  TabsRoute.MARKET_OPTIMIZATION,
+  TabsRoute.MARKET_PRICES,
+  TabsRoute.ANCILARRY_SERVICES,
+  TabsRoute.IMBALANCE_ANALYSIS,
+  TabsRoute.BATTERY_HEALTH,
+  TabsRoute.TB_SPREAD,
+];
+const SOLAR_TAB_NAMES: string[] = [TabsRoute.GENERATION];
 
 const TAB_ID_MAP: Record<string, string> = {
   [TabsRoute.OPERATIONS]: ViewAnalysisTabs.Operations,
@@ -63,6 +76,7 @@ const TAB_ID_MAP: Record<string, string> = {
   [TabsRoute.PERFORMANCE]: 'performance',
   [TabsRoute.BATTERY_HEALTH]: ViewAnalysisTabs.BatteryHealth,
   [TabsRoute.TB_SPREAD]: ViewAnalysisTabs.TBSpread,
+  [TabsRoute.GENERATION]: ViewAnalysisTabs.SolarGeneration,
 };
 
 export function AssetAnalysis() {
@@ -123,6 +137,30 @@ export function AssetAnalysis() {
   }, [currentSelectedAssetID, period, currentAsset, dispatch, isPreservingYear, persistedYear]);
 
   const selectedAsset = currentAsset?.id === currentSelectedAssetID ? currentAsset : null;
+  const isSolarAsset = selectedAsset?.type === AssetType.Solar;
+  const validTabNames = isSolarAsset ? SOLAR_TAB_NAMES : BESS_TAB_NAMES;
+  /**
+   * The tab actually valid for the selected asset's type, computed synchronously from `isSolarAsset`
+   * rather than waiting on the effect below -- `Tabs` is uncontrolled (captures `defaultValue` once at
+   * mount), so its `key` must change in the same render where the tab set changes, and it must receive
+   * the correct value in that same render too. Relying on `activeTab` state alone left a one-render gap
+   * where a fresh Tabs instance could still mount with a stale tab name that matches no rendered screen,
+   * showing a blank panel until the user manually clicked a tab.
+   */
+  const resolvedActiveTab = validTabNames.includes(activeTab)
+    ? activeTab
+    : isSolarAsset
+      ? TabsRoute.GENERATION
+      : TabsRoute.OPERATIONS;
+
+  /**
+   * keep the active tab valid for the selected asset's type (BESS vs Solar tab sets don't overlap)
+   */
+  useEffect(() => {
+    if (!validTabNames.includes(activeTab)) {
+      setActiveTab(isSolarAsset ? TabsRoute.GENERATION : TabsRoute.OPERATIONS);
+    }
+  }, [isSolarAsset]);
 
   useEffect(() => {
     if (isPreservingYear) {
@@ -169,17 +207,14 @@ export function AssetAnalysis() {
       }
     }
   }, [currentSelectedAssetID, allAssets]);
-  const renderIntialScreen = isSeperateAnalysisRoute && (!currentSelectedAssetID || !period?.month || !period?.year);
-  const selectInputOptions = ((): SelectInputItem<{
+  const renderIntialScreen = !currentSelectedAssetID || !period?.month || !period?.year;
+  // Asset/period selection is unlocked on both the standalone and per-asset routes -- landing here from
+  // an asset's own "View Analysis" button just pre-fills that asset, it no longer pins you to it.
+  const selectInputOptions: SelectInputItem<{
     organization_id: number;
     organization_name: string;
     available_periods?: MonthYear[];
-  }>[] => {
-    if (isSeperateAnalysisRoute) {
-      return allAssets;
-    }
-    return [{id: currentAsset?.id ?? 0, label: currentAsset?.name ?? '', subLabel: currentAsset?.organization?.name}];
-  })();
+  }>[] = allAssets;
 
   // ===================
   // refs
@@ -209,7 +244,6 @@ export function AssetAnalysis() {
    */
   useEffect(() => {
     // do not fetch if already fetched
-    if (!isSeperateAnalysisRoute) return;
     if (allAssetsFetched.current) return;
 
     dispatch(
@@ -351,7 +385,7 @@ export function AssetAnalysis() {
         <div>
           <Text variant="h3">Data Analysis Preview</Text>
           <Text variant="caption" className="text-text-secondary! mb-4">
-            Based on uploaded Aggregator + SCADA data
+            {isSolarAsset ? 'Based on uploaded Solar SCADA data' : 'Based on uploaded Aggregator + SCADA data'}
           </Text>
         </div>
         {currentSelectedAssetID && period?.year ? (
@@ -376,7 +410,6 @@ export function AssetAnalysis() {
               {item.label} <span className="text-text-secondary! text-small!">({item.subLabel})</span>
             </Text>
           )}
-          disabled={isInputLocked}
           label="Select Asset :"
           labelClassName="text-[16px]! absolute -left-2 -translate-x-full top-1/2 -translate-y-1/2 font-InterMedium! mr-1"
           options={selectInputOptions}
@@ -386,9 +419,8 @@ export function AssetAnalysis() {
             isDeepLinkingRef.current = false;
             setCurrentSelectedAssetID(Number(item.id));
           }}
-          wrapperClassName={cn('', !isInputLocked && 'bg-white')}
+          wrapperClassName="bg-white"
           placeholder="Search by Asset name"
-          rightIconClassName={cn(isInputLocked && 'hidden')}
           dropdownClassName=""
         />
         <MonthYearPicker
@@ -396,16 +428,14 @@ export function AssetAnalysis() {
           labelClassName="text-[16px]! absolute -left-2 -translate-x-full top-1/2 -translate-y-1/2 font-InterMedium! mr-1"
           className="ml-44"
           allowedMonths={selectedAsset?.available_periods}
-          disabled={isInputLocked}
-          wrapperClassName={cn('w-60', !isInputLocked && 'bg-white')}
+          wrapperClassName="w-60 bg-white"
           iconClassName="text-text-placeholder!"
-          value={isInputLocked ? selectedAsset?.active_period : period}
+          value={period}
           onChange={newPeriod => {
             isDeepLinkingRef.current = false;
             setPeriod(newPeriod);
           }}
           placeholder=""
-          rightIconClassName={cn(isInputLocked && 'hidden')}
         />
       </div>
 
@@ -418,96 +448,123 @@ export function AssetAnalysis() {
         </div>
       ) : (
         <Tabs
-          key={`${currentSelectedAssetID}-${tabResetKey}`}
+          key={`${currentSelectedAssetID}-${tabResetKey}-${isSolarAsset}`}
           className="h-full mt-6"
           tabButtonClassName="px-1"
-          defaultValue={activeTab}
+          defaultValue={resolvedActiveTab}
           onChange={(tab: string) => setActiveTab(tab)}>
-          <Tabs.Screen
-            name={TabsRoute.OPERATIONS}
-            element={
-              <AssetOperations
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-          <Tabs.Screen
-            name={TabsRoute.MARKET_OPTIMIZATION}
-            element={
-              <AssetMarket
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-          <Tabs.Screen
-            name={TabsRoute.MARKET_PRICES}
-            element={
-              <AssetMarketPrices
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-          <Tabs.Screen
-            name={TabsRoute.ANCILARRY_SERVICES}
-            element={
-              <AssetAncillaryServices
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-
-          <Tabs.Screen
-            name={TabsRoute.IMBALANCE_ANALYSIS}
-            element={
-              <AssetImabalanceAnalysis
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-          <Tabs.Screen
-            name={TabsRoute.BATTERY_HEALTH}
-            element={
-              <AssetBatteryHealth
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
-          <Tabs.Screen
-            name={TabsRoute.TB_SPREAD}
-            element={
-              <AssetTbSpread
-                key={location.pathname}
-                assetSystemGenerationId={currentAsset?.asset_id}
-                assetId={currentSelectedAssetID}
-                month={period?.month}
-                year={period?.year}
-              />
-            }
-          />
+          {isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.GENERATION}
+              element={
+                <AssetSolarGeneration
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.OPERATIONS}
+              element={
+                <AssetOperations
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.MARKET_OPTIMIZATION}
+              element={
+                <AssetMarket
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.MARKET_PRICES}
+              element={
+                <AssetMarketPrices
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.ANCILARRY_SERVICES}
+              element={
+                <AssetAncillaryServices
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.IMBALANCE_ANALYSIS}
+              element={
+                <AssetImabalanceAnalysis
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.BATTERY_HEALTH}
+              element={
+                <AssetBatteryHealth
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
+          {!isSolarAsset && (
+            <Tabs.Screen
+              name={TabsRoute.TB_SPREAD}
+              element={
+                <AssetTbSpread
+                  key={location.pathname}
+                  assetSystemGenerationId={currentAsset?.asset_id}
+                  assetId={currentSelectedAssetID}
+                  month={period?.month}
+                  year={period?.year}
+                />
+              }
+            />
+          )}
         </Tabs>
       )}
     </ScreenWrapper>

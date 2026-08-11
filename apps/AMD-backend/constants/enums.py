@@ -73,6 +73,8 @@ class AssetFileType(BaseEnum):
     MERGED_SCADA_AGGREGATOR = 3
     INTERNAL_APPRAISAL_REPORT = 4
     OPTIMIZED_DATASET = 5
+    SOLAR_SCADA_REPORT = 6
+    SOLAR_PROCESSED_DATASET = 7
 
 
 class AssetMetrics(BaseEnum):
@@ -206,6 +208,11 @@ class APDAuditLogScenario(BaseEnum):
     REMOVED_COMMENT = AuditLogScenario.REMOVED_COMMENT.value
     REPLIED_TO_COMMENT = AuditLogScenario.REPLIED_TO_COMMENT.value
     VIEWED_EXECUTIVE_ANALYSIS = AuditLogScenario.VIEWED_EXECUTIVE_ANALYSIS.value
+    SOLAR_SCADA_UPLOADED = AuditLogScenario.SOLAR_SCADA_UPLOADED.value
+    SOLAR_SCADA_REPLACED = AuditLogScenario.SOLAR_SCADA_REPLACED.value
+    SOLAR_SCADA_REMOVED = AuditLogScenario.SOLAR_SCADA_REMOVED.value
+    VIEWED_SOLAR_ANALYSIS = AuditLogScenario.VIEWED_SOLAR_ANALYSIS.value
+    DOWNLOADED_SOLAR_SCADA_FILE = AuditLogScenario.DOWNLOADED_SOLAR_SCADA_FILE.value
 
 
 class APDAuditLogModules(BaseEnum):
@@ -244,12 +251,17 @@ class AnalysisSections(StrEnum):
     # executive summary section
     EXECUTIVE_SUMMARY = "executive-summary"
 
+    # solar analysis section
+    SOLAR_GENERATION = "solar-generation"
+    SOLAR_WEATHER = "solar-weather"
+
 
 class AnalysisModules:
     ASSET_ANALYSIS = "view-analysis"
     BENCHMARK_ANALYSIS = "benchmark-analysis"
     INVOICE_ANALYSIS = "invoice-analysis"
     EXECUTIVE_ANALYSIS = "executive-analysis"
+    SOLAR_ANALYSIS = "solar-analysis"
 
 
 class AnalysisWidget(StrEnum):
@@ -341,3 +353,11 @@ class AnalysisWidget(StrEnum):
 
     REVENUE_RECONCILIATION_PER_STREAM_COMPARISON = "analysis-revenue-reconciliation-per-stream-comparison"
     REVENUE_RECONCILIATION_SUMMARY = "analysis-revenue-reconciliation-summary"
+
+    # ================== #
+    #  Solar Analysis    #
+    # ================== #
+    ANALYSIS_SOLAR_KPI_VITALS = "analysis-solar-kpi-vitals"
+    ANALYSIS_SOLAR_GENERATION_SPLIT = "analysis-solar-generation-split"
+    ANALYSIS_SOLAR_DAILY_TREND = "analysis-solar-daily-trend"
+    ANALYSIS_SOLAR_IRRADIANCE_TREND = "analysis-solar-irradiance-trend"

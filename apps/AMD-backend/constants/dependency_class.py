@@ -5,6 +5,9 @@ from pandas import DataFrame
 class MergedDataFrame(DataFrame):
     pass
 
+class SolarOperationsDataFrame(DataFrame):
+    pass
+
 # TODO: implement trigger for this dependency to be loaded
 class AssetUsableCapacity(float):
     pass

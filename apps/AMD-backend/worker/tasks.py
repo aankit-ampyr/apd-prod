@@ -7,7 +7,6 @@ from .v2 import (
     asset_computation,
     asset_analytics_deletion,
 )
-from constants.enums import AnalysisModules
 
 
 async def get_db(
@@ -23,7 +22,7 @@ async def asset_computation_task(
     month: int | Literal['all'],
     year: int | Literal['all'],
     dependencies: List[str] | None = None,
-    modules: List[AnalysisModules] | None = None,
+    modules: List[str] | None = None,
     db: AsyncSession = TaskiqDepends(get_db),
 ):
     try:
@@ -44,7 +43,7 @@ async def asset_analytics_deletion_task(
     month: int,
     year: int,
     dependencies: List[str] | None = None,
-    modules: List[AnalysisModules] | None = None,
+    modules: List[str] | None = None,
     db: AsyncSession = TaskiqDepends(get_db),
 ):
     try:

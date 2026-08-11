@@ -1158,3 +1158,97 @@ class AnalysisController:
         return await self.service.export_strategy_energy_throughput_summary(
             db=db, asset_id=asset_id, year=year, month=month, current_user=current_user
         )
+
+    async def get_solar_kpi_vitals(
+        self,
+        asset: Asset = Depends(verify_asset_access),
+        month: int = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        redis: Redis = Depends(get_redis_conn),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
+        return await self.service.get_solar_kpi_vitals(
+            db=db,
+            redis=redis,
+            asset_id=asset.id,
+            month=month,
+            year=year,
+            current_user=current_user,
+        )
+
+    async def get_solar_generation_split(
+        self,
+        asset: Asset = Depends(verify_asset_access),
+        month: int = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
+        return await self.service.get_solar_generation_split(
+            db=db, asset_id=asset.id, month=month, year=year, current_user=current_user
+        )
+
+    async def get_solar_daily_generation_trend(
+        self,
+        asset: Asset = Depends(verify_asset_access),
+        month: int = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
+        return await self.service.get_solar_daily_generation_trend(
+            db=db, asset_id=asset.id, month=month, year=year, current_user=current_user
+        )
+
+    async def get_solar_irradiance_trend(
+        self,
+        asset: Asset = Depends(verify_asset_access),
+        month: int = Query(...),
+        year: int = Query(...),
+        db: AsyncSession = Depends(get_db),
+        current_user: dict = Depends(
+            allowed_roles(
+                UserRole.ADMIN.value, UserRole.ANALYST.value, UserRole.MANAGER.value
+            )
+        ),
+    ):
+        if Platform.AMD.value not in current_user.get("platform", []):
+            return Res.error(
+                "E-10013",
+                message="Unauthorized: AMD platform required",
+                http_status_code=403,
+            )
+        return await self.service.get_solar_irradiance_trend(
+            db=db, asset_id=asset.id, month=month, year=year, current_user=current_user
+        )

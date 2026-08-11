@@ -30,6 +30,16 @@ export enum AssetSteps {
   Review = 5,
 }
 
+// Solar assets follow a shorter 3-step onboarding flow; step numbers below
+// intentionally reuse the same 1-3 range as AssetSteps but mean something
+// different (BasicInformation still 1, but 2/3 diverge from BESS) -- always
+// branch on asset type before comparing `current_step` against either enum.
+export enum SolarAssetSteps {
+  BasicInformation = 1,
+  ScadaUpload = 2,
+  Review = 3,
+}
+
 export enum AssetMetrics {
   AssetRevenue = 1,
   CapacityMarket = 2,
@@ -50,6 +60,8 @@ export enum AssetFileType {
   MergedDataset = 3,
   IAR = 4,
   OptimizedDataset = 5,
+  SolarScadaReport = 6,
+  SolarProcessedDataset = 7,
 }
 
 export enum AssetMarketUtilizationTypes {

@@ -73,6 +73,7 @@ export interface AssetSliceInitialState {
   optimizedDatasetGenerationLoading: boolean;
   aggregatorReportUploadLoading: boolean;
   scadaReportUploadLoading: boolean;
+  solarScadaReportUploadLoading: boolean;
   iarReportUploadLoading: boolean;
   assetListLoading: boolean;
   currentAssetFilesLoading: boolean;
@@ -108,6 +109,7 @@ export interface AssetSliceInitialState {
 
   aggregatorReportUploadError: AssetFileUploadError | null;
   scadaReportUploadError: AssetFileUploadError | null;
+  solarScadaReportUploadError: AssetFileUploadError | null;
   iarReportUploadError: AssetFileUploadError | null;
   invoiceUploadError: AssetFileUploadError | null;
   invoiceSettlementUploadError: AssetFileUploadError | null;
@@ -160,6 +162,38 @@ export interface AssetSliceInitialState {
       summary: Nullable<AssetTBSpreadAnalytics['summary']>;
       details: Nullable<AssetTBSpreadAnalytics['details']>;
     }>;
+    solar: Partial<{
+      kpi_vitals: Nullable<{
+        asset_id: number;
+        month: number;
+        year: number;
+        capacity_mw: number;
+        energy_exported_mwh: number;
+        peak_power_mw: number;
+        capacity_factor_pct: number | null;
+        specific_yield_kwh_per_kw: number | null;
+        performance_ratio_pct: number | null;
+        insolation_kwh_per_m2: number;
+      }>;
+      generation_split: Nullable<{
+        asset_id: number;
+        month: number;
+        year: number;
+        chart_data: Array<{label: string; value: number}>;
+      }>;
+      daily_trend: Nullable<{
+        asset_id: number;
+        month: number;
+        year: number;
+        daily_trend: Array<{date: string; energy_mwh: number}>;
+      }>;
+      irradiance_trend: Nullable<{
+        asset_id: number;
+        month: number;
+        year: number;
+        irradiance_trend: Array<{date: string; avg_irradiance_wm2: number; energy_mwh: number}>;
+      }>;
+    }>;
   };
 
   // analytics loading and error states
@@ -209,6 +243,12 @@ export interface AssetSliceInitialState {
       summary: boolean;
       details: boolean;
     }>;
+    solar: Partial<{
+      kpi_vitals: boolean;
+      generation_split: boolean;
+      daily_trend: boolean;
+      irradiance_trend: boolean;
+    }>;
   };
   analyticsError: {
     operations: Partial<{
@@ -254,6 +294,12 @@ export interface AssetSliceInitialState {
     tb_spread: Partial<{
       summary: boolean | string;
       details: boolean | string;
+    }>;
+    solar: Partial<{
+      kpi_vitals: boolean | string;
+      generation_split: boolean | string;
+      daily_trend: boolean | string;
+      irradiance_trend: boolean | string;
     }>;
   };
 

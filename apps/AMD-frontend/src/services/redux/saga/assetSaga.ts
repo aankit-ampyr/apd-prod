@@ -50,6 +50,11 @@ import {
   uploadScadaReportSuccess,
   uploadScadaReportFailure,
 
+  // solar scada report upload
+  uploadSolarScadaReportRequest,
+  uploadSolarScadaReportSuccess,
+  uploadSolarScadaReportFailure,
+
   // asset analytics
   assetOperationalAnalyticsRequest,
   assetOperationalAnalyticsSuccess,
@@ -196,6 +201,11 @@ import {
   filterAggregatorScadaFilesSuccess,
   filterAggregatorScadaFilesFailure,
 
+  // filter solar scada files
+  filterSolarScadaFilesRequest,
+  filterSolarScadaFilesSuccess,
+  filterSolarScadaFilesFailure,
+
   // filter merged dataset files
   filterInvoiceFilesRequest,
   filterInvoiceFilesSuccess,
@@ -282,6 +292,26 @@ import {
   getAssetTBSpreadDetailsSuccess,
   getAssetTBSpreadDetailsFailure,
 
+  // get asset solar kpi vitals
+  getAssetSolarKpiVitalsRequest,
+  getAssetSolarKpiVitalsSuccess,
+  getAssetSolarKpiVitalsFailure,
+
+  // get asset solar generation split
+  getAssetSolarGenerationSplitRequest,
+  getAssetSolarGenerationSplitSuccess,
+  getAssetSolarGenerationSplitFailure,
+
+  // get asset solar daily generation trend
+  getAssetSolarDailyTrendRequest,
+  getAssetSolarDailyTrendSuccess,
+  getAssetSolarDailyTrendFailure,
+
+  // get asset solar irradiance trend
+  getAssetSolarIrradianceTrendRequest,
+  getAssetSolarIrradianceTrendSuccess,
+  getAssetSolarIrradianceTrendFailure,
+
   // upload invoices
   uploadInvoicesRequest,
   uploadInvoicesSuccess,
@@ -327,6 +357,7 @@ import {
   optimizationParams,
   uploadAggregatorReport,
   uploadScadaReport,
+  uploadSolarScadaReport,
   mergeAssetDatasets,
   assetOperationalAnalytics,
   assetMarketSummary,
@@ -366,6 +397,10 @@ import {
   getAssetBatteryHealthWarrantyExceedance,
   getAssetTBSpreadSummary,
   getAssetTBSpreadDetails,
+  getAssetSolarKpiVitals,
+  getAssetSolarGenerationSplit,
+  getAssetSolarDailyTrend,
+  getAssetSolarIrradianceTrend,
   getAssetExecutiveAnalysisMonthRevenueComparison,
   getAssetExecutiveAnalysisRevenueByStream,
   getAssetExecutiveAnalysisSummary,
@@ -514,6 +549,19 @@ function* UploadScadaReportSaga(action: ReturnType<typeof uploadScadaReportReque
     }
   } catch (error: any) {
     yield put(uploadScadaReportFailure(error.response?.data || error.response));
+  }
+}
+
+function* UploadSolarScadaReportSaga(action: ReturnType<typeof uploadSolarScadaReportRequest>): Generator {
+  try {
+    const response: any = yield call(uploadSolarScadaReport, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(uploadSolarScadaReportSuccess(response.data));
+    } else {
+      yield put(uploadSolarScadaReportFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(uploadSolarScadaReportFailure(error.response?.data || error.response));
   }
 }
 
@@ -893,6 +941,20 @@ function* FilterAssetAggregatorScadaFileSaga(action: ReturnType<typeof filterAgg
   }
 }
 
+function* FilterAssetSolarScadaFileSaga(action: ReturnType<typeof filterSolarScadaFilesRequest>): Generator {
+  try {
+    const filesResponse: any = yield call(getAssetFiles, action.payload);
+
+    if (filesResponse.data.status === SUCCESS_KEY) {
+      yield put(filterSolarScadaFilesSuccess({response: filesResponse.data, params: action.payload}));
+    } else {
+      yield put(filterSolarScadaFilesFailure(filesResponse.data));
+    }
+  } catch (error: any) {
+    yield put(filterSolarScadaFilesFailure(error.response?.data || error.response));
+  }
+}
+
 function* FilterInvoiceFilesSaga(action: ReturnType<typeof filterInvoiceFilesRequest>): Generator {
   try {
     // Call both APIs in parallel - update active period and filter files
@@ -1160,6 +1222,62 @@ function* GetAssetTBSpreadDetailsSaga(action: ReturnType<typeof getAssetTBSpread
   }
 }
 
+function* GetAssetSolarKpiVitalsSaga(action: ReturnType<typeof getAssetSolarKpiVitalsRequest>): Generator {
+  try {
+    const response: any = yield call(getAssetSolarKpiVitals, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getAssetSolarKpiVitalsSuccess(response.data));
+    } else {
+      yield put(getAssetSolarKpiVitalsFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getAssetSolarKpiVitalsFailure(error.response?.data || error.response));
+  }
+}
+
+function* GetAssetSolarGenerationSplitSaga(
+  action: ReturnType<typeof getAssetSolarGenerationSplitRequest>,
+): Generator {
+  try {
+    const response: any = yield call(getAssetSolarGenerationSplit, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getAssetSolarGenerationSplitSuccess(response.data));
+    } else {
+      yield put(getAssetSolarGenerationSplitFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getAssetSolarGenerationSplitFailure(error.response?.data || error.response));
+  }
+}
+
+function* GetAssetSolarDailyTrendSaga(action: ReturnType<typeof getAssetSolarDailyTrendRequest>): Generator {
+  try {
+    const response: any = yield call(getAssetSolarDailyTrend, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getAssetSolarDailyTrendSuccess(response.data));
+    } else {
+      yield put(getAssetSolarDailyTrendFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getAssetSolarDailyTrendFailure(error.response?.data || error.response));
+  }
+}
+
+function* GetAssetSolarIrradianceTrendSaga(
+  action: ReturnType<typeof getAssetSolarIrradianceTrendRequest>,
+): Generator {
+  try {
+    const response: any = yield call(getAssetSolarIrradianceTrend, action.payload);
+    if (response.data.status === SUCCESS_KEY) {
+      yield put(getAssetSolarIrradianceTrendSuccess(response.data));
+    } else {
+      yield put(getAssetSolarIrradianceTrendFailure(response.data));
+    }
+  } catch (error: any) {
+    yield put(getAssetSolarIrradianceTrendFailure(error.response?.data || error.response));
+  }
+}
+
 function* GetAssetExecutiveAnalysisMonthlyRevenueComparison(
   action: ReturnType<typeof getExecutiveAnalysisMonthlyRevenueComparisonRequest>,
 ): Generator {
@@ -1349,6 +1467,7 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(assetOptimizationParamRequest.type, OptimizationParamsSaga);
   yield takeLatest(uploadAggregatorReportRequest.type, UploadAggregatorReportSaga);
   yield takeLatest(uploadScadaReportRequest.type, UploadScadaReportSaga);
+  yield takeLatest(uploadSolarScadaReportRequest.type, UploadSolarScadaReportSaga);
   yield takeLatest(mergeDatasetRequest.type, MergeScadaReportSaga);
   yield takeLatest(generateOptimizedDatasetRequest.type, GenerateOptimizedDatasetSaga);
   yield takeLatest(removeAssetFileRequest.type, RemoveAssetFileSaga);
@@ -1385,6 +1504,7 @@ export default function* AssetSaga(): Generator {
 
   yield takeLatest(currentAssetFilesRequest.type, GetAssetFilesSaga);
   yield takeLatest(filterAggregatorScadaFilesRequest.type, FilterAssetAggregatorScadaFileSaga);
+  yield takeLatest(filterSolarScadaFilesRequest.type, FilterAssetSolarScadaFileSaga);
   yield takeLatest(filterInvoiceFilesRequest.type, FilterInvoiceFilesSaga);
   yield takeLatest(filterInvoiceSettlementFilesRequest.type, FilterInvoiceSettlementFilesSaga);
   yield takeLatest(updateAssetReportingPeriodRequest.type, UpdateAssetReportingPeriodSaga);
@@ -1407,6 +1527,10 @@ export default function* AssetSaga(): Generator {
   yield takeLatest(getAssetBatteryHealthWarrantyExceedanceRequest.type, GetAssetBatteryHealthWarrantyExceedanceSaga);
   yield takeLatest(getAssetTBSpreadSummaryRequest.type, GetAssetTBSpreadSummarySaga);
   yield takeLatest(getAssetTBSpreadDetailsRequest.type, GetAssetTBSpreadDetailsSaga);
+  yield takeLatest(getAssetSolarKpiVitalsRequest.type, GetAssetSolarKpiVitalsSaga);
+  yield takeLatest(getAssetSolarGenerationSplitRequest.type, GetAssetSolarGenerationSplitSaga);
+  yield takeLatest(getAssetSolarDailyTrendRequest.type, GetAssetSolarDailyTrendSaga);
+  yield takeLatest(getAssetSolarIrradianceTrendRequest.type, GetAssetSolarIrradianceTrendSaga);
   yield takeLatest(
     getExecutiveAnalysisMonthlyRevenueComparisonRequest.type,
     GetAssetExecutiveAnalysisMonthlyRevenueComparison,

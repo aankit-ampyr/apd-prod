@@ -40,12 +40,11 @@ export const allAssetsList = createSelector([(state: RootState) => state.asset.a
     .map((asset): SelectInputItem => ({label: asset.name, id: asset.id})),
 );
 
-// View Analysis dropdown: show only assets that have analysis months (if provided by backend).
+// View Analysis dropdown: show all assets (BESS + Solar) that have analysis months (if provided by backend).
 export const analysisAssetsList = createSelector([(state: RootState) => state.asset.allAssets], allAssets => {
   return (
     allAssets
-      // exclude asset without analysis and solar assets
-      .filter(item => item.analysis_available && item.type !== AssetTypeEnum.Solar)
+      .filter(item => item.analysis_available)
       .map(
         (
           item,
@@ -139,6 +138,10 @@ export const scadaReportUploadError = (state: RootState) => state.asset.scadaRep
 // iar report loading selectors
 export const iarReportUploadLoading = (state: RootState) => state.asset.iarReportUploadLoading;
 export const iarReportUploadError = (state: RootState) => state.asset.iarReportUploadError;
+
+// solar scada report loading selectors
+export const solarScadaReportUploadLoading = (state: RootState) => state.asset.solarScadaReportUploadLoading;
+export const solarScadaReportUploadError = (state: RootState) => state.asset.solarScadaReportUploadError;
 
 // optimized dataset loading selectors
 export const optimizedDatasetGenerationLoading = (state: RootState) => state.asset.optimizedDatasetGenerationLoading;
@@ -332,6 +335,31 @@ export const assetTBSpreadDetailsLoading = (state: RootState) =>
   state.asset.analyticsLoading.tb_spread?.details ?? false;
 export const assetTBSpreadDetailsError = (state: RootState) => state.asset.analyticsError.tb_spread?.details ?? false;
 
+// asset solar kpi vitals
+export const assetSolarKpiVitalsResult = (state: RootState) => state.asset.analytics.solar?.kpi_vitals;
+export const assetSolarKpiVitalsLoading = (state: RootState) =>
+  state.asset.analyticsLoading.solar?.kpi_vitals ?? false;
+export const assetSolarKpiVitalsError = (state: RootState) => state.asset.analyticsError.solar?.kpi_vitals ?? false;
+
+// asset solar generation split
+export const assetSolarGenerationSplitResult = (state: RootState) => state.asset.analytics.solar?.generation_split;
+export const assetSolarGenerationSplitLoading = (state: RootState) =>
+  state.asset.analyticsLoading.solar?.generation_split ?? false;
+export const assetSolarGenerationSplitError = (state: RootState) =>
+  state.asset.analyticsError.solar?.generation_split ?? false;
+
+// asset solar daily generation trend
+export const assetSolarDailyTrendResult = (state: RootState) => state.asset.analytics.solar?.daily_trend;
+export const assetSolarDailyTrendLoading = (state: RootState) =>
+  state.asset.analyticsLoading.solar?.daily_trend ?? false;
+export const assetSolarDailyTrendError = (state: RootState) => state.asset.analyticsError.solar?.daily_trend ?? false;
+
+// asset solar irradiance trend
+export const assetSolarIrradianceTrendResult = (state: RootState) => state.asset.analytics.solar?.irradiance_trend;
+export const assetSolarIrradianceTrendLoading = (state: RootState) =>
+  state.asset.analyticsLoading.solar?.irradiance_trend ?? false;
+export const assetSolarIrradianceTrendError = (state: RootState) =>
+  state.asset.analyticsError.solar?.irradiance_trend ?? false;
 
 // market hourly price patterns
 export const assetMarketHourlyPricePatternsResult = (state: RootState) =>

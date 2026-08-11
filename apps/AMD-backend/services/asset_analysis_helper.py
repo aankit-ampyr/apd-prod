@@ -3,6 +3,7 @@ from python_common.exceptions.data_exception import DependencyNotAvailableError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from models import (
+    Asset,
     AssetOptimizationParameter,
     AssetFile,
     MonthlyHardcodedValue,
@@ -49,6 +50,7 @@ from constants.dependency_class import (
     YearlyPdfInvoicesRecords,
     YearlySummaryStatementDataFrame,
     YearlySummaryStatementRecords,
+    SolarOperationsDataFrame,
 )
 
 
@@ -435,6 +437,56 @@ class AnalysisServiceHelper:
                 raise ExceptionWithErrorCode(
                     "E-10114",
                     message="File key not found in S3. Please re-run merge.",
+                )
+
+        except Exception:
+            traceback.print_exc()
+            raise ExceptionWithErrorCode(
+                "E-10001", message="Error processing analysis data."
+            )
+
+        return filtered_df
+
+    @dependency(SolarOperationsDataFrame)
+    async def load_solar_operations_file(
+        self, asset_id: int, month: int, year: int, db: AsyncSession, **kwargs
+    ):
+        file_query = await db.execute(
+            select(AssetFile).where(
+                AssetFile.asset_id == asset_id,
+                AssetFile.type == AssetFileType.SOLAR_PROCESSED_DATASET.value,
+                AssetFile.month == month,
+                AssetFile.year == year,
+            )
+        )
+        solar_file = file_query.scalars().first()
+        if not solar_file:
+            raise ExceptionWithErrorCode(
+                "E-10280", message="Solar dataset is not available."
+            )
+
+        try:
+            file_obj, _ = FileStorageManager.get_file_object(
+                solar_file.key, storage_type=solar_file.storage_server
+            )
+            df = pd.read_excel(BytesIO(file_obj))
+
+            if "Timestamp" in df.columns:
+                df["Timestamp"] = pd.to_datetime(df["Timestamp"], format="mixed")
+                df.set_index("Timestamp", inplace=True)
+
+            filtered_df = df[(df.index.month == month) & (df.index.year == year)]
+            if filtered_df.empty:
+                raise ExceptionWithErrorCode(
+                    "E-10111",
+                    message="Analysis data not found for the selected period.",
+                )
+
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                raise ExceptionWithErrorCode(
+                    "E-10280",
+                    message="File key not found in S3. Please re-upload the solar report.",
                 )
 
         except Exception:
@@ -3779,4 +3831,118 @@ class AnalysisServiceHelper:
 
         return {
             "payment_trend": payment_trend_data
+        }
+
+    # ================== #
+    #  Solar Analysis    #
+    # ================== #
+
+    @analytics_meta(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_KPI_VITALS,
+    )
+    async def get_solar_kpi_vitals(
+        self,
+        df: SolarOperationsDataFrame,
+        db: AsyncSession,
+        asset_id: int,
+        month: int,
+        year: int,
+    ):
+        # 15-minute cadence: interval length in hours for insolation integration
+        interval_hours = 0.25
+
+        energy_kwh = float(df.get("Export_kWh", 0).sum())
+        energy_mwh = energy_kwh / 1000
+        peak_power_mw = float(df.get("AC_Power_kW", 0).max()) / 1000
+        insolation_kwh_m2 = (
+            float((df.get("Irradiance_Wm2", 0) * interval_hours).sum()) / 1000
+        )
+
+        asset = await db.get(Asset, asset_id)
+        # capacity is stored as a single AC MW value on the asset -- see
+        # docs/solar-analysis-calculations.md §5 for the AC-vs-DC caveat this
+        # carries into specific yield / performance ratio below.
+        capacity_mw = float(asset.capacity) if asset and asset.capacity else 0
+        capacity_kw = capacity_mw * 1000
+        hours_in_month = calendar.monthrange(year, month)[1] * 24
+
+        specific_yield = round(energy_kwh / capacity_kw, 2) if capacity_kw else None
+        capacity_factor_pct = (
+            round((energy_mwh / (capacity_mw * hours_in_month)) * 100, 2)
+            if capacity_mw and hours_in_month
+            else None
+        )
+        performance_ratio_pct = (
+            round((specific_yield / insolation_kwh_m2) * 100, 2)
+            if specific_yield is not None and insolation_kwh_m2
+            else None
+        )
+
+        return {
+            "capacity_mw": round(capacity_mw, 2),
+            "energy_exported_mwh": round(energy_mwh, 2),
+            "peak_power_mw": round(peak_power_mw, 2),
+            "capacity_factor_pct": capacity_factor_pct,
+            "specific_yield_kwh_per_kw": specific_yield,
+            "performance_ratio_pct": performance_ratio_pct,
+            "insolation_kwh_per_m2": round(insolation_kwh_m2, 2),
+        }
+
+    @analytics_meta(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_GENERATION_SPLIT,
+    )
+    def get_solar_generation_split(self, df: SolarOperationsDataFrame):
+        # The meter's two tariff registers (off-peak/peak) -- the grid
+        # operator's tariff windows, not a time-of-day rule applied by us.
+        offpeak_mwh = round(float(df.get("Offpeak_kWh", 0).sum()) / 1000, 2)
+        peak_mwh = round(float(df.get("Peak_kWh", 0).sum()) / 1000, 2)
+
+        return {
+            "chart_data": [
+                {"label": "Off-Peak", "value": offpeak_mwh},
+                {"label": "Peak", "value": peak_mwh},
+            ]
+        }
+
+    @analytics_meta(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_GENERATION,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_DAILY_TREND,
+    )
+    def get_solar_daily_generation_trend(self, df: SolarOperationsDataFrame):
+        daily_energy_kwh = df["Export_kWh"].resample("D").sum()
+
+        return {
+            "daily_trend": [
+                {
+                    "date": timestamp.strftime("%Y-%m-%d"),
+                    "energy_mwh": round(float(value) / 1000, 2),
+                }
+                for timestamp, value in daily_energy_kwh.items()
+            ]
+        }
+
+    @analytics_meta(
+        module=AnalysisModules.SOLAR_ANALYSIS,
+        section=AnalysisSections.SOLAR_WEATHER,
+        widget=AnalysisWidget.ANALYSIS_SOLAR_IRRADIANCE_TREND,
+    )
+    def get_solar_irradiance_trend(self, df: SolarOperationsDataFrame):
+        daily = df.resample("D").agg(
+            {"Irradiance_Wm2": "mean", "Export_kWh": "sum"}
+        )
+
+        return {
+            "irradiance_trend": [
+                {
+                    "date": timestamp.strftime("%Y-%m-%d"),
+                    "avg_irradiance_wm2": round(float(row["Irradiance_Wm2"]), 2),
+                    "energy_mwh": round(float(row["Export_kWh"]) / 1000, 2),
+                }
+                for timestamp, row in daily.iterrows()
+            ]
         }

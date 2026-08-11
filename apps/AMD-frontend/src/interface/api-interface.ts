@@ -74,6 +74,7 @@ export interface ApiConfigInterface {
     asset_organization: (assetId: number) => string;
     asset_aggregator_report_upload: (assetId: number) => string;
     asset_scada_report_upload: (assetId: number) => string;
+    asset_solar_scada_report_upload: (assetId: number) => string;
     asset_merge_dataset: (assetId: number) => string;
     asset_optimized_dataset: (assetId: number) => string;
     asset_multiple_users: string;
@@ -141,6 +142,12 @@ export interface ApiConfigInterface {
     asset_analysis_market_best_markets_export: (assetId: number) => string;
     asset_analysis_market_revenue_distribution: (assetId: number) => string;
     asset_analysis_market_hourly_price_patterns: (assetId: number) => string;
+
+    // asset analysis-solar related APIs
+    asset_analysis_solar_kpi_vitals: (assetId: number) => string;
+    asset_analysis_solar_generation_split: (assetId: number) => string;
+    asset_analysis_solar_daily_trend: (assetId: number) => string;
+    asset_analysis_solar_irradiance_trend: (assetId: number) => string;
 
     // executive analysis related APIs
     asset_executive_analysis_monthly_revenue_comparison: (assetId: number) => string;
@@ -432,6 +439,18 @@ export interface RemoveScadaReportRequest {
     assetId: number;
   };
   response: APIResponse;
+}
+
+export interface UploadSolarScadaReportRequest {
+  payload: {
+    assetId: number;
+    formData: any; // formdata
+  };
+  response: APIResponse<AssetReportFile & {processed_dataset: AssetGenerateReport}>;
+  error_response: APIResponse<{
+    file: {name: string};
+    validation_errors: string[];
+  }>;
 }
 
 export interface MergeAssetDatasetsRequest {
@@ -1156,6 +1175,79 @@ export interface AssetExecutiveAnalysisRevenueByStreamExportRequest {
     assetId: number;
     fileName: string;
   };
+}
+
+// =============================== Asset Solar Analysis ===============================
+export interface AssetAnalysisSolarKpiVitalsRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    month: number;
+    year: number;
+    capacity_mw: number;
+    energy_exported_mwh: number;
+    peak_power_mw: number;
+    capacity_factor_pct: number | null;
+    specific_yield_kwh_per_kw: number | null;
+    performance_ratio_pct: number | null;
+    insolation_kwh_per_m2: number;
+  }>;
+}
+
+export interface AssetAnalysisSolarGenerationSplitRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    month: number;
+    year: number;
+    chart_data: Array<{
+      label: string;
+      value: number;
+    }>;
+  }>;
+}
+
+export interface AssetAnalysisSolarDailyTrendRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    month: number;
+    year: number;
+    daily_trend: Array<{
+      date: string;
+      energy_mwh: number;
+    }>;
+  }>;
+}
+
+export interface AssetAnalysisSolarIrradianceTrendRequest {
+  params: {
+    assetId: number;
+    month: number;
+    year: number;
+  };
+  response: APIResponse<{
+    asset_id: number;
+    month: number;
+    year: number;
+    irradiance_trend: Array<{
+      date: string;
+      avg_irradiance_wm2: number;
+      energy_mwh: number;
+    }>;
+  }>;
 }
 
 // =============================== Invoice Request ===============================

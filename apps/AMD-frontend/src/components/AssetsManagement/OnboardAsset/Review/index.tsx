@@ -6,6 +6,7 @@ import {
   createAssetRequest,
   editAssetRequest,
   filterAggregatorScadaFilesRequest,
+  filterSolarScadaFilesRequest,
   filterInvoiceFilesRequest,
   filterInvoiceSettlementFilesRequest,
   filterInvoiceSummaryStatementFilesRequest,
@@ -22,6 +23,7 @@ import {MonthYear} from '@/interface';
 import {UploadFileHistory} from './FileUploadHistory';
 import {IARReportSection} from './IARReportSection';
 import {AggregateScadaSection} from './AggregateScadaSection';
+import {SolarScadaSection} from './SolarScadaSection';
 import {ReportingPeriod} from './ReporintPreriod';
 import {UnsavedChangesModal} from './UnsavedChangesModal';
 import {CreateAssetConfirmationModal} from './CreateAssetConfirmationModal';
@@ -50,6 +52,9 @@ const isAggregatorScadaSectionValid = (currentAsset: ReturnType<typeof currentSe
 
 const isIARScadaSectionValid = (currentAsset: ReturnType<typeof currentSelectedAsset>) =>
   Boolean(currentAsset?.iar_report_file);
+
+const isSolarScadaSectionValid = (currentAsset: ReturnType<typeof currentSelectedAsset>) =>
+  Boolean(currentAsset?.solar_scada_report_file && currentAsset?.solar_processed_dataset_file);
 
 /**
  * ===============================================================
@@ -152,9 +157,12 @@ export function Review(props: ReviewProps) {
   const canEditOptimizationParameters = !isStepLocked && (isAMDAdmin || currentAsset?.status !== AssetStatus.Inactive);
 
   /**
-   * A derevied flag to check whether the file upload section (aggregator-&-scada and IAR report) has file uploaded or not, if not disable the create asset button.
+   * A derevied flag to check whether the file upload section (aggregator-&-scada and IAR report for BESS/Hybrid,
+   * solar SCADA report for Solar) has file uploaded or not, if not disable the create asset button.
    */
-  const isFileUploadSectionValid = isAggregatorScadaSectionValid(currentAsset) && isIARScadaSectionValid(currentAsset);
+  const isFileUploadSectionValid = isNonSolarAsset
+    ? isAggregatorScadaSectionValid(currentAsset) && isIARScadaSectionValid(currentAsset)
+    : isSolarScadaSectionValid(currentAsset);
 
   /**
    * ref to reset the form values after changes inside them are discarded via discard CTA in unsaved changes modal.
@@ -188,6 +196,21 @@ export function Review(props: ReviewProps) {
   const aggregateScadaSectionMemo = useMemo(
     () => <AggregateScadaSection monthYearValidation={reportingPeriod ?? undefined} />,
     [reportingPeriod],
+  );
+
+  /**
+   * Memoize the SolarScadaSection render prop to prevent recreating the component on every render.
+   *
+   * Only pin uploads to `reportingPeriod` once the asset is actually onboarded (Active/Inactive) --
+   * `reportingPeriod` locks to the asset's `active_period` the moment any solar file exists, and the
+   * picker to change it only appears once onboarded (see the SectionFrame headerContent below). Passing
+   * it through unconditionally would reject every subsequent upload for a different month while still in
+   * Draft, since there'd be no way to update the pinned period first. BESS's equivalent onboarding-time
+   * upload step avoids this by not pinning to an asset-level period at all before onboarding.
+   */
+  const solarScadaSectionMemo = useMemo(
+    () => <SolarScadaSection monthYearValidation={isAssetOnboarded ? (reportingPeriod ?? undefined) : undefined} />,
+    [reportingPeriod, isAssetOnboarded],
   );
 
   const invoiceUploadSectionMemo = useMemo(
@@ -317,6 +340,17 @@ export function Review(props: ReviewProps) {
     if (!currentAsset?.id) return;
     dispatch(
       filterAggregatorScadaFilesRequest({
+        assetId: currentAsset.id,
+        month: [value.month],
+        year: [value.year],
+      }),
+    );
+  }
+
+  function handleSolarReportingPeriodDone(value: MonthYear) {
+    if (!currentAsset?.id) return;
+    dispatch(
+      filterSolarScadaFilesRequest({
         assetId: currentAsset.id,
         month: [value.month],
         year: [value.year],
@@ -584,6 +618,26 @@ export function Review(props: ReviewProps) {
                 children={() => invoiceUploadSectionMemo}
               />
             )}
+
+            {isAssetOnboarded && <UploadFileHistory />}
+          </>
+        )}
+
+        {!isNonSolarAsset && (
+          <>
+            <SectionFrame
+              title="Upload Solar SCADA Report"
+              headerContent={
+                isAssetOnboarded ? (
+                  <ReportingPeriod
+                    value={reportingPeriod}
+                    onChange={setReportingPeriod}
+                    onDone={handleSolarReportingPeriodDone}
+                  />
+                ) : null
+              }
+              children={() => solarScadaSectionMemo}
+            />
 
             {isAssetOnboarded && <UploadFileHistory />}
           </>

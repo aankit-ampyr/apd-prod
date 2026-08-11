@@ -176,6 +176,7 @@ class DependencyResolver:
 def is_monthly_module(module: str) -> bool:
     return module in {
         AnalysisModules.ASSET_ANALYSIS,
+        AnalysisModules.SOLAR_ANALYSIS,
         # add other monthly modules here
     }
 

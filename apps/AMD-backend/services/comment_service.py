@@ -19,7 +19,6 @@ from utils.comment_utils import extract_tagged_users
 from python_common.utils.response_utils import Res
 from constants.enums import (
     AssetStatus,
-    AssetType,
     CommentContextType,
     UserRole,
     Platform,
@@ -386,10 +385,7 @@ class CommentService:
             asset = await db.get(Asset, asset_id)
             if not asset:
                 return Res.error("E-10034", message="Asset not found.", http_status_code=404)
-            
-            if asset.type == AssetType.SOLAR.value:
-                return Res.error("E-10120", message="Comments are not applicable for Solar assets.", http_status_code=422)
-            
+
             if asset.status != AssetStatus.ACTIVE.value:
                 return Res.error("E-10240", message="This action cannot be performed on inactive assets.", http_status_code=422)
             

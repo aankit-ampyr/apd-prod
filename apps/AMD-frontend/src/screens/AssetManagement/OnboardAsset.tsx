@@ -5,6 +5,7 @@ import {
   AssetBasicInformation,
   OptimizationParams,
   UploadAssetReport,
+  SolarScadaUpload,
   IARUpload,
   Review,
   UnsavedChangesModal,
@@ -36,9 +37,10 @@ import {
   resetAssetMessage,
   gotoIARStep,
   gotoReviewStep,
+  gotoSolarReviewStep,
   getAllOrganizationsListRequest,
 } from '@/services/redux/slice';
-import {AssetStatus, AssetSteps, AssetType, UserRole} from '@/constants';
+import {AssetStatus, AssetSteps, AssetType, SolarAssetSteps, UserRole} from '@/constants';
 import {AlertBox, Skeleton, Text} from '@/ui-kits';
 
 const steps: StepsWithUnderscoreType[] = [
@@ -69,6 +71,24 @@ const steps: StepsWithUnderscoreType[] = [
   },
 ];
 
+const solarSteps: StepsWithUnderscoreType[] = [
+  {
+    image: Images.fileEdit,
+    label: 'Basic Information',
+    step: 1,
+  },
+  {
+    image: Images.upload,
+    label: 'Upload Solar SCADA',
+    step: 2,
+  },
+  {
+    image: Images.fileSuccess,
+    label: 'Review',
+    step: 3,
+  },
+];
+
 export function OnboardAssetScreen() {
   // ==================
   // hooks
@@ -95,6 +115,7 @@ export function OnboardAssetScreen() {
   // state
   // =================
   const [showHeaderStep, setShowHeaderSteps] = useState<boolean>(true);
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetType | null>(currentAsset?.type ?? null);
   const [step, setStep] = useState<number>(currentAsset?.current_step ?? 0);
   const [reviewHasUnsavedChanges, setReviewHasUnsavedChanges] = useState(false);
   const [showUnsavedChangesModal, setShowUnsavedChangesModal] = useState(false);
@@ -111,6 +132,13 @@ export function OnboardAssetScreen() {
   }, [currentAsset?.type, currentAsset?.status]);
   const isPendingApprovalNavigationLocked =
     isAnalyst && currentAsset?.status === AssetStatus.PendingApproval && !isAssetOnboarded;
+  const isSolarType = (currentAsset?.type ?? selectedAssetType) === AssetType.Solar;
+  const maxStepForType = isSolarType ? SolarAssetSteps.Review : AssetSteps.Review;
+  const activeStepsConfig = isSolarType ? solarSteps : steps;
+  // steps beyond Basic Information aren't reachable until the asset actually exists -- the type
+  // dropdown alone (before saving) can make the header show 3/5 steps, but only step 1 is clickable
+  // until there's a real asset to edit.
+  const headerMaxStep = currentAsset ? maxStepForType : AssetSteps.BasicInformation;
 
   // ==================
   // query params
@@ -124,7 +152,7 @@ export function OnboardAssetScreen() {
     if (nextStep === step) return;
     if (isPendingApprovalNavigationLocked) return;
 
-    if (step === AssetSteps.Review && reviewHasUnsavedChanges) {
+    if (step === maxStepForType && reviewHasUnsavedChanges) {
       setPendingStepAction(() => () => setStep(nextStep));
       setShowUnsavedChangesModal(true);
       return;
@@ -157,6 +185,11 @@ export function OnboardAssetScreen() {
   function handleIARSave() {
     setStep(AssetSteps.Review);
     dispatch(gotoReviewStep());
+  }
+
+  function handleSolarScadaSave() {
+    setStep(SolarAssetSteps.Review);
+    dispatch(gotoSolarReviewStep());
   }
 
   const aggregatorReportError = useSelector(aggregatorReportUploadError);
@@ -229,16 +262,11 @@ export function OnboardAssetScreen() {
        * After entring Basic information, user will navigate to diff url with dymanic ID,
        * (/asset-management/onboarding) -> (/asset-management/onboarding/:id)
        *
-       * but for solar asset as its already onboarded it will land on
-       * (/asset-management/onboarding) -> (/asset-management/:id)
-       *
+       * Solar assets follow the same continue-onboarding flow as BESS/Hybrid --
+       * they still have a SCADA upload + Review step left to complete.
        */
       if (success === 'S-10025' && location.pathname === Routes.ASSET_ONBOARDING && currentAsset) {
-        if (currentAsset.type === AssetType.Solar) {
-          navigate(Routes.VIEW_ASSET.replace(':id', String(currentAsset?.id)), {replace: true});
-        } else {
-          navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
-        }
+        navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
       }
     }
 
@@ -260,41 +288,41 @@ export function OnboardAssetScreen() {
   }, [isLoading, mode, currentAsset, id]);
 
   useEffect(() => {
-    if (currentAsset?.current_step && currentAsset?.type !== AssetType.Solar) {
+    if (currentAsset?.current_step) {
       let newStep = (currentAsset?.current_step ?? 0) + 1;
 
-      if (newStep > AssetSteps.Review) {
-        newStep = AssetSteps.Review;
+      if (newStep > maxStepForType) {
+        newStep = maxStepForType;
       }
       setStep(newStep);
     }
   }, [currentAsset?.current_step, currentAsset?.type]);
 
   useEffect(() => {
-    if (isPendingApprovalNavigationLocked && step !== AssetSteps.Review) {
-      setStep(AssetSteps.Review);
+    if (isPendingApprovalNavigationLocked && step !== maxStepForType) {
+      setStep(maxStepForType);
     }
-  }, [isPendingApprovalNavigationLocked, step]);
+  }, [isPendingApprovalNavigationLocked, step, maxStepForType]);
+
+  useEffect(() => {
+    if (!currentAsset?.type) return;
+    setSelectedAssetType(currentAsset.type);
+  }, [currentAsset?.type]);
 
   /**
-   * This Effect will run when we user is on view asset screen and edited the asset type to non solar asset (solar -> bess, hybrid)
+   * This Effect will run when the user is on the view-asset screen and the asset's type is edited
+   * such that it is no longer fully onboarded (e.g. type change purges optimization params/steps).
+   * All asset types now follow the same Draft -> onboarding -> Active/Inactive lifecycle, so this
+   * only needs to check onboarded status, not type.
    */
   useEffect(() => {
     if (!currentAsset) return;
     const isViewAssetRoute = matchesRoute(location.pathname, Routes.VIEW_ASSET);
-    const isOnboardAssetRoute = matchesRoute(location.pathname, Routes.VIEW_ASSET_ONBOARDING);
     if (isLoading) return;
     if (isAssetNormaLoading) return;
 
-    // if solar asset is changes to bess, hybrid in user is not View asset screen, go back to onboarding screen
-    // and asset is not fully onboarded;
-    if (isViewAssetRoute && currentAsset?.type !== AssetType.Solar && !isAssetOnboarded) {
+    if (isViewAssetRoute && !isAssetOnboarded) {
       navigate(Routes.VIEW_ASSET_ONBOARDING.replace(':id', String(currentAsset?.id)), {replace: true});
-    }
-
-    // if bess, hybrid asset is changed to solar in user is not onboarding screen, go back to view asset
-    if (isOnboardAssetRoute && currentAsset?.type === AssetType.Solar) {
-      navigate(Routes.VIEW_ASSET.replace(':id', String(currentAsset?.id)), {replace: true});
     }
   }, [location.pathname, currentAsset?.type, isLoading, isAssetNormaLoading, isAssetOnboarded]);
 
@@ -351,11 +379,11 @@ export function OnboardAssetScreen() {
     if (!isAMDAdmin) return;
 
     // No need to fetch organizations again when asset is in review step as it is already fetched in review step.
-    if (currentAsset && ![AssetSteps.BasicInformation, AssetSteps.Review].includes(currentAsset?.current_step as any))
+    if (currentAsset && ![AssetSteps.BasicInformation, maxStepForType].includes(currentAsset?.current_step as any))
       return;
 
     dispatch(getAllOrganizationsListRequest());
-  }, [currentAsset?.current_step]);
+  }, [currentAsset?.current_step, maxStepForType]);
 
   /**
    * Since we have intialized current step to 0 so on asset creation screen (/asset-management/onboarding) when asset is not even created,
@@ -375,7 +403,8 @@ export function OnboardAssetScreen() {
       )}
       wrapperClassName={cn(
         'flex flex-col rounded-[40px]!',
-        [AssetSteps.AggregatorScada, AssetSteps.IAR].includes(step) &&
+        ((isSolarType && step === SolarAssetSteps.ScadaUpload) ||
+          [AssetSteps.AggregatorScada, AssetSteps.IAR].includes(step)) &&
           !isLoading &&
           'bg-transparent shadow-none p-0 rounded-none!',
         'max-w-280 w-full',
@@ -392,9 +421,9 @@ export function OnboardAssetScreen() {
                 <StepsWithUnderscore
                   className="justify-center trans"
                   loading={true}
-                  maxStep={5}
+                  maxStep={headerMaxStep}
                   gotoStep={() => {}}
-                  steps={steps}
+                  steps={activeStepsConfig}
                   currentStep={step}
                 />
               </div>
@@ -404,14 +433,14 @@ export function OnboardAssetScreen() {
             <React.Fragment />
           ) : (
             <div className="absolute top-15 -translate-y-1/2 flex items-center">
-              {showHeaderStep && currentAsset?.type !== AssetType.Solar && (
+              {showHeaderStep && (
                 <StepsWithUnderscore
                   className={
                     isPendingApprovalNavigationLocked ? '[&>button:not(:last-child)]:cursor-not-allowed' : undefined
                   }
-                  maxStep={5}
+                  maxStep={headerMaxStep}
                   gotoStep={isPendingApprovalNavigationLocked ? () => {} : handleStepChange}
-                  steps={steps}
+                  steps={activeStepsConfig}
                   currentStep={step}
                 />
               )}
@@ -595,16 +624,22 @@ export function OnboardAssetScreen() {
               <AssetBasicInformation
                 mode={mode as any}
                 onBack={() => navigate(Routes.ASSET_MANAGEMENT)}
-                continueOnboarding={() => setStep(Math.min((currentAsset?.current_step ?? 0) + 1, AssetSteps.Review))}
-                hideHeaderFunc={p => setShowHeaderSteps(!p)}
+                continueOnboarding={() => setStep(Math.min((currentAsset?.current_step ?? 0) + 1, maxStepForType))}
+                hideHeaderFunc={type => {
+                  setSelectedAssetType(type);
+                  setShowHeaderSteps(true);
+                }}
               />
             )}
-            {step === AssetSteps.OptimizationConfiguration && (
+            {isSolarType && step === SolarAssetSteps.ScadaUpload && (
+              <SolarScadaUpload onSave={handleSolarScadaSave} />
+            )}
+            {!isSolarType && step === AssetSteps.OptimizationConfiguration && (
               <OptimizationParams mode={mode as any} onBack={() => navigate(-1)} />
             )}
-            {step === AssetSteps.AggregatorScada && <UploadAssetReport onSave={handleAggregatorScadaSave} />}
-            {step === AssetSteps.IAR && <IARUpload onSave={handleIARSave} />}
-            {step === AssetSteps.Review && (
+            {!isSolarType && step === AssetSteps.AggregatorScada && <UploadAssetReport onSave={handleAggregatorScadaSave} />}
+            {!isSolarType && step === AssetSteps.IAR && <IARUpload onSave={handleIARSave} />}
+            {((isSolarType && step === SolarAssetSteps.Review) || (!isSolarType && step === AssetSteps.Review)) && (
               <Review
                 mode="create"
                 onUnsavedChangesChange={setReviewHasUnsavedChanges}

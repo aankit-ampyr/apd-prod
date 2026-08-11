@@ -46,7 +46,7 @@ const initialValues: FormInitalValues = {
 
 interface BasicInfoProps {
   onBack: () => void;
-  hideHeaderFunc: (val: boolean) => void;
+  hideHeaderFunc: (val: AssetType | null) => void;
   continueOnboarding: () => void;
   mode: 'add' | 'edit';
 }
@@ -169,9 +169,7 @@ export function AssetBasicInformation(props: BasicInfoProps) {
   }, [failure, success]);
 
   useEffect(() => {
-    if (values.type) {
-      hideHeaderFunc(values.type === AssetType.Solar);
-    }
+    hideHeaderFunc(values.type);
   }, [values.type]);
 
   /**
@@ -315,7 +313,7 @@ export function AssetBasicInformation(props: BasicInfoProps) {
             Cancel
           </Button>
           <Button className="w-full px-8" disabled={!isAnalyst && (!dirty || !isValid)} onClick={() => isAnalyst ? continueOnboarding() : handleSubmit()}>
-            {isAnalyst ? "Continue Onboarding" : (values.type !== AssetType.Solar ? 'Save & Continue' : 'Save')}
+            {isAnalyst ? 'Continue Onboarding' : 'Save & Continue'}
           </Button>
         </div>
       )}

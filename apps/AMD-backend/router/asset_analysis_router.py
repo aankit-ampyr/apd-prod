@@ -87,4 +87,12 @@ class AnalysisRouter:
         self.router.get("/{asset_id}/analysis/executive-comparison/revenue-by-stream/export")(self.controller.export_revenue_by_stream_analysis)
         self.router.get("/{asset_id}/analysis/executive-comparison/summary")(self.controller.get_executive_summary)
         self.router.get("/{asset_id}/analysis/executive-comparison/executive-summary/export")(self.controller.export_executive_summary)
- 
+
+        # =======================================
+        # Solar Analysis                        #
+        # =======================================
+        self.router.get("/{asset_id}/analysis/solar/kpi-vitals")(self.controller.get_solar_kpi_vitals)
+        self.router.get("/{asset_id}/analysis/solar/generation-split")(self.controller.get_solar_generation_split)
+        self.router.get("/{asset_id}/analysis/solar/daily-trend")(self.controller.get_solar_daily_generation_trend)
+        self.router.get("/{asset_id}/analysis/solar/irradiance-trend")(self.controller.get_solar_irradiance_trend)
+

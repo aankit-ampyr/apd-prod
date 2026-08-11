@@ -80,7 +80,8 @@ export interface Asset {
   type: AssetType;
   capacity: number;
   status: AssetStatus;
-  current_step: AssetSteps;
+  // number, not AssetSteps -- for Solar assets this is interpreted against SolarAssetSteps instead
+  current_step: number;
   organization: {
     id: number;
     name: string;
@@ -106,6 +107,8 @@ export interface Asset {
   iar_report_file?: Nullable<AssetReportFile>;
   merged_dataset_file?: Nullable<AssetGenerateReport>;
   optimized_dataset_file?: Nullable<AssetGenerateReport>;
+  solar_scada_report_file?: Nullable<AssetReportFile>;
+  solar_processed_dataset_file?: Nullable<AssetGenerateReport>;
 
   // invoice files
   invoice_file?: Nullable<Invoice>;
