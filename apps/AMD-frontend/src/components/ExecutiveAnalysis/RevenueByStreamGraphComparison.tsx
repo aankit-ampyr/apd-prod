@@ -164,7 +164,8 @@ export function RevenueByStreamGraphComparison(props: RevenueByStreamGraphCompar
         </div>
       }
       yDomainPadding={2000}
-      chartMargins={{bottom: 40}}
+      chartMargins={{ top: 35, bottom: 40, right: 10 }}
+      sepYChartMargins={{ top: 35 }}
       headerNote={
         <div className="justify-end flex gap-2">
           <div className="flex h-5 w-6 items-center justify-center rounded text-white bg-[#1EC590]">

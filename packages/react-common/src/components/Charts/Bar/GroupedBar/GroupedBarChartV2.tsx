@@ -97,6 +97,7 @@ interface GroupedBarChartV2Props {
     bottom?: number;
     left?: number;
   };
+  yDomainMaxMultiplier?: number;
   sepYChartMargins?: {
     top?: number;
     right?: number;
@@ -142,6 +143,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     barRoomWidth = 35,
     customActions,
     formatYAxisTick = (value) => String(value),
+    yDomainMaxMultiplier,
   } = props;
 
   /**
@@ -195,6 +197,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
   const [hoverTooltip, setHoverTooltip] = useState<{
     left: number;
     top: number;
+    transform: string;
     data: GroupedBarTooltipData;
   } | null>(null);
   const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,10 +214,40 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
     // Use the inner relative div as the reference — this stays correct even when chart is scrolled
     const containerRect = innerChartRef.current?.getBoundingClientRect();
     const targetRect = event.currentTarget.getBoundingClientRect();
-    if (!containerRect || !targetRect) return;
+    const container = innerChartRef.current;
+
+    if (!containerRect || !targetRect || !container) return;
+
+    let left = targetRect.left - containerRect.left + targetRect.width / 2;
+    let top = targetRect.top - containerRect.top - 8;
+    let transform = "translate(-50%, -100%)";
+
+    const host = chartHostRef.current;
+    const scrollLeft = host ? host.scrollLeft : 0;
+    const visibleWidth = host ? host.clientWidth : containerRect.width;
+    const visibleLeft = scrollLeft;
+    const visibleRight = scrollLeft + visibleWidth;
+
+    const tooltipEstimatedWidth = 240;
+    const tooltipEstimatedHeight = 120;
+
+    // Horizontal collision
+    if (left - tooltipEstimatedWidth / 2 < visibleLeft) {
+      left = visibleLeft + tooltipEstimatedWidth / 2 + 12;
+    } else if (left + tooltipEstimatedWidth / 2 > visibleRight) {
+      left = visibleRight - tooltipEstimatedWidth / 2 - 12;
+    }
+
+    // Vertical collision (Top edge clipping for high bars)
+    if (top - tooltipEstimatedHeight < 0) {
+      top = targetRect.top - containerRect.top + 16;
+      transform = "translate(-50%, 0)";
+    }
+
     setHoverTooltip({
-      left: targetRect.left - containerRect.left + targetRect.width / 2,
-      top: targetRect.top - containerRect.top - 8,
+      left,
+      top,
+      transform,
       data: tooltipData,
     });
   };
@@ -284,6 +317,14 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
       // no need to data key since we have multiple bar charts. recharts will automatically infer the y ticks domain
       tickLine={false}
       interval={0}
+      domain={
+        yDomainMaxMultiplier
+          ? [
+              (dataMin: number) => (dataMin < 0 ? Math.floor(dataMin * yDomainMaxMultiplier) : 0),
+              (dataMax: number) => (dataMax === 0 ? 1 : Math.ceil(dataMax * yDomainMaxMultiplier)),
+            ]
+          : undefined
+      }
       axisLine={{ stroke: "var(--color-border)", strokeWidth: 2 }}
       tickFormatter={(value) => formatYAxisTick(value)}
       tick={{
@@ -414,7 +455,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
           style={{
             left: hoverTooltip.left,
             top: hoverTooltip.top,
-            transform: "translate(-50%, -100%)",
+            transform: hoverTooltip.transform,
             pointerEvents: "auto",
           }}
           onMouseEnter={() => {
@@ -507,6 +548,7 @@ export function GroupedBarChartV2(props: GroupedBarChartV2Props) {
   return (
     <div
       ref={chartRef}
+      onMouseLeave={hideBarTooltip}
       className={cn(
         "rounded-lg border border-border p-4 bg-white relative flex flex-col gap-4",
         isFullScreen && "grow",

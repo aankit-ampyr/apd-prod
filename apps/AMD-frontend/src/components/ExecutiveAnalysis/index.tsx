@@ -241,6 +241,7 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
             subtitle="Compare Actual and Optimal Revenue with monthly Capture Rate for the selected year."
           />
         }
+        margin={{ top: 35 }}
         showBarPointValues={false}
         data={monthlyRevenueChartData}
         tooltipInteractionMode="item"
@@ -250,7 +251,7 @@ export function ExecutiveAnalysis(props: ExecutiveAnalysisProps) {
           const optmized = payload.find(item => item.dataKey === 'optmized_revenue');
           const capture_rate = payload.find(item => item.dataKey === 'capture_rate');
           return (
-            <div className="bg-white rounded-md border border-border px-4 py-2 shadow-md">
+            <div className="bg-white rounded-md border border-border px-4 py-2 shadow-md chart-actions">
               <Text variant="14M">{label}</Text>
               <Text variant="14M" className="text-text-secondary!">
                 {actual?.name}:{' '}

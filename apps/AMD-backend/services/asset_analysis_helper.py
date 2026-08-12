@@ -217,6 +217,32 @@ class AnalysisServiceHelper:
 
         return {"per_stream_comparison": transformed_data, "total_stream_data": total}
 
+    def _static_values_get_tb_spread_summary(self, tb2_capture_rate: int, tb_spread_benchmark: int | None):
+        benchmark_gap = (
+            round(tb2_capture_rate - tb_spread_benchmark, 2)
+            if tb_spread_benchmark is not None
+            else None
+        )
+        return {
+            "tb_spread_benchmark": (
+                round(tb_spread_benchmark, 2)
+                if tb_spread_benchmark is not None
+                else None
+            ),
+            "benchmark_gap": (
+                round(benchmark_gap, 2) if benchmark_gap is not None else None
+            ),
+        }
+
+    def _static_values_get_tb_spread_details(self, tb_spread_benchmark: int | None):
+        return {
+            "tb_spread_benchmark": (
+                round(tb_spread_benchmark, 2)
+                if tb_spread_benchmark is not None
+                else None
+            ),
+        }
+
     @dependency(YearlyPdfInvoicesRecords)
     async def load_yearly_pdf_invoices(
         self,
@@ -3375,14 +3401,10 @@ class AnalysisServiceHelper:
             "avg_tb3": round(avg_tb3, 2),
             "avg_arbitrage_revenue": round(avg_arbitrage_revenue, 2),
             "tb2_capture_rate": round(tb2_capture_rate, 2),
-            "tb_spread_benchmark": (
-                round(tb_spread_benchmark, 2)
-                if tb_spread_benchmark is not None
-                else None
-            ),
-            "benchmark_gap": (
-                round(benchmark_gap, 2) if benchmark_gap is not None else None
-            ),
+            **self._static_values_get_tb_spread_summary(
+                tb2_capture_rate=tb2_capture_rate,
+                tb_spread_benchmark=tb_spread_benchmark,
+            )
         }
 
     @analytics_meta(
@@ -3485,10 +3507,8 @@ class AnalysisServiceHelper:
             )
 
         return {
-            "tb_spread_benchmark": (
-                round(tb_spread_benchmark, 2)
-                if tb_spread_benchmark is not None
-                else None
+            **self._static_values_get_tb_spread_details(
+                tb_spread_benchmark=tb_spread_benchmark,
             ),
             "tb_spread": daily_rows,
         }

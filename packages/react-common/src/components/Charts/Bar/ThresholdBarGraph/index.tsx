@@ -125,6 +125,7 @@ interface ThresholdBarGraphProps {
     width: number;
     height: number;
   }) => ReactElement;
+  yDomainMaxMultiplier?: number;
 }
 
 export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
@@ -172,6 +173,7 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
     highLabel = "High",
     legendRenderer,
     onBadgeClick,
+    yDomainMaxMultiplier,
   } = props;
 
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -508,7 +510,14 @@ export function ThresholdBarGraph(props: ThresholdBarGraphProps) {
                 width={yAxisWidth}
                 ticks={yAxisTicks}
                 tickCount={yAxisTickCount}
-                domain={yAxisDomain}
+                domain={
+                  yAxisDomain || (yDomainMaxMultiplier
+                    ? [
+                        (dataMin: number) => (dataMin < 0 ? Math.floor(dataMin * yDomainMaxMultiplier) : 0),
+                        (dataMax: number) => (dataMax === 0 ? 1 : Math.ceil(dataMax * yDomainMaxMultiplier)),
+                      ]
+                    : undefined)
+                }
                 tick={{
                   fontSize: 12,
                   fill: "var(--color-text-secondary)",

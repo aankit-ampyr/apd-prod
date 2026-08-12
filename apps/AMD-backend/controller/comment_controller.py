@@ -60,7 +60,7 @@ class CommentController:
         owner_id: Optional[int] = Query(None),
         unread_only: bool = Query(False),
         page: int = Query(1, ge=1),
-        limit: int = Query(100, ge=1, le=500),
+        limit: int = Query(500, ge=1, le=500),
     ):
         if Platform.AMD.value not in current_user.get("platform", []):
             return Res.error("E-10013", message="Unauthorized: AMD platform required")

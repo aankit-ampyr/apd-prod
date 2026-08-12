@@ -60,7 +60,10 @@ async def validate_simulation_access(
     if is_authorized:
         return simulation.project.proj_id
 
-    if "compute" == [segment for segment in request.url.path.split("/") if segment][-1]:
+    if [segment for segment in request.url.path.split("/") if segment][-1] in (
+        "compute",
+        "fuel-curve",
+    ):
         return simulation.project.proj_id
 
     if request.method == "GET":

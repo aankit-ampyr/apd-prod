@@ -309,7 +309,7 @@ export function MultiMarketOptmizationVsActual(props: MultiMarketOptmizationVsAc
         }}
         tooltipRenderer={({label, currentData, series}) => {
           return (
-            <div className="bg-white px-4 py-2 border-border border rounded-md">
+            <div className="bg-white px-4 py-2 border-border border rounded-md chart-actions">
               <Text variant="16M">{label}</Text>
               {currentData ? (
                 <div className="mt-2 flex flex-col gap-1.5">
@@ -436,7 +436,7 @@ export function MultiMarketOptmizationVsActual(props: MultiMarketOptmizationVsAc
           if (!tooltipItems.length) return null;
 
           return (
-            <div className="rounded-md border border-border bg-white px-4 py-3 shadow-md">
+            <div className="rounded-md border border-border bg-white px-4 py-3 shadow-md chart-actions">
               <Text variant="14SB" className="text-text-primary!">
                 {baseLabel}
               </Text>

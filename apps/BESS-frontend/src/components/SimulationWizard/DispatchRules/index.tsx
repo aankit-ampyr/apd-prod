@@ -291,7 +291,7 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
       setQ2(DGDriggerType['Battery SOC threshold']);
       setQ3(false);
       setQ4(LoadServingPriority['BESS First (Solar → BESS → DG)']);
-      setQ5(true);
+      setQ5(false);
       setQ6(false);
       confirmDispatchRuleChange(previousValues);
       return;
@@ -301,7 +301,7 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
       setQ2(DGDriggerType['Battery + Solar deficiency']);
       setQ3(false);
       setQ4(LoadServingPriority['BESS First (Solar → BESS → DG)']);
-      setQ5(true);
+      setQ5(false);
       setQ6(false);
     }
 
@@ -359,7 +359,7 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
       setQ2(dispatchData?.dg_trigger_type ?? DGDriggerType['Battery + Solar deficiency']);
       setQ3(dispatchData?.is_dg_charging_bess ?? false);
       setQ4(dispatchData?.load_serving_priority ?? LoadServingPriority['BESS First (Solar → BESS → DG)']);
-      setQ5(dispatchData?.is_dg_takeover_full_load ?? true);
+      setQ5(dispatchData?.is_dg_takeover_full_load ?? false);
       setQ6(dispatchData?.is_cycle_charging_enabled ?? false);
 
       if (dispatchData?.dg_start_time !== null && dispatchData?.dg_end_time !== null) {
@@ -388,7 +388,7 @@ export const DispatchRules = ({onNextToSizing}: DispatchRulesProps) => {
           dg_trigger_type: dispatchData?.dg_trigger_type ?? DGDriggerType['Battery + Solar deficiency'],
           is_dg_charging_bess: dispatchData?.is_dg_charging_bess ?? false,
           load_serving_priority: dispatchData?.load_serving_priority ?? LoadServingPriority['BESS First (Solar → BESS → DG)'],
-          is_dg_takeover_full_load: dispatchData?.is_dg_takeover_full_load ?? true,
+          is_dg_takeover_full_load: dispatchData?.is_dg_takeover_full_load ?? false,
           is_cycle_charging_enabled: dispatchData?.is_cycle_charging_enabled ?? false,
           dg_start_time: dispatchData?.dg_start_time !== undefined && dispatchData?.dg_start_time !== null ? Number(dispatchData?.dg_start_time) : 6,
           dg_end_time: dispatchData?.dg_end_time !== undefined && dispatchData?.dg_end_time !== null ? Number(dispatchData?.dg_end_time) : 18,

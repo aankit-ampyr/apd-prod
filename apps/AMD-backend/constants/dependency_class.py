@@ -37,7 +37,6 @@ class IARDataFrame(BaseModel):
 class YearlyHardcodedMetricValues(RootModel[dict[int, dict[int, float]]]):
     pass
 
-# TODO: implement trigger for this dependency to be loaded
 class YearlyPdfInvoicesRecords(RootModel[dict[int, Any]]):
     pass
 

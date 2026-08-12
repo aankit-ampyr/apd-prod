@@ -69,6 +69,7 @@ interface DivergantBarChartsV2Props {
   barValueLabelProps?: React.SVGAttributes<SVGTextElement>;
   yBottomDomainPadding?: number;
   yDomainPadding?: number;
+  yDomainMaxMultiplier?: number;
   headerClassName?: string;
   yAxisTickFormtter?: (tick: string) => string;
   customActions?: React.ReactNode;
@@ -113,6 +114,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     headerClassName,
     yAxisTickFormtter = (v) => v.toString(),
     customActions,
+    yDomainMaxMultiplier,
   } = props;
 
   /**
@@ -140,6 +142,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
   const [hoverTooltip, setHoverTooltip] = useState<{
     left: number;
     top: number;
+    transform: string;
     data: DivergentBarData;
   } | null>(null);
   const tooltipTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -156,10 +159,40 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     // Use the inner relative div — stays correct even when chart is scrolled horizontally
     const containerRect = innerChartRef.current?.getBoundingClientRect();
     const targetRect = event.currentTarget.getBoundingClientRect();
-    if (!containerRect || !targetRect) return;
+    const container = innerChartRef.current;
+    
+    if (!containerRect || !targetRect || !container) return;
+
+    let left = targetRect.left - containerRect.left + targetRect.width / 2;
+    let top = targetRect.top - containerRect.top - 8;
+    let transform = "translate(-50%, -100%)";
+
+    const host = chartHostRef.current;
+    const scrollLeft = host ? host.scrollLeft : 0;
+    const visibleWidth = host ? host.clientWidth : containerRect.width;
+    const visibleLeft = scrollLeft;
+    const visibleRight = scrollLeft + visibleWidth;
+
+    const tooltipEstimatedWidth = 240;
+    const tooltipEstimatedHeight = 120;
+
+    // Horizontal collision
+    if (left - tooltipEstimatedWidth / 2 < visibleLeft) {
+      left = visibleLeft + tooltipEstimatedWidth / 2 + 12;
+    } else if (left + tooltipEstimatedWidth / 2 > visibleRight) {
+      left = visibleRight - tooltipEstimatedWidth / 2 - 12;
+    }
+
+    // Vertical collision (Top edge clipping for high bars)
+    if (top - tooltipEstimatedHeight < 0) {
+      top = targetRect.top - containerRect.top + 16;
+      transform = "translate(-50%, 0)";
+    }
+
     setHoverTooltip({
-      left: targetRect.left - containerRect.left + targetRect.width / 2,
-      top: targetRect.top - containerRect.top - 8,
+      left,
+      top,
+      transform,
       data: barData,
     });
   };
@@ -182,11 +215,16 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
     let max = Math.max(...values);
     let min = Math.min(...values);
 
-    if (max > 0) {
-      max += yDomainPadding;
-    }
-    if (min < 0) {
-      min -= yDomainPadding;
+    if (yDomainMaxMultiplier) {
+      max = max > 0 ? Math.ceil(max * yDomainMaxMultiplier) : max;
+      min = min < 0 ? Math.floor(min * yDomainMaxMultiplier) : min;
+    } else {
+      if (max > 0) {
+        max += yDomainPadding;
+      }
+      if (min < 0) {
+        min -= yDomainPadding;
+      }
     }
 
     return [min, max];
@@ -459,12 +497,11 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
 
       {showTooltip && hoverTooltip && (
         <div
-          className="absolute z-50"
+          className="absolute z-50 pointer-events-auto"
           style={{
             left: hoverTooltip.left,
             top: hoverTooltip.top,
-            transform: "translate(-50%, -100%)",
-            pointerEvents: "auto",
+            transform: hoverTooltip.transform,
           }}
           onMouseEnter={() => {
             if (tooltipTimeout.current) {
@@ -500,6 +537,7 @@ export function DivergentBarChartV2(props: DivergantBarChartsV2Props) {
   return (
     <div
       ref={chartRef}
+      onMouseLeave={hideBarTooltip}
       className={cn(
         "rounded-lg border border-border p-4 bg-white relative flex flex-col gap-4",
         isFullScreen && "grow",

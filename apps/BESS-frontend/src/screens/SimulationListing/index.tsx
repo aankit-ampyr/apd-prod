@@ -3,7 +3,7 @@ import {DataTable, FilterGroup, ScreenWrapper} from '@/components';
 import {SIMULATION_STATUS} from '@/constants';
 import {useDropdownValues, useToast} from '@/hooks';
 import type {DataTableColumn, SortType} from '@/interface';
-import {allProjectsData, allProjectsList, authDataSelector} from '@/services/redux/selectors';
+import {allProjectsData, allProjectsList, authDataSelector, projectLoading} from '@/services/redux/selectors';
 import {
   deleteSimulationSuccess,
   initiateSimulationData,
@@ -131,6 +131,7 @@ export const SimulationListing = () => {
 
   const authData = useSelector(authDataSelector);
   const allProjData = useSelector(allProjectsData);
+  const projectsLoading = useSelector(projectLoading);
 
   const failure = useSelector(simulationListError) as ErrorCodes;
   const updateFailure = useSelector(updateSimulationError) as ErrorCodes;
@@ -611,7 +612,7 @@ export const SimulationListing = () => {
               Select Project :
             </Text>
 
-            {isProjectLoading ? (
+            {projectsLoading ? (
               <Skeleton animation="wave" variant="rounded" width={210} height={40} className="rounded-md!" />
             ) : (
               <SearchableSelectInput

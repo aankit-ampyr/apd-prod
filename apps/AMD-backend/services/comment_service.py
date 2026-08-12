@@ -626,7 +626,7 @@ class CommentService:
         owner_id: Optional[int] = None,
         unread_only: bool = False,
         page: int = 1,
-        limit: int = 100,
+        limit: int = 500,
     ):
         try:
             asset = await db.get(Asset, asset_id)

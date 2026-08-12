@@ -9,7 +9,13 @@ import {
   Section,
   CommentTrigger,
 } from '../../../common';
-import {CommentContextType, CommentModule, ViewAnalysisTabs, ViewAnalysisWidgets, WidgetDataPointPayload} from '@/constants';
+import {
+  CommentContextType,
+  CommentModule,
+  ViewAnalysisTabs,
+  ViewAnalysisWidgets,
+  WidgetDataPointPayload,
+} from '@/constants';
 import {formatCurrencyToPound, formatDate} from '@/utils';
 import {Badge, Icon, Text} from '@/ui-kits';
 import {TopWorstDays} from './TopWorstDays';
@@ -94,7 +100,8 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
     return allComments.filter(
       (comment: any) =>
         String(comment.context_widget) === String(widget) &&
-        (String(comment.context_data_point) === String(dataPointId) || String(dataPointId).includes(String(comment.context_data_point)))
+        (String(comment.context_data_point) === String(dataPointId) ||
+          String(dataPointId).includes(String(comment.context_data_point))),
     ).length;
   };
 
@@ -111,7 +118,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
         context_asset_id: assetId,
         context_year: year,
         context_month: month,
-      })
+      }),
     );
     dispatch(setPanelOpen(true));
   };
@@ -376,6 +383,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
           downloadFileName={`${assetSystemGenerationId}_${month}_${year}_daily_imbalance_breakdown.png`}
           header="Daily Imbalance Revenue vs Charges"
           enableHorizontalScroll
+          chartMargins={{ top: 35, right: 10, left: 0, bottom: 0 }}
           className="px-6 py-4 shadow-md shadow-border/30"
           showLegends
           customTooltipRenderer={props => {
@@ -389,7 +397,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
             const [revenue, charges] = items;
 
             return (
-              <div className="bg-white px-4 py-3 rounded-md border-border border">
+              <div className="bg-white px-4 py-3 rounded-md border-border border min-w-[240px] chart-actions">
                 <Text variant="14M" className="mb-2">
                   <span className="text-body-1! font-InterSemiBold">
                     {monthName} {day} |
@@ -424,13 +432,12 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
                     contextYear={year}
                     contextMonth={date.getMonth() + 1}
                     contextDataPoint={category}
-                  
-                      variant="icon-with-text"
-                      label="Add Comment"
-                      className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
-                      iconClassName="w-4 h-4 text-[#088477]"
-                      labelClassName="text-[#088477]"
-                    />
+                    variant="icon-with-text"
+                    label="Add Comment"
+                    className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                    iconClassName="w-4 h-4 text-[#088477]"
+                    labelClassName="text-[#088477]"
+                  />
                 </div>
               </div>
             );
@@ -460,7 +467,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
           barRadius={4}
           xAxisLabel="Date"
           yAxisLabel="Revenue (£)"
-          sepYChartMargins={{bottom: 61}}
+          sepYChartMargins={{ top: 35, bottom: 61 }}
         />
       </Section>
 
@@ -475,7 +482,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
             contextType={CommentContextType.Widget}
             contextAssetId={assetId}
             contextYear={year}
-              contextMonth={month}
+            contextMonth={month}
             variant="icon-only"
             className="flex items-center justify-center w-7 h-7 rounded-md charts-action hover:bg-primary-tint-2!"
             iconClassName="text-primary-tint-1! group-hover:text-primary-tint-1!"
@@ -491,7 +498,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
         subtitle="Analyze charge patterns by hour to identify peak imbalance periods.">
         <DivergentBarChartV2
           data={hourlyChargesData}
-          onBadgeClick={(label) => handleBadgeClick(ViewAnalysisWidgets.ImbalanceChargesByHour, label)}
+          onBadgeClick={label => handleBadgeClick(ViewAnalysisWidgets.ImbalanceChargesByHour, label)}
           title="Imbalance Charges by Hour of Day"
           customActions={
             <CommentTrigger
@@ -518,8 +525,8 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
               </Text>
             </div>
           }
-          chartMargins={{right: 20}}
-          sepYChartMargins={{bottom: 61}}
+          chartMargins={{ top: 35, right: 20 }}
+          sepYChartMargins={{ top: 35, bottom: 61 }}
           xAxisLabel="Hours"
           barWidth={40}
           barRoomWidth={100}
@@ -543,7 +550,7 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
           showTooltip
           customTooltipRenderer={({data}) => {
             return (
-              <div className="bg-white rounded-sm px-3 py-2 border flex flex-col gap-1 border-border">
+              <div className="bg-white rounded-sm px-3 py-2 border flex flex-col gap-1 border-border min-w-[180px] chart-actions">
                 <Text variant="12SB">{data.label}</Text>
                 <Text className="text-text-secondary!" variant="12R">
                   Total Charges:{' '}
@@ -559,15 +566,14 @@ export function AssetImabalanceAnalysis(props: AssetImabalanceAnalsisProps) {
                     contextType={CommentContextType.DataPoint}
                     contextAssetId={assetId}
                     contextYear={year}
-              contextMonth={month}
+                    contextMonth={month}
                     contextDataPoint={data.label}
-                  
-                      variant="icon-with-text"
-                      label="Add Comment"
-                      className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
-                      iconClassName="w-4 h-4 text-[#088477]"
-                      labelClassName="text-[#088477]"
-                    />
+                    variant="icon-with-text"
+                    label="Add Comment"
+                    className="flex items-center gap-1.5 text-sm font-medium hover:opacity-80 transition-opacity cursor-pointer"
+                    iconClassName="w-4 h-4 text-[#088477]"
+                    labelClassName="text-[#088477]"
+                  />
                 </div>
               </div>
             );

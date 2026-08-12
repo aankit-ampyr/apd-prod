@@ -223,7 +223,7 @@ export function CommentPanel() {
       readRequestedIdsRef.current = new Set();
     }
     prevIsUnreadActive.current = isUnreadFilterActive;
-  }, [isUnreadFilterActive, allComments, currentUser, activeContext, dispatch]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isUnreadFilterActive, allComments, currentUser, activeContext, dispatch]);
 
   // Effect 2: Mention filter changed while unread tab is open
   // Dispatches read requests for snapshot items that are now newly visible.
@@ -242,7 +242,7 @@ export function CommentPanel() {
         });
       }
     });
-  }, [filterUserId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [filterUserId]);
 
   const [isCreatingNew, setIsCreatingNew] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);

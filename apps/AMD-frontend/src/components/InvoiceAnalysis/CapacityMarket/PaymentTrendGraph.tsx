@@ -84,7 +84,7 @@ export function PaymentTrendGraph(props: PaymentTrendGraphProps) {
     const title = String(label).replace('\n', ' ');
 
     return (
-      <div className="min-w-[200px] rounded-md border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)]">
+      <div className="min-w-[200px] rounded-md border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)] chart-actions">
         <Text variant="14SB" className="mb-3 block text-[17px] font-bold text-text-primary">
           {title}
         </Text>

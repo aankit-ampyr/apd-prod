@@ -30,6 +30,9 @@ import logging
 import io
 from io import StringIO
 from pprint import pprint
+from models.audit_log_model import AuditLog
+from datetime import datetime, timezone, timedelta
+
 
 logger = logging.getLogger(__name__)
 
@@ -238,22 +241,36 @@ class AnalysisService:
                     http_status_code=404,
                 )
 
-            await audit_logs(
-                db=db,
-                redis=redis,
-                user_id=current_user.get("user_id"),
-                user_role=current_user.get("role"),
-                module=AuditLogModules.VIEW_ANALYSIS,
-                action=AuditLogScenario.VIEWED_ASSET_ANALYSIS,
-                before={
-                    "Asset": asset.name,
-                    "Month/Year": f"{month}/{year}",
-                },
-                after="User viewed Asset Analysis visualisations",
-                resource_id=asset.asset_id,
-            )
-            await db.commit()
+            resource_id = asset.asset_id
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(seconds=30)
 
+            recent_log_query = await db.execute(
+                select(AuditLog).where(
+                    AuditLog.user_id == current_user.get("user_id"),
+                    AuditLog.action == AuditLogScenario.VIEWED_ASSET_ANALYSIS.value,
+                    AuditLog.resource_id == resource_id,
+                    AuditLog.created_at >= recent_cutoff,
+                )
+            )
+            already_logged_recently = recent_log_query.scalars().first()
+
+            if not already_logged_recently:
+                await audit_logs(
+                    db=db,
+                    redis=redis,
+                    user_id=current_user.get("user_id"),
+                    user_role=current_user.get("role"),
+                    module=AuditLogModules.VIEW_ANALYSIS,
+                    action=AuditLogScenario.VIEWED_ASSET_ANALYSIS,
+                    before={
+                        "Asset": asset.name,
+                        "Month/Year": f"{month}/{year}",
+                    },
+                    after="User viewed Asset Analysis visualisations",
+                    resource_id=resource_id,
+                )
+                await db.commit()
+           
             # if computed result already exits
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
@@ -2416,39 +2433,38 @@ class AnalysisService:
 
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
-            if analytics_data:
-                return Res.success(
-                    "S-10079",
-                    data={
-                        "asset_id": asset_id,
-                        "month": month,
-                        "year": year,
-                        **analytics_data,
-                    },
-                )
-
-            # ============== load dependencies data ===================
-            merged_df = await self.helper.load_merged_file(
-                asset_id=asset_id,
-                month=month,
-                year=year,
-                db=db,
-            )
-            usable_capacity = await self.helper.load_asset_usable_capacity(
-                asset_id=asset_id, db=db
-            )
-
             benchmark_record = await self.helper.load_tb_spread_benchmark(
                 db=db, month=month, year=year
             )
 
-            # ================== calculate analytics data ===================
-            analytics_data = self.helper.get_tb_spread_summary(
-                merged_df=merged_df,
-                usable_capacity=usable_capacity,
-                tb_spread_benchmark=benchmark_record,
-            )
-            compute_context["result"] = analytics_data
+            if not analytics_data:
+                # ============== load dependencies data ===================
+                merged_df = await self.helper.load_merged_file(
+                    asset_id=asset_id,
+                    month=month,
+                    year=year,
+                    db=db,
+                )
+                usable_capacity = await self.helper.load_asset_usable_capacity(
+                    asset_id=asset_id, db=db
+                )
+
+
+                # ================== calculate analytics data ===================
+                analytics_data = self.helper.get_tb_spread_summary(
+                    merged_df=merged_df,
+                    usable_capacity=usable_capacity,
+                    tb_spread_benchmark=benchmark_record,
+                )
+                compute_context["result"] = analytics_data
+
+            analytics_data = {
+                **analytics_data,
+                **self.helper._static_values_get_tb_spread_summary(
+                    tb_spread_benchmark=benchmark_record,
+                    tb2_capture_rate=analytics_data.get("tb2_capture_rate")
+                ),
+            }
 
             return Res.success(
                 "S-10079",
@@ -2492,35 +2508,33 @@ class AnalysisService:
 
             analytics_data = kwargs.get("analytics_data")
             compute_context = kwargs.get("compute_context")
-            if analytics_data:
-                return Res.success(
-                    "S-10080",
-                    data={
-                        "asset_id": asset_id,
-                        "month": month,
-                        "year": year,
-                        **analytics_data,
-                    },
-                )
-
-            # ============== load dependencies data ===================
-            merged_df = await self.helper.load_merged_file(
-                asset_id=asset_id,
-                month=month,
-                year=year,
-                db=db,
-            )
-
             benchmark_record = await self.helper.load_tb_spread_benchmark(
                 db=db, month=month, year=year
             )
 
-            # ============== compute data ===================
-            analytics_data = self.helper.get_tb_spread_details(
-                merged_df=merged_df,
-                tb_spread_benchmark=benchmark_record,
-            )
-            compute_context["result"] = analytics_data
+            if not analytics_data:
+                # ============== load dependencies data ===================
+                merged_df = await self.helper.load_merged_file(
+                    asset_id=asset_id,
+                    month=month,
+                    year=year,
+                    db=db,
+                )
+
+                # ============== compute data ===================
+                analytics_data = self.helper.get_tb_spread_details(
+                    merged_df=merged_df,
+                    tb_spread_benchmark=benchmark_record,
+                )
+                compute_context["result"] = analytics_data
+
+            # injecting static value in the payload since they do no contribute into analytics computation
+            analytics_data = {
+                **analytics_data,
+                **self.helper._static_values_get_tb_spread_details(
+                    tb_spread_benchmark=benchmark_record,
+                ),
+            }
 
             return Res.success(
                 "S-10080",

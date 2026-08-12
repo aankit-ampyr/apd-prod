@@ -337,7 +337,7 @@ export function AssetMarketPrices(props: AssetMarketPricesProps) {
 
   const customTooltipRenderer = (widgetId: string, yAxisLabel: string) => (data: BarDataPoint, barData?: any) => {
     return (
-      <div className="min-w-[200px] rounded-md border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)] flex flex-col gap-2">
+      <div className="min-w-[200px] rounded-md border border-border bg-white px-4 py-3 shadow-[0_10px_30px_rgba(16,19,41,0.14)] flex flex-col gap-2 chart-actions">
         <Text variant="14SB" className="mb-1 block text-[17px] font-bold text-text-primary">
           {data.label}
         </Text>

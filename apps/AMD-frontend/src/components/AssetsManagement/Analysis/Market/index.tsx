@@ -523,7 +523,7 @@ export function AssetMarket(props: MarketOptimizationProps) {
           legendRenderer={!isEpexOnlyView ? renderUtilizationLegend : undefined}
           customTooltipRenderer={({color, label, percentage, value}) => {
             return (
-              <div className="min-w-40 py-2 px-4 rounded-md bg-white! z-99999 flex flex-col gap-2 border border-border">
+              <div className="min-w-40 py-2 px-4 rounded-md bg-white! z-99999 flex flex-col gap-2 border border-border chart-actions">
                 <Text variant="16SB">{label}</Text>
                 <Text variant="14M">Periods : {value}</Text>
                 <Text variant="14M" style={{color}}>

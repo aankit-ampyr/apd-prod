@@ -308,13 +308,15 @@ export function InvoicesRevenuReconcilliation(props: AssetInvoiceAnalysisTab) {
         xAxisLabel="Revenue Stream"
         yAxisLabel="Revenue (£)"
         showLegends
+        chartMargins={{ top: 40, right: 10 }}
+        sepYChartMargins={{ top: 40 }}
         formatYAxisTick={value => formatNumber(Number(value))}
         showTooltip
         tooltipInteractionMode="item"
         customTooltipRenderer={props => {
           const {category, items} = props;
           return (
-            <div className="border flex flex-col gap-1 border-border bg-white p-4 rounded-md">
+            <div className="border flex flex-col gap-1 border-border bg-white p-4 rounded-md chart-actions">
               <Text variant="14SB">{category}</Text>
               {items.map((item, i) => (
                 <Text key={i} variant="14R" className="text-text-secondary!">
